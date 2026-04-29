@@ -1,671 +1,2428 @@
 /* ============================================================
-   app.js – Dashboard EVNHANOI / Quản lý TongHopThietBi
-   Supabase + filters + pagination + charts + CSV export
-   ============================================================ */
+   EVNHANOI Dashboard - app.js
+   Extracted from inline <script> in index.html
+   Includes: Layout Editor, Supabase data, Auth (Supabase Auth)
+============================================================ */
 
-// ── 1. SUPABASE CONFIG ───────────────────────────────────────
-const SUPABASE_URL = 'https://xqqmfmljwycpehfyknoy.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxcW1mbWxqd3ljcGVoZnlrbm95Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODM4MDQsImV4cCI6MjA4Nzg1OTgwNH0.J_z0cFqq_Yet-n2X2L_VREdkcAqbkRFpYUp-ti3Fukc';
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-const TABLE_NAME = 'TongHopThietBi';
+/* ═══════════════════════════════════════════════
+   DATA MODEL
+═══════════════════════════════════════════════ */
+const DEFS = {
+  filter: {
+    label: 'Bộ lọc', badgeClass: 'badge-filter', badgeText: 'FILTER',
+    dotColor: '#ffd740', headerColor: '#ffd740', icon: 'fas fa-filter', id: 'filterPanel',
+    defaultProps: { visible: true, sticky: true, bgColor: '#111720', borderRadius: 8, padding: 12 }
+  },
+  stats: {
+    label: 'Thông tin chung', badgeClass: 'badge-stats', badgeText: 'STATS',
+    dotColor: '#00e676', headerColor: '#00e676', icon: 'fas fa-chart-bar', id: 'statsGrid',
+    defaultProps: {
+      visible: true, sticky: false, bgColor: '#111720', borderRadius: 8, padding: 12, columns: 4, layoutStyle: 'tech-stack-3x3',
+      cards: [
+        { icon: '🏢', label: 'Tổng số TBA',           value: '—',    color: '#00e676' },
+        { icon: '🏗', label: 'TBA 220kV',              value: '—',    color: '#ff9100', ratio: true, ratioValue: '—' },
+        { icon: '⚡', label: 'TBA 110kV',              value: '—',    color: '#ff4081', ratio: true, ratioValue: '—' },
+        { icon: '🏗', label: 'Công nghệ thiết bị TBA', value: '',     color: '#40c4ff',
+          chartType: 'tech',
+          tech220: { AIS: 0, GIS: 0, HGIS: 0, HGIS_AIS: 0 },
+          tech110: { AIS: 0, GIS: 0, HGIS: 0, HGIS_AIS: 0 },
+          tech22:  { GIS: 0, KCK: 0, GIS_KCK: 0 }
+        },
+        { icon: '🔌', label: 'Tổng số thiết bị',       value: '—',    color: '#00c8ff' },
+        { icon: '⚡', label: 'Tổng công suất',          value: '—',    color: '#18ffff' },
+        { icon: '▦',  label: 'Tổng số ngăn',           value: '—',    color: '#b388ff' },
+        { icon: '↗',  label: 'Ngăn đường dây',         value: '—',    color: '#69ff47' },
+        { icon: '🔧', label: 'MBA',                value: '—',    color: '#ffd740' },
+        { icon: '↗',  label: 'Ngăn xuất tuyến',        value: '—',    color: '#ff4081' },
+        { icon: '⇄',  label: 'Ngăn liên lạc (LL)',     value: '—',    color: '#18ffff' },
+        { icon: '🔋', label: 'Ngăn tụ bù (TBN)',       value: '—',    color: '#00e676' },
+        { icon: '🔌', label: 'Ngăn tự dùng (TD)',      value: '—',    color: '#ff9100' },
+        { icon: '🧲', label: 'Ngăn kháng',              value: '—',    color: '#b388ff' },
+      ]
+    }
+  },
+  chips: {
+    label: 'Danh sách thiết bị', badgeClass: 'badge-chips', badgeText: 'CHIPS',
+    dotColor: '#b388ff', headerColor: '#b388ff', icon: 'fas fa-tags', id: 'deviceByType',
+    defaultProps: { visible: true, sticky: false, bgColor: '#111720', borderRadius: 8, padding: 12 }
+  },
+  charts: {
+    label: 'Số lượng thiết bị theo trạm', badgeClass: 'badge-charts', badgeText: 'CHARTS',
+    dotColor: '#00c8ff', headerColor: '#00c8ff', icon: 'fas fa-chart-pie', id: 'chartsRow',
+    defaultProps: { visible: true, sticky: false, bgColor: '#111720', borderRadius: 8, padding: 12, layout: '50/50' }
+  },
+  timeline: {
+    label: 'Năm sản xuất', badgeClass: 'badge-timeline', badgeText: 'TIMELINE',
+    dotColor: '#18ffff', headerColor: '#18ffff', icon: 'fas fa-stream', id: 'chartTN',
+    defaultProps: { visible: true, sticky: false, bgColor: '#111720', borderRadius: 8, padding: 12, months: 24 }
+  },
+  table: {
+    label: 'Danh sách thiết bị', badgeClass: 'badge-table', badgeText: 'TABLE',
+    dotColor: '#ff5252', headerColor: '#ff5252', icon: 'fas fa-table', id: 'tbody',
+    defaultProps: { visible: true, sticky: false, bgColor: '#111720', borderRadius: 8, padding: 12, rowsPerPage: 20, exportBtn: true }
+  }
+};
 
-// ── 2. CONSTANTS ─────────────────────────────────────────────
-const CAP_MAP = { 0: 'TT (0.4kV)', 1: '110kV', 2: '220kV', 3: '35kV', 4: '22kV', 6: '6kV', 9: '10kV' };
-const CAP_LABEL = { 0: 'TT', 1: '110kV', 2: '220kV', 3: '35kV', 4: '22kV', 6: '6kV', 9: '10kV' };
-const PAGE_SIZE = 50;
+const IC_COLORS = ['#00e676','#00c8ff','#b388ff','#ff5252','#ffd740','#18ffff','#ff9100','#ff4081','#69ff47','#40c4ff'];
 
-const PALETTE = [
-  '#3b82f6','#10b981','#f59e0b','#8b5cf6',
-  '#06b6d4','#ef4444','#ec4899','#14b8a6',
-  '#f97316','#84cc16','#a78bfa','#fb923c'
+const SAVED_LAYOUT = [
+  {
+    "type": "stats",
+    "id": "statsGrid",
+    "props": {
+      "visible": true,
+      "sticky": false,
+      "bgColor": "#111720",
+      "borderRadius": 10,
+      "padding": 14,
+      "columns": 4,
+      "layoutStyle": "tech-stack-3x3",
+      "cards": [
+        {
+          "icon": "🏢",
+          "label": "Tổng số TBA",
+          "value": "—",
+          "color": "#00e676"
+        },
+        {
+          "icon": "🏗",
+          "label": "TBA 220kV",
+          "value": "—",
+          "color": "#ff9100",
+          "ratio": true,
+          "ratioValue": "—"
+        },
+        {
+          "icon": "⚡",
+          "label": "TBA 110kV",
+          "value": "—",
+          "color": "#ff4081",
+          "ratio": true,
+          "ratioValue": "—"
+        },
+        {
+          "icon": "🏗",
+          "label": "Công nghệ thiết bị TBA",
+          "value": "",
+          "color": "#40c4ff",
+          "chartType": "tech",
+          "tech220": {
+            "AIS": 0,
+            "GIS": 0,
+            "HGIS": 0,
+            "HGIS_AIS": 0
+          },
+          "tech110": {
+            "AIS": 0,
+            "GIS": 0,
+            "HGIS": 0,
+            "HGIS_AIS": 0
+          },
+          "tech22": {
+            "GIS": 0,
+            "KCK": 0,
+            "GIS_KCK": 0
+          }
+        },
+        {
+          "icon": "🔌",
+          "label": "Tổng số thiết bị",
+          "value": "—",
+          "color": "#00c8ff"
+        },
+        {
+          "icon": "⚡",
+          "label": "Tổng công suất",
+          "value": "—",
+          "color": "#18ffff"
+        },
+        {
+          "icon": "▦",
+          "label": "Tổng số ngăn",
+          "value": "—",
+          "color": "#b388ff"
+        },
+        {
+          "icon": "↗",
+          "label": "Ngăn đường dây",
+          "value": "—",
+          "color": "#69ff47"
+        },
+        {
+          "icon": "🔧",
+          "label": "MBA",
+          "value": "—",
+          "color": "#ffd740"
+        },
+        {
+          "icon": "↗",
+          "label": "Ngăn xuất tuyến",
+          "value": "—",
+          "color": "#ff4081"
+        },
+        {
+          "icon": "⇄",
+          "label": "Ngăn liên lạc (LL)",
+          "value": "—",
+          "color": "#18ffff"
+        },
+        {
+          "icon": "🔋",
+          "label": "Ngăn tụ bù (TBN)",
+          "value": "—",
+          "color": "#00e676"
+        },
+        {
+          "icon": "🔌",
+          "label": "Ngăn tự dùng (TD)",
+          "value": "—",
+          "color": "#ff9100"
+        },
+        {
+          "icon": "🧲",
+          "label": "Ngăn kháng",
+          "value": "—",
+          "color": "#b388ff"
+        }
+      ]
+    }
+  },
+  {
+    "type": "filter",
+    "id": "filterPanel",
+    "props": {
+      "visible": true,
+      "sticky": true,
+      "bgColor": "#111720",
+      "borderRadius": 10,
+      "padding": 14
+    }
+  },
+  {
+    "type": "chips",
+    "id": "deviceByType",
+    "props": {
+      "visible": true,
+      "sticky": false,
+      "bgColor": "#111720",
+      "borderRadius": 10,
+      "padding": 14
+    }
+  },
+  {
+    "type": "charts",
+    "id": "chartsRow",
+    "props": {
+      "visible": true,
+      "sticky": false,
+      "bgColor": "#111720",
+      "borderRadius": 10,
+      "padding": 14,
+      "layout": "50/50"
+    }
+  },
+  {
+    "type": "timeline",
+    "id": "chartTN",
+    "props": {
+      "visible": true,
+      "sticky": false,
+      "bgColor": "#111720",
+      "borderRadius": 10,
+      "padding": 14,
+      "months": 24
+    }
+  }
 ];
 
-// Phân loại thiết bị loại trừ khỏi tổng số thiết bị
-// (THM, RL, TIchânsứ, HTTĐ, Dầu – theo yêu cầu)
-const EXCLUDED_PHANLOAI = ['THM', 'RL', 'HTTĐ'];
-// Hàm kiểm tra loại trừ thiết bị (dùng cho totalDevices)
-function isExcludedDevice(pl) {
-  if (!pl) return true;
-  const n = pl.trim().toUpperCase().replace(/\s+/g,'').normalize('NFC');
-  if (n === 'THM')  return true;
-  if (n === 'RL')   return true;
-  if (n === 'DẦU' || n === 'DAU' || n.startsWith('DẦU') || n.startsWith('DAU')) return true;
-  if (n.startsWith('TICHAN') || n.includes('TICHÂN') || n.includes('TICHANSỨ')) return true;
-  if (n === 'HTTĐ' || n === 'HTTD' || n.startsWith('HTTD')) return true;
-  return false;
-}
-// Phân loại thiết bị loại trừ khỏi CHIPS (không hiển thị)
-const EXCLUDED_CHIPS_PHANLOAI = new Set(['TIchânsứ', 'HTTĐ']);
-// Cap điện áp hiển thị trong CHIPS filter
-const CHIP_CAP_VALS = [2, 1, 3, 4, 9, 6, 0];
-// Thứ tự cấp ĐA giảm dần + màu nhất quán
-const CAP_ORDER  = ['2','1','3','4','9','6','0'];
-const CAP_COLORS = {'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
-// Màu công nghệ TBA
-const TECH_COLORS = {AIS:'#00c8ff', GIS:'#b388ff', HGIS:'#18ffff', HGIS_AIS:'#ff9100', GIS_KCK:'#ff9100', KCK:'#00e676'};
-
-// Helper chuẩn hoá giá trị Loai_ngan_lo — xử lý encoding khác nhau trong DB
-function normNganLoai(v) {
-  if (!v) return '';
-  // Bước 1: strip dấu tiếng Việt → ASCII, lowercase, bỏ space
-  const n = String(v).trim()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[đĐ]/g, 'd')
-    .replace(/\s+/g, '')
-    .toLowerCase();
-  return n;
-}
-// Kiểm tra một row thuộc ngăn nào (dùng normNganLoai để match mọi encoding)
-function matchLoaiNgan(v, target) {
-  // target: 'dz'|'mba'|'xt'|'ll'|'tbn'|'td'|'khang'
-  const n = normNganLoai(v);
-  switch (target) {
-    case 'dz':    return n === 'ngandz' || n === 'nganduongday' || n === 'dz';
-    case 'mba':   return n === 'nganmba';
-    case 'xt':    return n === 'nganxt' || n === 'nganxuattuyen';
-    case 'll':    return n === 'nganll' || n === 'nganlienlac';
-    case 'tbn':   return n === 'ngantbn' || n === 'ngantubun' || n === 'ngantbu';
-    case 'td':    return n === 'ngantd'  || n === 'ngantudung';
-    case 'khang': return n === 'ngankhang';
-    default:      return false;
-  }
-}
-let allData = [];
-let filteredData = [];
-let currentPage = 1;
-let sortCol = -1;
-let sortAsc = true;
-let selectedChartTram = ''; // '' = tất cả, else tên trạm cụ thể
-let deviceChart = null;
-let typeChart   = null;
-let tnChart     = null;
-
-// Chip filter selections
-let selectedPhanLoai = new Set();
-let selectedCap = new Set();
-let selectedDoi = new Set();
-
-// Filter theo Loai_ngan_lo khi click stat card ngăn
-let selectedLoaiNgan = '';
-
-// ── 4. FETCH ALL DATA ────────────────────────────────────────
-async function fetchData() {
-  // Supabase free tier limits to 1000 rows per request – paginate
-  let allRows = [];
-  let from = 0;
-  const batchSize = 1000;
-
-  while (true) {
-    const { data, error } = await supabaseClient
-      .from(TABLE_NAME)
-      .select('*')
-      .range(from, from + batchSize - 1);
-
-    if (error) { console.error('[Supabase Error]', error); return null; }
-    if (!data || data.length === 0) break;
-    allRows = allRows.concat(data);
-    if (data.length < batchSize) break;
-    from += batchSize;
-  }
-  return allRows;
+function freshLayout() {
+  return SAVED_LAYOUT.map(item => ({
+    type: item.type,
+    uid:  'uid_' + item.type,
+    props: JSON.parse(JSON.stringify(item.props))
+  }));
 }
 
-// ── 5. POPULATE FILTER DROPDOWNS ────────────────────────────
-function populateFilters(data) {
-  const doi      = [...new Set(data.map(d => d.Doi).filter(Boolean))].sort();
-  const caps     = [...new Set(data.map(d => d.Cap_dien_ap).filter(v => v !== null && v !== undefined))].sort((a,b)=>a-b);
-  const phanLoai = [...new Set(data.map(d => d.Phan_loai_thiet_bi).filter(Boolean))].sort();
-  const trams    = [...new Set(data.map(d => d.Tram).filter(Boolean))].sort();
+let layout     = freshLayout();
+normalizeLayoutState();
+let selectedUid = null;
+let dragSrcIdx  = null;
 
-  fillSelect('filterDoi',     doi,      v => v);
-  fillSelect('filterCap',     caps,     v => `${CAP_LABEL[v] || v} (cấp ${v})`);
-  fillSelect('filterPhanLoai',phanLoai, v => v);
-  fillSelect('filterTram',    trams,    v => v);
+/* ─── UNDO HISTORY ─── */
+const MAX_HISTORY = 20;
+let history   = [];   // stack of JSON snapshots
+let isModified = false;
+let layerSearchTerm = '';
+let editorViewMode = 'edit';
+const LAYOUT_DRAFT_KEY = 'evn_layout_editor_draft_v3';
+
+function normalizeSearchText(v) {
+  return String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 }
 
-function fillSelect(id, values, labelFn) {
-  const sel = document.getElementById(id);
-  const cur = sel.value;
-  // keep first "Tất cả" option
-  while (sel.options.length > 1) sel.remove(1);
-  values.forEach(v => {
-    const opt = document.createElement('option');
-    opt.value = v;
-    opt.textContent = labelFn(v);
-    sel.appendChild(opt);
+function normalizeStatsCardLabel(label) {
+  const raw = String(label || '').trim();
+  const k = normalizeSearchText(raw);
+  if (k === 'tong so tba') return 'Tổng số TBA';
+  if (k === 'tba 220kv') return 'TBA 220kV';
+  if (k === 'tba 110kv') return 'TBA 110kV';
+  if (k === 'cong nghe thiet bi tba') return 'Công nghệ thiết bị TBA';
+  if (k === 'tong so thiet bi') return 'Tổng số thiết bị';
+  if (k === 'tong cong suat (mva)' || k === 'tong cong suat') return 'Tổng công suất';
+  if (k === 'tong so ngan') return 'Tổng số ngăn';
+  if (k === 'ngan duong day') return 'Ngăn đường dây';
+  if (k === 'ngan mba' || k === 'mba') return 'MBA';
+  if (k === 'ngan xt' || k === 'ngan xuat tuyen' || k === 'ngan xuat tuyen (xt)') return 'Ngăn xuất tuyến';
+  if (k === 'ngan lien lac (ll)' || k === 'ngan lien lac' || k === 'ngan ll') return 'Ngăn liên lạc (LL)';
+  if (k === 'ngan tu bu (tbn)' || k === 'ngan tu bu' || k === 'ngan tbn') return 'Ngăn tụ bù (TBN)';
+  if (k === 'ngan tu dung (td)' || k === 'ngan tu dung' || k === 'ngantd') return 'Ngăn tự dùng (TD)';
+  if (k === 'ngan khang') return 'Ngăn kháng';
+  return raw;
+}
+
+function normalizeStatsLayoutItem(item) {
+  if (!item || item.type !== 'stats' || !item.props) return item;
+  item.props.columns = 4;
+  item.props.layoutStyle = 'tech-stack-3x3';
+  if (!Array.isArray(item.props.cards)) return item;
+
+  const desiredOrder = [
+    'Tổng số TBA',
+    'TBA 220kV',
+    'TBA 110kV',
+    'Công nghệ thiết bị TBA',
+    'Tổng số thiết bị',
+    'Tổng công suất',
+    'Tổng số ngăn',
+    'Ngăn đường dây',
+    'MBA',
+    'Ngăn xuất tuyến',
+    'Ngăn liên lạc (LL)',
+    'Ngăn tụ bù (TBN)',
+    'Ngăn tự dùng (TD)',
+    'Ngăn kháng'
+  ];
+
+  const cardsByLabel = new Map();
+  const extras = [];
+  item.props.cards.forEach(card => {
+    const normalizedLabel = normalizeStatsCardLabel(card.label);
+    card.label = normalizedLabel;
+    if (normalizedLabel === 'Công nghệ thiết bị TBA') card.chartType = 'tech';
+    if (!cardsByLabel.has(normalizedLabel)) cardsByLabel.set(normalizedLabel, card);
+    else extras.push(card);
   });
-  sel.value = cur;
+
+  const reordered = [];
+  desiredOrder.forEach(label => {
+    if (cardsByLabel.has(label)) reordered.push(cardsByLabel.get(label));
+  });
+  extras.forEach(card => reordered.push(card));
+  item.props.cards = reordered;
+  return item;
 }
 
-// ── 6. APPLY FILTERS ────────────────────────────────────────
-// Lọc theo Loai_ngan_lo khi click stat card ngăn
-function filterByLoaiNgan(loai) {
-  // Toggle: click lại thì bỏ lọc
-  selectedLoaiNgan = selectedLoaiNgan === loai ? '' : loai;
-  // Highlight card đang active
-  document.querySelectorAll('.stat-card-ngan').forEach(el => {
-    el.classList.toggle('stat-card-active', el.dataset.ngan === selectedLoaiNgan);
-  });
-  applyFilters();
-  // Cuộn xuống bảng
-  if (selectedLoaiNgan) {
-    setTimeout(() => {
-      const tbl = document.querySelector('.data-table');
-      if (tbl) tbl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 150);
+function normalizeLayoutState() {
+  layout = (Array.isArray(layout) ? layout : []).map(item => normalizeStatsLayoutItem(item));
+}
+
+function isTypingContext(el) {
+  if (!el) return false;
+  const tag = (el.tagName || '').toLowerCase();
+  return el.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select';
+}
+
+function persistDraft() {
+  try {
+    // Loại bỏ card.value tính toán động (công suất, ngăn...) trước khi lưu draft
+    // để tránh hiển thị giá trị cũ khi load lại trang
+    const cleanLayout = layout.map(item => {
+      if (item.type !== 'stats') return item;
+      return {
+        ...item,
+        props: {
+          ...item.props,
+          cards: (item.props.cards || []).map(card => {
+            // Giữ nguyên cấu trúc nhưng reset value về '—' để force recompute
+            const { value: _v, ratioValue: _r, ...rest } = card;
+            return { ...rest, value: '—' };
+          })
+        }
+      };
+    });
+    localStorage.setItem(LAYOUT_DRAFT_KEY, JSON.stringify({ layout: cleanLayout, selectedUid, ts: Date.now() }));
+  } catch (err) {
+    console.warn('persistDraft failed', err);
   }
 }
 
-function applyFilters() {
-  const doi      = document.getElementById('filterDoi').value;
-  const cap      = document.getElementById('filterCap').value;
-  const phanLoai = document.getElementById('filterPhanLoai').value;
-  const tram     = document.getElementById('filterTram').value;
-  const q        = document.getElementById('searchInput').value.trim().toLowerCase();
-
-  filteredData = allData.filter(d => {
-    if (doi      && d.Doi !== doi)                              return false;
-    if (cap      && String(d.Cap_dien_ap) !== String(cap))     return false;
-    if (phanLoai && d.Phan_loai_thiet_bi !== phanLoai)        return false;
-    if (tram     && d.Tram !== tram)                           return false;
-    // Chip filter: phân loại thiết bị
-    if (selectedPhanLoai.size > 0) {
-      const pl = (d.Phan_loai_thiet_bi || '').trim();
-      if (!selectedPhanLoai.has(pl)) return false;
-    }
-    // Filter ngăn theo Loai_ngan_lo (click từ stat card)
-    if (selectedLoaiNgan) {
-      if (normNganLoai(d.Loai_ngan_lo) !== normNganLoai(selectedLoaiNgan)) return false;
-    }
-    if (q) {
-      const haystack = [d.Tram, d.Ten_thiet_bi, d.Ngan_thiet_bi,
-                        d.Phan_loai_thiet_bi, d.Doi, d.Hang_san_xuat]
-        .map(v => (v || '').toLowerCase()).join(' ');
-      if (!haystack.includes(q)) return false;
-    }
-    return true;
-  });
-
-  currentPage = 1;
-  renderStats(filteredData);
-  renderTypeChips();
-  populateChartTramSelect(filteredData);
-  renderBarChart(filteredData);
-  renderPieChart(filteredData);
-  renderTNTimeline(filteredData);
-  renderTable(filteredData);
-  renderPagination();
-  renderActiveFilters({ doi, cap, phanLoai, tram, q });
+function clearDraft() {
+  try { localStorage.removeItem(LAYOUT_DRAFT_KEY); } catch (err) {}
 }
 
-function resetFilters() {
-  ['filterDoi','filterCap','filterPhanLoai','filterTram'].forEach(id => {
-    document.getElementById(id).value = '';
-  });
-  document.getElementById('searchInput').value = '';
-  selectedPhanLoai.clear();
-  selectedLoaiNgan = '';
-  document.querySelectorAll('.stat-card-ngan').forEach(el => el.classList.remove('stat-card-active'));
-  applyFilters();
-}
+function restoreDraftIfAvailable() {
+  try {
+    const raw = localStorage.getItem(LAYOUT_DRAFT_KEY);
+    if (!raw) return;
+    const draft = JSON.parse(raw);
+    if (!draft || !Array.isArray(draft.layout)) return;
 
-function renderActiveFilters({ doi, cap, phanLoai, tram, q }) {
-  const row   = document.getElementById('activeFilterRow');
-  const chips = document.getElementById('activeFilterChips');
-  const filters = [];
-  if (doi)             filters.push({ label: `Đội: ${doi}`, key: 'filterDoi' });
-  if (cap)             filters.push({ label: `Cấp: ${CAP_LABEL[cap] || cap}`, key: 'filterCap' });
-  if (phanLoai)        filters.push({ label: `Loại: ${phanLoai}`, key: 'filterPhanLoai' });
-  if (tram)            filters.push({ label: `Trạm: ${tram}`, key: 'filterTram' });
-  if (q)               filters.push({ label: `"${q}"`, key: 'searchInput' });
-  if (selectedLoaiNgan) filters.push({ label: `Ngăn: ${selectedLoaiNgan}`, key: '_loaiNgan' });
-
-  if (!filters.length) { row.style.display = 'none'; return; }
-  row.style.display = 'flex';
-  chips.innerHTML = '';
-  filters.forEach(f => {
-    const chip = document.createElement('div');
-    chip.className = 'active-chip';
-    chip.innerHTML = `${f.label} <i class="fas fa-times"></i>`;
-    chip.onclick = () => {
-      if (f.key === '_loaiNgan') {
-        selectedLoaiNgan = '';
-        document.querySelectorAll('.stat-card-ngan').forEach(el => el.classList.remove('stat-card-active'));
-        applyFilters();
-      } else {
-        const el = document.getElementById(f.key);
-        if (el) el.value = '';
-        applyFilters();
-      }
-    };
-    chips.appendChild(chip);
-  });
-}
-
-// ── 7. RENDER STATS ──────────────────────────────────────────
-function renderStats(data) {
-  const tf = d => d.Tram || '';
-
-  // ── TBA counts ──
-  // Dùng allData để xác định maxCap của từng trạm:
-  // Thiết bị 110kV ở trạm 220kV vẫn tính là trạm 220kV
-  const capPrioR = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
-  const tramMaxCapR = {};
-  allData.forEach(d => {
-    const tram = tf(d); if (!tram) return;
-    const cap = String(d.Cap_dien_ap);
-    if (!tramMaxCapR[tram] || (capPrioR[cap]??99) < (capPrioR[tramMaxCapR[tram]]??99))
-      tramMaxCapR[tram] = cap;
-  });
-
-  // Tập hợp các trạm xuất hiện trong data (filteredData hoặc allData)
-  const filteredTrams = new Set(data.map(tf).filter(Boolean));
-  const totalTBA = filteredTrams.size;
-  const n220 = [...filteredTrams].filter(t => tramMaxCapR[t] === '2').length;
-  const n110 = [...filteredTrams].filter(t => tramMaxCapR[t] === '1').length;
-
-  // ── Tổng số thiết bị: sum So_luong, bỏ THM, RL, TIchânsứ, HTTĐ, Dầu ──
-  const totalDevices = data
-    .filter(d => !isExcludedDevice(d.Phan_loai_thiet_bi))
-    .reduce((s, d) => s + (Number(d.So_luong) || 0), 0);
-
-  // ── Tổng công suất: chỉ Phan_loai_thiet_bi = 'MBA' exact (bỏ MBATD, MBA,, MBA  ...) ──
-  const tongCongSuat = data
-    .filter(d => (d.Phan_loai_thiet_bi || '').trim().replace(/\W/g, '').toUpperCase() === 'MBA')
-    .reduce((s, d) => s + (Number(d.Cong_suat) || 0), 0);
-
-  // ── Tổng số ngăn: đếm Ngan_thiet_bi unique theo Tram, KHÔNG tính HTTĐ ──
-  const nganSet = new Set();
-  data.forEach(d => {
-    if (d.Ngan_thiet_bi && d.Tram) {
-      // Loại HTTĐ ra khỏi đếm ngăn
-      const pl = (d.Phan_loai_thiet_bi || '').trim().toUpperCase().replace(/\s+/g,'').normalize('NFC');
-      if (pl === 'HTTĐ' || pl === 'HTTD' || pl.startsWith('HTTD')) return;
-      nganSet.add(`${d.Tram}|||${d.Ngan_thiet_bi}`);
+    // Lọc chặt: chỉ giữ item hợp lệ (không null, có type + uid + props)
+    const validItems = draft.layout.filter(item =>
+      item && typeof item === 'object' && item.type && item.uid && item.props
+    );
+    if (validItems.length === 0) {
+      console.warn('[restoreDraft] Draft không có item hợp lệ — dùng fresh layout');
+      clearDraft();
+      return;
     }
-  });
-  const totalNgan = nganSet.size;
 
-  // ── Ngăn đường dây ──
-  const nganDLSet = new Set();
-  data.filter(d => matchLoaiNgan(d.Loai_ngan_lo, 'dz'))
-      .forEach(d => { if (d.Tram && d.Ngan_thiet_bi) nganDLSet.add(`${d.Tram}|||${d.Ngan_thiet_bi}`); });
-  const nganDuongDay = nganDLSet.size;
-
-  // ── Ngăn MBA: đếm unique Ngan_thiet_bi có Phan_loai_thiet_bi = 'MBA' exact ──
-  const nganMBASet = new Set();
-  data.filter(d => (d.Phan_loai_thiet_bi || '').trim() === 'MBA')
-      .forEach(d => { if (d.Tram && d.Ngan_thiet_bi) nganMBASet.add(`${d.Tram}|||${d.Ngan_thiet_bi}`); });
-  const nganMBA = nganMBASet.size;
-
-  // ── Ngăn XT ──
-  const nganXTSet = new Set();
-  data.filter(d => matchLoaiNgan(d.Loai_ngan_lo, 'xt'))
-      .forEach(d => { if (d.Tram && d.Ngan_thiet_bi) nganXTSet.add(`${d.Tram}|||${d.Ngan_thiet_bi}`); });
-  const nganXT = nganXTSet.size;
-
-  // ── Ngăn liên lạc ──
-  const nganLLSet = new Set();
-  data.filter(d => matchLoaiNgan(d.Loai_ngan_lo, 'll'))
-      .forEach(d => { if (d.Tram && d.Ngan_thiet_bi) nganLLSet.add(`${d.Tram}|||${d.Ngan_thiet_bi}`); });
-  const nganLL = nganLLSet.size;
-
-  // ── Ngăn tụ bù ──
-  const nganTBNSet = new Set();
-  data.filter(d => matchLoaiNgan(d.Loai_ngan_lo, 'tbn'))
-      .forEach(d => { if (d.Tram && d.Ngan_thiet_bi) nganTBNSet.add(`${d.Tram}|||${d.Ngan_thiet_bi}`); });
-  const nganTBN = nganTBNSet.size;
-
-  // ── Ngăn tự dùng ──
-  const nganTDSet = new Set();
-  data.filter(d => matchLoaiNgan(d.Loai_ngan_lo, 'td'))
-      .forEach(d => { if (d.Tram && d.Ngan_thiet_bi) nganTDSet.add(`${d.Tram}|||${d.Ngan_thiet_bi}`); });
-  const nganTD = nganTDSet.size;
-
-  // ── Ngăn kháng ──
-  const nganKhangSet = new Set();
-  data.filter(d => matchLoaiNgan(d.Loai_ngan_lo, 'khang'))
-      .forEach(d => { if (d.Tram && d.Ngan_thiet_bi) nganKhangSet.add(`${d.Tram}|||${d.Ngan_thiet_bi}`); });
-  const nganKhang = nganKhangSet.size;
-
-  // ── Công nghệ TBA ──
-  // Bước 1: Thu thập tất cả Phan_loai_thiet_bi theo từng trạm và cấp điện áp
-  // tramCapTypes[tram][cap] = Set of Phan_loai_thiet_bi
-  const tramCapTypes = {};
-  data.forEach(d => {
-    const tram = tf(d);
-    const cap  = String(d.Cap_dien_ap);
-    const pl   = (d.Phan_loai_thiet_bi || '').trim().toUpperCase();
-    if (!tram || !pl) return;
-    if (!tramCapTypes[tram]) tramCapTypes[tram] = {};
-    if (!tramCapTypes[tram][cap]) tramCapTypes[tram][cap] = new Set();
-    tramCapTypes[tram][cap].add(pl);
-  });
-
-  // Bước 2: Với mỗi trạm có cap 1 hoặc 2 → xác định cấp hiệu lực (220 > 110)
-  // rồi phân loại công nghệ dựa vào Phan_loai_thiet_bi của cấp hiệu lực đó
-  // Quy tắc phân loại (1 trạm = 1 TBA):
-  //   - có HGIS + MC/AIS trong cùng cấp → HGIS-AIS (hỗn hợp)
-  //   - chỉ có HGIS                     → HGIS
-  //   - chỉ có GIS (không HGIS)         → GIS
-  //   - còn lại (MC, AIS, ...)          → AIS
-  function classifyTech(typeSet) {
-    // typeSet chứa Phan_loai_thiet_bi (uppercase) của trạm ở cấp hiệu lực
-    const arr = [...typeSet];
-    const hasGIS  = arr.some(t => t === 'GIS');
-    const hasHGIS = arr.some(t => t === 'HGIS');
-    const hasMC   = arr.some(t => t === 'MC');
-    if (hasHGIS && hasMC) return 'HGIS_AIS';
-    if (hasGIS  && hasMC) return 'HGIS_AIS';
-    if (hasHGIS)          return 'HGIS';
-    if (hasGIS)           return 'GIS';
-    return 'AIS';
-}
-
-  const tech220 = { AIS: 0, GIS: 0, HGIS: 0, HGIS_AIS: 0 };
-  const tech110 = { AIS: 0, GIS: 0, HGIS: 0, HGIS_AIS: 0 };
-  // tech22 gộp cả cap 4(22kV) và cap 3(35kV)
-  const tech22 = { GIS: 0, KCK: 0, GIS_KCK: 0 };
-
-  const countedTramsHV = new Set();
-
-  // 22-35kV: cùng logic — GIS/HGIS/MC exact match
-  function classifyLV(typeSet) {
-    const arr = [...typeSet];
-    const hasGIS  = arr.some(t => t === 'GIS');
-    const hasHGIS = arr.some(t => t === 'HGIS');
-    const hasMC   = arr.some(t => t === 'MC');
-    if (hasHGIS && hasMC) return 'GIS_KCK';
-    if (hasGIS  && hasMC) return 'GIS_KCK';
-    if (hasHGIS || hasGIS) return 'GIS';
-    return 'KCK';
-  }
-
-  Object.entries(tramCapTypes).forEach(([tram, capMap]) => {
-    // HV: 220kV ưu tiên
-    const effCap = capMap['2'] ? '2' : capMap['1'] ? '1' : null;
-    if (effCap && !countedTramsHV.has(tram)) {
-      countedTramsHV.add(tram);
-      const cls = classifyTech(capMap[effCap]);
-      if (effCap === '2') tech220[cls] = (tech220[cls] || 0) + 1;
-      else                tech110[cls] = (tech110[cls] || 0) + 1;
-    }
-    // LV: cap 4 (22kV) và cap 3 (35kV) — gộp chung vào tech22
-    const lvCaps = ['4', '3'].filter(c => capMap[c]);
-    if (lvCaps.length > 0) {
-      // Gộp tất cả types của các cap thấp
-      const lvTypes = new Set();
-      lvCaps.forEach(cap => capMap[cap].forEach(t => lvTypes.add(t)));
-      const cls = classifyLV(lvTypes);
-      tech22[cls] = (tech22[cls] || 0) + 1;
-    }
-  });
-
-  const fmt = n => Number(n).toLocaleString('vi-VN');
-  const pct = (a, b) => b > 0 ? ((a / b) * 100).toFixed(1) + '%' : '—';
-
-  setText('totalStations', fmt(totalTBA));
-  setText('total110kV',    fmt(n110));
-  setText('ratio110kV',    pct(n110, totalTBA));
-  setText('total220kV',    fmt(n220));
-  setText('ratio220kV',    pct(n220, totalTBA));
-  setText('totalDevices',  fmt(totalDevices));
-  setText('totalNgan',     fmt(totalNgan));
-  setText('nganDuongDay',  fmt(nganDuongDay));
-  setText('nganMBA',       fmt(nganMBA));
-  setText('nganXT',        fmt(nganXT));
-  setText('nganLL',        fmt(nganLL));
-  setText('nganTBN',       fmt(nganTBN));
-  setText('nganTD',        fmt(nganTD));
-  setText('nganKhang',     fmt(nganKhang));
-  setText('tongCongSuat',  fmt(Math.round(tongCongSuat)));
-  // Công nghệ TBA – render bảng chi tiết
-  renderTechTable(tech220, tech110, tech22);
-}
-
-
-// ── 7b. RENDER TECH TABLE ────────────────────────────────────
-// Hiển thị bảng công nghệ TBA với filter 220kV / 110kV / 22kV
-let techFilter = 'all'; // 'all' | '220' | '110' | '22'
-
-function renderTechTable(tech220, tech110, tech22) {
-  window._techData = { tech220, tech110, tech22 };
-  _renderTechDisplay(tech220, tech110, tech22);
-}
-
-function setTechFilter(f) { setTechHVFilter(f); } // legacy alias
-
-function setTechHVFilter(f) {
-  window._hvFilterStat = f;
-  // Update dropdown if present
-  const sel = document.querySelector('.tech-hv-select');
-  if (sel) sel.value = f;
-  if (window._techData) {
-    _renderTechDisplay(window._techData.tech220, window._techData.tech110, window._techData.tech22);
+    layout = validItems.map(item => {
+      // Xóa card.value cũ của stats section — sẽ được recompute sau khi data load
+      if (item.type !== 'stats') return item;
+      return {
+        ...item,
+        props: {
+          ...item.props,
+          cards: (item.props.cards || []).map(card => ({ ...card, value: '—', ratioValue: undefined }))
+        }
+      };
+    });
+    normalizeLayoutState();
+    selectedUid = draft.selectedUid || null;
+    isModified = true;
+    updateModifiedUI();
+    showToast('↺ Đã khôi phục bản nháp gần nhất (' + validItems.length + ' sections)');
+  } catch (err) {
+    console.warn('restoreDraft failed', err);
+    clearDraft();  // xoá draft hỏng, dùng fresh layout
   }
 }
 
-function _renderTechDisplay(tech220, tech110, tech22) {
-  const box = document.getElementById('techTBABox');
-  if (!box) return;
-  const fmt = n => Number(n).toLocaleString('vi-VN');
+function filterLayers(term) {
+  layerSearchTerm = String(term || '');
+  const clearBtn = document.getElementById('layerSearchClear');
+  if (clearBtn) clearBtn.style.opacity = layerSearchTerm ? '1' : '0.55';
+  renderLayers();
+}
 
-  function barItem(cls, label, val, maxVal) {
-    const pct = maxVal > 0 ? Math.round((val / maxVal) * 100) : 0;
-    return `<div class="tech-bar-item">
-      <div class="tech-bar-header">
-        <span class="tech-bar-label ${cls}">${label}</span>
-        <span class="tech-bar-num ${cls}">${fmt(val)}</span>
+function clearLayerSearch() {
+  layerSearchTerm = '';
+  const input = document.getElementById('layerSearchInput');
+  if (input) input.value = '';
+  renderLayers();
+}
+
+function getSelectedIndex() {
+  return layout.findIndex(l => l.uid === selectedUid);
+}
+
+function selectRelativeSection(step) {
+  if (!layout.length) return;
+  let idx = getSelectedIndex();
+  if (idx < 0) idx = step > 0 ? -1 : 1;
+  idx = Math.max(0, Math.min(layout.length - 1, idx + step));
+  const target = layout[idx];
+  if (target) selectSection(target.uid);
+}
+
+function saveToHistory() {
+  history.push(JSON.stringify(layout));
+  if (history.length > MAX_HISTORY) history.shift();
+  markModified();
+  updateHistoryUI();
+}
+
+function undoLayout() {
+  if (!history.length) return;
+  layout = JSON.parse(history.pop());
+  if (!history.length) { isModified = false; updateModifiedUI(); }
+  render();
+  updateHistoryUI();
+  showToast('↩ Đã hoàn tác');
+}
+
+function markModified() {
+  isModified = true;
+  updateModifiedUI();
+  persistDraft();
+}
+
+function updateModifiedUI() {
+  document.getElementById('unsavedDot').classList.toggle('visible', isModified);
+}
+
+function updateHistoryUI() {
+  const n = history.length;
+  const btn  = document.getElementById('btnUndo');
+  const hBtn = document.getElementById('histBtn');
+  const lbl  = document.getElementById('histLabel');
+  if (btn)  btn.disabled  = n === 0;
+  if (hBtn) hBtn.disabled = n === 0;
+  if (lbl)  lbl.textContent = n === 0 ? '0 thao tác' : `${n} thao tác`;
+}
+
+function getVisibleLayout() {
+  return layout.filter(item => item && item.props && item.props.visible);
+}
+
+function analyzeLayoutUX() {
+  const visibleItems = getVisibleLayout();
+  const scorecard = { score: 100, strengths: [], issues: [] };
+  const orderIdeal = ['filter', 'stats', 'chips', 'charts', 'timeline', 'table'];
+  const stickyCount = layout.filter(item => item.props && item.props.sticky).length;
+  const hiddenCount = layout.filter(item => item.props && !item.props.visible).length;
+  const visibleOrder = visibleItems.map(item => item.type);
+  const expectedOrder = orderIdeal.filter(type => visibleOrder.includes(type));
+  const liveRows = Array.isArray(_chipAllData) ? _chipAllData.length : 0;
+  const liveFiltered = Array.isArray(_chipFiltered) ? _chipFiltered.length : 0;
+  const liveStations = new Set((_chipFiltered.length ? _chipFiltered : _chipAllData).map(d => (d.Tram || '').trim()).filter(Boolean)).size;
+  const liveTypes = new Set((_chipFiltered.length ? _chipFiltered : _chipAllData).map(d => (d.Phan_loai_thiet_bi || '').trim()).filter(Boolean)).size;
+  const isDataLoaded = liveRows > 0;
+
+  const filterItem = layout.find(item => item.type === 'filter');
+  if (!filterItem || !filterItem.props.visible) {
+    scorecard.score -= 20;
+    scorecard.issues.push({
+      title: 'Thiếu bộ lọc ở đầu trang',
+      detail: 'Người dùng vận hành cần lọc nhanh trước khi xem thống kê và bảng. Nên đặt section Bộ lọc lên đầu và luôn bật hiển thị.',
+      tone: 'warn'
+    });
+  } else {
+    scorecard.strengths.push('Bộ lọc đã hiện diện trên layout.');
+    if (!filterItem.props.sticky) {
+      scorecard.score -= 8;
+      scorecard.issues.push({
+        title: 'Bộ lọc chưa được ghim',
+        detail: 'Khi cuộn sâu xuống bảng và biểu đồ, người dùng khó quay lại để chỉnh bộ lọc. Nên để Bộ lọc ở chế độ sticky.',
+        tone: 'warn'
+      });
+    } else {
+      scorecard.strengths.push('Bộ lọc đang được ghim khi cuộn.');
+    }
+  }
+
+  const orderMismatch = visibleOrder.reduce((sum, type, idx) => sum + (expectedOrder[idx] === type ? 0 : 1), 0);
+  if (orderMismatch > 0) {
+    scorecard.score -= Math.min(14, orderMismatch * 3);
+    scorecard.issues.push({
+      title: 'Thứ tự section chưa tối ưu cho hành vi đọc',
+      detail: 'Nên đi theo luồng: Bộ lọc → Tổng quan → Thiết bị → Biểu đồ → Timeline → Bảng chi tiết để giảm nhảy mắt.',
+      tone: 'info'
+    });
+  } else if (visibleOrder.length) {
+    scorecard.strengths.push('Luồng đọc đang đi từ tổng quan đến chi tiết.');
+  }
+
+  if (stickyCount > 1) {
+    scorecard.score -= Math.min(12, (stickyCount - 1) * 5);
+    scorecard.issues.push({
+      title: 'Có quá nhiều section sticky',
+      detail: 'Nhiều khối được ghim sẽ làm dashboard bị chiếm chiều cao và mất vùng nhìn dữ liệu.',
+      tone: 'warn'
+    });
+  }
+
+  if (hiddenCount > 0) {
+    scorecard.score -= Math.min(10, hiddenCount * 3);
+    scorecard.issues.push({
+      title: 'Một số section đang bị ẩn',
+      detail: 'Nếu đây là layout giao cho người dùng cuối, nên chỉ ẩn khi thật sự không dùng đến để tránh bỏ sót thông tin.',
+      tone: 'info'
+    });
+  }
+
+  const paddingSet = new Set(visibleItems.map(item => Number(item.props.padding || 0)));
+  if (paddingSet.size > 2) {
+    scorecard.score -= 6;
+    scorecard.issues.push({
+      title: 'Khoảng đệm giữa các khối chưa đồng nhất',
+      detail: 'Padding không đồng đều làm cảm giác layout rời rạc. Nên chuẩn hóa quanh 12–14px.',
+      tone: 'info'
+    });
+  }
+
+  const radiusSet = new Set(visibleItems.map(item => Number(item.props.borderRadius || 0)));
+  if (radiusSet.size > 2) {
+    scorecard.score -= 5;
+    scorecard.issues.push({
+      title: 'Border radius chưa nhất quán',
+      detail: 'Nên dùng cùng một ngôn ngữ bo góc để giao diện nhìn đồng bộ hơn.',
+      tone: 'info'
+    });
+  }
+
+  const statsItem = layout.find(item => item.type === 'stats');
+  if (statsItem) {
+    const cards = Array.isArray(statsItem.props.cards) ? statsItem.props.cards.length : 0;
+    if (cards > 8) {
+      scorecard.score -= 6;
+      scorecard.issues.push({
+        title: 'Khối thống kê đang khá dày',
+        detail: 'Nhiều ô stats cùng lúc làm người dùng khó quét số chính. Ưu tiên 4–8 KPI quan trọng nhất ở phía trên.',
+        tone: 'warn'
+      });
+    }
+    if (Number(statsItem.props.columns || 0) > 4) {
+      scorecard.score -= 5;
+      scorecard.issues.push({
+        title: 'Stats đang chia quá nhiều cột',
+        detail: '5 cột trở lên làm chữ và số hẹp trên màn hình phổ biến. 4 cột thường dễ đọc hơn.',
+        tone: 'info'
+      });
+    } else {
+      scorecard.strengths.push('Khối stats giữ độ rộng ô vừa phải.');
+    }
+  }
+
+  const chartsItem = layout.find(item => item.type === 'charts');
+  if (chartsItem && chartsItem.props.layout !== '50/50') {
+    scorecard.score -= 4;
+    scorecard.issues.push({
+      title: 'Bố cục chart chưa cân bằng',
+      detail: 'Biểu đồ so sánh theo trạm và theo loại thiết bị nên chia 50/50 để người dùng quét ngang thuận hơn.',
+      tone: 'info'
+    });
+  }
+
+  const tableItem = layout.find(item => item.type === 'table');
+  if (tableItem) {
+    const rows = Number(tableItem.props.rowsPerPage || 20);
+    if (rows < 10 || rows > 25) {
+      scorecard.score -= 4;
+      scorecard.issues.push({
+        title: 'Số dòng mặc định của bảng chưa cân bằng',
+        detail: 'Dưới 10 dòng làm mất ngữ cảnh, trên 25 dòng làm bảng quá dài. Khoảng 20 dòng là mức dễ theo dõi hơn.',
+        tone: 'info'
+      });
+    }
+  }
+
+  if (isDataLoaded) {
+    scorecard.strengths.push(`Đang chấm trên dữ liệu thực: ${liveFiltered.toLocaleString('vi-VN')}/${liveRows.toLocaleString('vi-VN')} dòng, ${liveStations.toLocaleString('vi-VN')} trạm.`);
+    const filterActive = _chipFiltered.length && _chipFiltered.length < _chipAllData.length;
+    if (filterActive) {
+      scorecard.strengths.push('Điểm UX đã phản ánh đúng ngữ cảnh lọc hiện tại.');
+    }
+    if (liveStations > 60 && chartsItem?.props?.visible) {
+      scorecard.score -= 8;
+      scorecard.issues.push({
+        title: 'Dữ liệu chart đang dày',
+        detail: `Đang có ${liveStations.toLocaleString('vi-VN')} trạm hiển thị. Nên dùng xem nhanh, top list hoặc mở heatmap khi thật sự cần.`,
+        tone: 'warn'
+      });
+    }
+    if (liveTypes > 18 && layout.find(item => item.type === 'chips')?.props?.visible) {
+      scorecard.score -= 5;
+      scorecard.issues.push({
+        title: 'Danh sách loại thiết bị khá nhiều',
+        detail: `Có ${liveTypes.toLocaleString('vi-VN')} phân loại thiết bị. Nên ưu tiên chip đang hoạt động hoặc nhóm theo cấp điện áp để giảm tải quét mắt.`,
+        tone: 'info'
+      });
+    }
+    if (liveFiltered === 0) {
+      scorecard.score -= 10;
+      scorecard.issues.push({
+        title: 'Layout hiện không có dữ liệu sau lọc',
+        detail: 'Điểm UX giảm vì người dùng sẽ nhìn thấy trạng thái rỗng. Cần kiểm tra lại bộ lọc hoặc thêm gợi ý xóa lọc.',
+        tone: 'warn'
+      });
+    }
+  } else {
+    scorecard.issues.push({
+      title: 'Chưa có dữ liệu thực để chấm sâu',
+      detail: 'Điểm hiện tại mới dựa trên cấu hình layout. Khi dữ liệu tải xong, điểm sẽ phản ánh sát thực tế hơn.',
+      tone: 'info'
+    });
+    scorecard.score -= 4;
+  }
+
+  if (!scorecard.issues.length) {
+    scorecard.strengths.push('Layout đang khá sạch và có thể giao thử nghiệm cho người dùng cuối.');
+  }
+
+  scorecard.score = Math.max(52, Math.min(100, Math.round(scorecard.score)));
+  scorecard.visibleCount = visibleItems.length;
+  scorecard.hiddenCount = hiddenCount;
+  scorecard.stickyCount = stickyCount;
+  scorecard.dataRows = liveRows;
+  scorecard.dataRowsFiltered = liveFiltered;
+  scorecard.stationCount = liveStations;
+  return scorecard;
+}
+
+function renderUXAudit() {
+  const box = document.getElementById('uxAuditPanel');
+  const badge = document.getElementById('uxScoreBadge');
+  if (!box || !badge) return;
+  const audit = analyzeLayoutUX();
+  const tone = audit.score >= 88 ? 'good' : audit.score >= 74 ? 'warn' : 'bad';
+  badge.className = 'ux-score-chip ' + tone;
+  badge.innerHTML = `<i class="fas fa-sparkles"></i> UX ${audit.score}/100`;
+
+  const issueHtml = (audit.issues.length ? audit.issues.slice(0, 4) : [{
+    title: 'Không phát hiện vấn đề lớn',
+    detail: 'Bản layout hiện tại đã đi đúng mạch lọc → tổng quan → chi tiết. Bạn có thể chuyển sang Xem trước để kiểm thử nhanh.',
+    tone: 'info'
+  }]).map(item => `
+    <div class="ux-issue-item ${item.tone || 'info'}">
+      <strong>${item.title}</strong>
+      <span>${item.detail}</span>
+    </div>
+  `).join('');
+
+  const pillHtml = [
+    ...audit.strengths.slice(0, 2).map(text => `<span class="ux-pill good"><i class="fas fa-check"></i>${text}</span>`),
+    ...audit.issues.slice(0, 2).map(text => `<span class="ux-pill warn"><i class="fas fa-triangle-exclamation"></i>${text.title}</span>`)
+  ].join('');
+
+  box.innerHTML = `
+    <div class="ux-score-card">
+      <div class="ux-score-head">
+        <span class="ux-score-label">Đánh giá hiện tại</span>
+        <span class="ux-score-value">${audit.score}</span>
       </div>
-      <div class="tech-bar-track"><div class="tech-bar-fill ${cls}" style="width:${pct}%"></div></div>
+      <div class="ux-score-meta">Tự động chấm theo cấu trúc layout và dữ liệu thực đang tải: mật độ trạm, trạng thái lọc và mức dễ quét của dashboard.</div>
+      <div class="ux-mini-metrics">
+        <div class="ux-mini-metric">
+          <span class="lbl">Đang hiển thị</span>
+          <span class="val">${audit.visibleCount}</span>
+        </div>
+        <div class="ux-mini-metric">
+          <span class="lbl">Đang ẩn</span>
+          <span class="val">${audit.hiddenCount}</span>
+        </div>
+        <div class="ux-mini-metric">
+          <span class="lbl">Sticky</span>
+          <span class="val">${audit.stickyCount}</span>
+        </div>
+        <div class="ux-mini-metric">
+          <span class="lbl">Dòng dữ liệu</span>
+          <span class="val">${(audit.dataRowsFiltered || audit.dataRows || 0).toLocaleString('vi-VN')}</span>
+        </div>
+      </div>
+    </div>
+    <div class="ux-review-card">
+      <div class="ux-review-head">
+        <span class="ux-review-title">Nhận xét & gợi ý áp dụng ngay</span>
+        <button class="btn btn-primary" type="button" onclick="autoOptimizeLayout()"><i class="fas fa-wand-magic-sparkles"></i> Tối ưu</button>
+      </div>
+      <div class="ux-pill-row">${pillHtml}</div>
+      <div class="ux-issue-list">${issueHtml}</div>
+    </div>
+  `;
+}
+
+function setViewMode(mode) {
+  editorViewMode = mode === 'preview' ? 'preview' : 'edit';
+  document.body.classList.toggle('preview-mode', editorViewMode === 'preview');
+  const editBtn = document.getElementById('viewEditBtn');
+  const previewBtn = document.getElementById('viewPreviewBtn');
+  const topBtn = document.getElementById('btnPreviewTop');
+  if (editBtn) editBtn.classList.toggle('active', editorViewMode === 'edit');
+  if (previewBtn) previewBtn.classList.toggle('active', editorViewMode === 'preview');
+  if (topBtn) {
+    topBtn.innerHTML = editorViewMode === 'preview'
+      ? '<i class="fas fa-pen-ruler"></i> Quay lại chỉnh sửa'
+      : '<i class="fas fa-expand"></i> Xem trước';
+  }
+}
+
+function togglePreviewMode() {
+  setViewMode(editorViewMode === 'preview' ? 'edit' : 'preview');
+}
+
+function toggleLightMode() {
+  const isLight = document.body.classList.toggle('light-mode');
+  const btn = document.getElementById('btnLightMode');
+  if (btn) {
+    btn.innerHTML = isLight
+      ? '<i class="fas fa-moon"></i> Chế độ tối'
+      : '<i class="fas fa-sun"></i> Chế độ sáng';
+  }
+  try { localStorage.setItem('evn_light_mode', isLight ? '1' : '0'); } catch(_) {}
+}
+
+function commitLayoutState(options = {}) {
+  const { clearHistory = true } = options;
+  isModified = false;
+  if (clearHistory) history = [];
+  updateModifiedUI();
+  updateHistoryUI();
+  clearDraft();
+}
+
+function autoOptimizeLayout(options = {}) {
+  const { silent = false, skipHistory = false, autoApply = true } = options;
+  if (!skipHistory) saveToHistory();
+  const orderedTypes = ['filter', 'stats', 'chips', 'charts', 'timeline', 'table'];
+  const oldLayout = layout.slice();
+  layout = orderedTypes.map((type, idx) => {
+    const def = DEFS[type];
+    const found = oldLayout.find(item => item.type === type);
+    const base = found ? JSON.parse(JSON.stringify(found)) : { type, uid: 'uid_' + type + '_' + Date.now() + '_' + idx, props: JSON.parse(JSON.stringify(def.defaultProps)) };
+    base.type = type;
+    base.props = Object.assign({}, JSON.parse(JSON.stringify(def.defaultProps)), base.props || {});
+    base.props.visible = true;
+    base.props.sticky = type === 'filter';
+    base.props.bgColor = '#111720';
+    base.props.borderRadius = 10;
+    base.props.padding = type === 'table' ? 12 : 14;
+    if (type === 'stats') base.props.columns = 4;
+    if (type === 'charts') base.props.layout = '50/50';
+    if (type === 'timeline') base.props.months = 24;
+    if (type === 'table') {
+      base.props.rowsPerPage = 20;
+      base.props.exportBtn = true;
+    }
+    return base;
+  });
+  selectedUid = layout[0] ? layout[0].uid : null;
+  clearLayerSearch();
+  render();
+  switchRTab('props');
+  document.getElementById('propsContent').scrollTop = 0;
+  if (autoApply) commitLayoutState({ clearHistory: false });
+  if (!silent) showToast(autoApply ? '✨ Đã tối ưu và áp dụng layout ngay' : '✨ Đã chuẩn hóa layout cho người dùng cuối');
+}
+
+function getPropsEmptyHTML() {
+  const audit = analyzeLayoutUX();
+  const bullets = (audit.issues.length ? audit.issues.slice(0, 3) : [{ title: 'Layout hiện tại đã khá gọn gàng.' }])
+    .map(item => `<div class="ux-issue-item ${item.tone || 'info'}"><strong>${item.title}</strong><span>${item.detail || 'Bạn có thể chọn một section để tinh chỉnh sâu hơn.'}</span></div>`)
+    .join('');
+  return `<div class="props-empty"><i class="fas fa-mouse-pointer"></i><div>Chọn một section để chỉnh chi tiết<br>hoặc áp preset tối ưu nhanh</div><div class="props-empty-actions"><button class="btn btn-primary" onclick="autoOptimizeLayout()"><i class="fas fa-wand-magic-sparkles"></i> Tối ưu toàn layout</button><button class="btn" onclick="selectSection(layout[0]?.uid)"><i class="fas fa-sliders-h"></i> Chọn section đầu tiên</button></div></div><div class="props-section"><div class="props-section-title"><i class="fas fa-magnifying-glass-chart"></i>Đánh giá nhanh</div>${bullets}</div>`;
+}
+
+function updateStatusBar() {
+  const total   = layout.length;
+  const visible = layout.filter(l => l.props.visible).length;
+  const hidden  = total - visible;
+  const sticky  = layout.filter(l => l.props.sticky).length;
+  document.getElementById('sb-count').textContent   = total;
+  document.getElementById('sb-visible').textContent = visible;
+  document.getElementById('sb-hidden').textContent  = hidden;
+  document.getElementById('sb-sticky').textContent  = sticky;
+  document.getElementById('layerCount').textContent = total;
+
+  const selItem = document.getElementById('sb-selected-item');
+  const selName = document.getElementById('sb-selected-name');
+  if (selectedUid) {
+    const item = layout.find(l => l.uid === selectedUid);
+    selItem.style.display = 'flex';
+    selName.textContent = item ? DEFS[item.type].label : '—';
+  } else {
+    selItem.style.display = 'none';
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   CLOCK
+═══════════════════════════════════════════════ */
+function tickClock() {
+  const el = document.getElementById('clock');
+  if (!el) return;
+  el.textContent = new Date().toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+tickClock();
+setInterval(tickClock, 1000);
+
+/* ═══════════════════════════════════════════════
+   RENDER
+═══════════════════════════════════════════════ */
+function render() {
+  renderCanvas();
+  renderQuickNav();
+  renderLayers();
+  renderProps();
+  updateStatusBar();
+  renderUXAudit();
+  setViewMode(editorViewMode);
+  // Re-render live chips + charts nếu data đã có
+  if (_chipAllData.length > 0) {
+    setTimeout(() => { renderChipsSection(); renderChartsSection(); renderTimelineSection(); renderLiveFilterSection(); }, 50);
+  }
+}
+
+let _canvasRenderRAF = 0;
+let _canvasNeedsFull = false;
+const _canvasDirtyUids = new Set();
+
+function scheduleCanvasRender(uid = null) {
+  if (uid) _canvasDirtyUids.add(uid);
+  else _canvasNeedsFull = true;
+  if (_canvasRenderRAF) return;
+  _canvasRenderRAF = requestAnimationFrame(() => {
+    _canvasRenderRAF = 0;
+    if (_canvasNeedsFull) {
+      renderCanvas();
+      renderQuickNav();
+      setupQuickNavObserver();
+      // Full rebuild — restore live sections từ cache ngay lập tức
+      if (_chipAllData.length > 0) {
+        requestAnimationFrame(() => { renderChipsSection(); renderChartsSection(); renderTimelineSection(); renderLiveFilterSection(); });
+      }
+    } else if (_canvasDirtyUids.size) {
+      // replaceCanvasSection đã xử lý charts/chips thông minh (không rebuild)
+      [..._canvasDirtyUids].forEach(replaceCanvasSection);
+    }
+    _canvasNeedsFull = false;
+    _canvasDirtyUids.clear();
+  });
+}
+
+function renderQuickNav() {
+  const host = document.getElementById('canvasQuickNav');
+  if (!host) return;
+  host.innerHTML = layout.map((item, idx) => {
+    const def = DEFS[item.type];
+    if (!def) return '';
+    return `<button type="button" data-uid="${item.uid}" class="quick-nav-item ${selectedUid === item.uid ? 'active' : ''}" onclick="jumpToSection('${item.uid}')"><span class="idx">${idx+1}</span>${def.label}</button>`;
+  }).join('');
+}
+
+function getCanvasScrollHost() {
+  return document.getElementById('canvasArea') || document.querySelector('.canvas-area') || document.scrollingElement || document.documentElement;
+}
+
+function getCanvasStickyOffset() {
+  const header = document.querySelector('.canvas-header');
+  const audit = document.getElementById('uxAuditPanel');
+  const quick = document.getElementById('canvasQuickNav');
+  const pieces = [header, audit, quick].filter(Boolean);
+  return pieces.reduce((sum, el) => {
+    const styles = window.getComputedStyle(el);
+    const mt = parseFloat(styles.marginTop) || 0;
+    const mb = parseFloat(styles.marginBottom) || 0;
+    return sum + el.offsetHeight + mt + mb;
+  }, 12);
+}
+
+function scrollSectionIntoCanvasView(uid, behavior = 'smooth', attempt = 0) {
+  const host = getCanvasScrollHost();
+  const el = document.querySelector(`.section-wrapper[data-uid="${uid}"]`);
+  if (!host || !el) {
+    if (attempt < 8) requestAnimationFrame(() => scrollSectionIntoCanvasView(uid, behavior, attempt + 1));
+    return;
+  }
+
+  const hostRect = host.getBoundingClientRect();
+  const targetRect = el.getBoundingClientRect();
+  const stickyOffset = getCanvasStickyOffset();
+  const nextTop = host.scrollTop + (targetRect.top - hostRect.top) - stickyOffset;
+
+  host.scrollTo({
+    top: Math.max(0, Math.round(nextTop)),
+    behavior
+  });
+}
+
+function jumpToSection(uid) {
+  if (!uid) return;
+  // Highlight nav button active
+  document.querySelectorAll('.quick-nav-item[data-uid]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.uid === uid);
+  });
+  // Chỉ scroll — không gọi selectSection (tránh re-render / reload data)
+  requestAnimationFrame(() => scrollSectionIntoCanvasView(uid, 'smooth'));
+}
+
+let _quickNavObserver = null;
+let _quickNavVisibleUid = null;
+
+function updateQuickNavVisible(uid) {
+  _quickNavVisibleUid = uid || null;
+  document.querySelectorAll('.quick-nav-item[data-uid]').forEach(btn => {
+    btn.classList.toggle('in-view', !!uid && btn.dataset.uid === uid);
+  });
+}
+
+function setupQuickNavObserver() {
+  const root = getCanvasScrollHost();
+  if (!root) return;
+  if (_quickNavObserver) _quickNavObserver.disconnect();
+  const seen = new Map();
+  _quickNavObserver = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      const uid = entry.target?.dataset?.uid;
+      if (!uid) return;
+      seen.set(uid, entry.isIntersecting ? entry.intersectionRatio : 0);
+    });
+    let bestUid = selectedUid || null;
+    let bestRatio = 0;
+    seen.forEach((ratio, uid) => {
+      if (ratio > bestRatio) {
+        bestRatio = ratio;
+        bestUid = uid;
+      }
+    });
+    if (bestUid) updateQuickNavVisible(bestUid);
+  }, { threshold: [0.2, 0.35, 0.55], root });
+  document.querySelectorAll('.section-wrapper[data-uid]').forEach(el => _quickNavObserver.observe(el));
+  updateQuickNavVisible(selectedUid || document.querySelector('.section-wrapper[data-uid]')?.dataset?.uid || null);
+}
+
+function buildSectionWrapper(item, idx) {
+  const def = DEFS[item.type];
+  if (!def) return null;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'section-wrapper' + (!item.props.visible ? ' is-hidden' : '');
+  wrapper.dataset.uid = item.uid;
+
+  const card = document.createElement('div');
+  card.className = 'section-card' + (selectedUid === item.uid ? ' is-selected' : '');
+  card.dataset.uid = item.uid;
+
+  const dh = document.createElement('div');
+  dh.className = 'card-drag';
+  dh.innerHTML = '<i class="fas fa-grip-vertical"></i>';
+  dh.draggable = true;
+  dh.addEventListener('dragstart', e => sectionDragStart(e, idx));
+  dh.addEventListener('dragend', sectionDragEnd);
+
+  const hbar = document.createElement('div');
+  hbar.className = 'card-header-bar';
+  hbar.style.setProperty('--section-color', def.headerColor);
+
+  const stickyBadge = item.props.sticky
+    ? `<span class="card-sticky-badge"><i class="fas fa-thumbtack" style="font-size:7px;margin-right:3px"></i>STICKY</span>`
+    : '';
+
+  hbar.innerHTML = `
+      <span class="card-order">${idx+1}</span>
+      <span class="section-badge ${def.badgeClass}">${def.badgeText}</span>
+      <span class="card-title-text">${def.label}</span>
+      <div class="card-header-meta">
+        ${stickyBadge}
+        <span class="card-id-text">#${def.id}</span>
+      </div>
+      <div class="card-actions">
+        <button class="card-act-btn" title="Lên" onclick="moveSection('${item.uid}',-1)"><i class="fas fa-chevron-up"></i></button>
+        <button class="card-act-btn" title="Xuống" onclick="moveSection('${item.uid}',1)"><i class="fas fa-chevron-down"></i></button>
+        <button class="card-act-btn" title="${item.props.visible?'Ẩn':'Hiện'}" onclick="toggleVis('${item.uid}')">
+          <i class="fas fa-eye${item.props.visible?'':'-slash'}"></i>
+        </button>
+        <button class="card-act-btn del" title="Xóa" onclick="removeSection('${item.uid}')"><i class="fas fa-times"></i></button>
+      </div>`;
+
+  const prev = document.createElement('div');
+  prev.className = 'card-preview';
+  prev.innerHTML = getPreview(item.type, { ...item.props, _uid: item.uid });
+
+  const rh = document.createElement('div');
+  rh.className = 'resize-handle';
+
+  card.appendChild(dh);
+  card.appendChild(hbar);
+  card.appendChild(prev);
+  card.appendChild(rh);
+
+  card.addEventListener('click', e => {
+    if (e.target.closest('.card-actions') || e.target.closest('.card-drag')) return;
+    if (e.target.closest('.hm-tram-trigger') || e.target.closest('.hm-tram-search')) return;
+    if (e.target.closest('.ic-card')) return;
+    if (e.target.closest('.device-chip')) return;
+    selectSection(item.uid);
+  });
+
+  wrapper.appendChild(card);
+  wrapper.addEventListener('dragover', e => e.preventDefault());
+  wrapper.addEventListener('drop', e => sectionDrop(e, idx));
+  return wrapper;
+}
+
+/* ── CANVAS ── */
+function renderCanvas() {
+  const canvas = document.getElementById('canvas');
+  canvas.innerHTML = '';
+
+  layout.forEach((item, idx) => {
+    const def = DEFS[item.type];
+    if (!def) return;
+    canvas.appendChild(mkDropZone(idx));
+    const wrapper = buildSectionWrapper(item, idx);
+    if (wrapper) canvas.appendChild(wrapper);
+  });
+
+  canvas.appendChild(mkDropZone(layout.length));
+}
+
+function replaceCanvasSection(uid) {
+  const item = layout.find(l => l.uid === uid);
+  const idx = layout.findIndex(l => l.uid === uid);
+  const canvas = document.getElementById('canvas');
+  const old = canvas?.querySelector(`.section-wrapper[data-uid="${uid}"]`);
+  if (!canvas || !item || idx < 0 || !old) {
+    renderCanvas();
+    renderQuickNav();
+    return;
+  }
+
+  // ── Tối ưu: charts & chips có live content — chỉ cập nhật selection state,
+  // không destroy DOM đã render. Giữ chart/table nguyên vẹn.
+  if (item.type === 'charts' || item.type === 'chips' || item.type === 'timeline') {
+    // Cập nhật wrapper visibility
+    old.className = 'section-wrapper' + (!item.props.visible ? ' is-hidden' : '');
+    // Cập nhật selected highlight trên card
+    const card = old.querySelector('.section-card');
+    if (card) card.classList.toggle('is-selected', selectedUid === uid);
+    // Nếu data sẵn: renderChartsSection tự xử lý (kể cả self-heal nếu mainEl bị mất)
+    if (item.type === 'charts' && _chipAllData.length > 0) {
+      requestAnimationFrame(() => renderChartsSection());
+    }
+    if (item.type === 'timeline' && _chipAllData.length > 0) {
+      requestAnimationFrame(() => renderTimelineSection());
+    }
+    if (item.type === 'chips' && _chipAllData.length > 0) {
+      const chipEl = old.querySelector('.card-preview');
+      const isEmpty = !chipEl || !chipEl.querySelector('.device-chip');
+      if (isEmpty) requestAnimationFrame(() => renderChipsSection());
+    }
+    return;
+  }
+
+  const next = buildSectionWrapper(item, idx);
+  if (!next) return;
+  old.replaceWith(next);
+
+  // Sau khi rebuild các section khác, giữ charts/chips không bị mất nếu data sẵn
+  if (_chipAllData.length > 0) {
+    requestAnimationFrame(() => { renderChipsSection(); renderChartsSection(); });
+  }
+}
+
+function mkDropZone(idx) {
+  const dz = document.createElement('div');
+  dz.className = 'drop-zone';
+  dz.dataset.dropIdx = idx;
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('active'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('active'));
+  dz.addEventListener('drop', e => { dz.classList.remove('active'); dropZoneDrop(e, parseInt(dz.dataset.dropIdx)); });
+  return dz;
+}
+
+/* ── LAYERS ── */
+function renderLayers() {
+  const list = document.getElementById('layerList');
+  list.innerHTML = '';
+  const term = normalizeSearchText(layerSearchTerm);
+  const filteredLayout = layout.filter(item => {
+    if (!term) return true;
+    const def = DEFS[item.type] || {};
+    const meta = [def.label, def.badgeText, def.id, item.type, item.props?.sticky ? 'sticky' : '', item.props?.visible ? 'visible' : 'hidden'].join(' ');
+    return normalizeSearchText(meta).includes(term);
+  });
+
+  if (!filteredLayout.length) {
+    const safeTerm = String(layerSearchTerm).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    list.innerHTML = `<div class="rpanel-empty"><i class="fas fa-search" style="margin-right:6px;color:var(--accent)"></i>Không có section phù hợp với từ khóa <strong>${safeTerm}</strong></div>`;
+  }
+
+  filteredLayout.forEach((item) => {
+    const idx = layout.findIndex(l => l.uid === item.uid);
+    const def = DEFS[item.type];
+    const el = document.createElement('div');
+    el.className = 'layer-item' +
+      (selectedUid === item.uid ? ' selected' : '') +
+      (!item.props.visible ? ' layer-hidden' : '');
+    el.tabIndex = 0;
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-label', `${def.label} - ${item.props.visible ? 'đang hiển thị' : 'đang ẩn'}`);
+
+    let meta = def.badgeText;
+    if (item.type === 'stats' && item.props.cards) meta += ` · ${item.props.cards.length} ô`;
+    if (item.props.sticky) meta += ' · STICKY';
+
+    el.innerHTML = `
+      <span class="layer-drag" draggable="true"><i class="fas fa-grip-vertical"></i></span>
+      <span class="layer-accent" style="background:${def.dotColor}"></span>
+      <div class="layer-info">
+        <span class="layer-name">${def.label}</span>
+        <span class="layer-meta">${meta}</span>
+      </div>
+      <div class="layer-badges">
+        ${item.props.sticky ? `<span class="layer-sticky-badge"><i class="fas fa-thumbtack"></i></span>` : ''}
+        <button class="layer-vis ${!item.props.visible ? 'hidden-eye' : ''}"
+          title="Ẩn/Hiện"
+          onclick="toggleVis('${item.uid}');event.stopPropagation()">
+          <i class="fas fa-eye${item.props.visible ? '' : '-slash'}"></i>
+        </button>
+      </div>`;
+
+    el.addEventListener('click', () => selectSection(item.uid));
+    el.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        selectSection(item.uid);
+      }
+    });
+    const dh = el.querySelector('.layer-drag');
+    dh.addEventListener('dragstart', e => sectionDragStart(e, idx));
+    dh.addEventListener('dragend', sectionDragEnd);
+    list.appendChild(el);
+  });
+
+  const addBtns = document.getElementById('addButtons');
+  addBtns.innerHTML = '';
+  Object.entries(DEFS).forEach(([type, def]) => {
+    if (layout.some(l => l.type === type)) return;
+    const btn = document.createElement('button');
+    btn.className = 'add-section-btn';
+    btn.innerHTML = `<i class="${def.icon}"></i>${def.label}`;
+    btn.onclick = () => addSection(type);
+    addBtns.appendChild(btn);
+  });
+  if (!addBtns.children.length) {
+    addBtns.innerHTML = '<span style="font-size:10px;color:var(--text-muted)">Tất cả section đã thêm</span>';
+  }
+}
+
+/* ── PROPS ── */
+function renderProps() {
+  const body  = document.getElementById('propsContent');
+  const title = document.getElementById('propsTitle');
+
+  if (!selectedUid) {
+    title.textContent = '—';
+    body.innerHTML = getPropsEmptyHTML();
+    return;
+  }
+
+  const item = layout.find(l => l.uid === selectedUid);
+  if (!item) return;
+  const def = DEFS[item.type];
+  title.textContent = def.badgeText;
+
+  let html = '';
+
+  // ─ Summary chip for selected section
+  html += `<div style="padding:10px 14px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;padding-bottom:10px">
+    <span class="section-badge ${def.badgeClass}" style="font-size:9px">${def.badgeText}</span>
+    <span style="font-size:12px;font-weight:600;color:var(--text-primary);flex:1">${def.label}</span>
+    <span style="font-family:var(--font-mono);font-size:9px;color:var(--text-muted)">#${def.id}</span>
+  </div>`;
+
+  // ─ Visibility
+  html += `<div class="props-section">
+    <div class="props-section-title"><i class="fas fa-eye"></i>Hiển thị</div>
+    <div class="prop-toggle-row">
+      <span class="toggle-label">Hiển thị</span>
+      <button class="toggle ${item.props.visible ? 'on' : ''}" onclick="toggleProp('${item.uid}','visible')"></button>
+    </div>
+    <div class="prop-toggle-row">
+      <span class="toggle-label">Sticky khi scroll</span>
+      <button class="toggle ${item.props.sticky ? 'on' : ''}" onclick="toggleProp('${item.uid}','sticky')"></button>
+    </div>
+  </div>`;
+
+  // ─ Appearance
+  html += `<div class="props-section">
+    <div class="props-section-title"><i class="fas fa-paint-brush"></i>Giao diện</div>
+    <div class="prop-row">
+      <label class="prop-label">
+        Border Radius
+        <span class="prop-label-val" id="br_v_${item.uid}">${item.props.borderRadius||8}px</span>
+      </label>
+      <input class="prop-input" type="range" min="0" max="24"
+        value="${item.props.borderRadius||8}"
+        oninput="setProp('${item.uid}','borderRadius',+this.value);document.getElementById('br_v_${item.uid}').textContent=this.value+'px'">
+    </div>
+    <div class="prop-row">
+      <label class="prop-label">
+        Padding
+        <span class="prop-label-val" id="pd_v_${item.uid}">${item.props.padding||12}px</span>
+      </label>
+      <input class="prop-input" type="range" min="0" max="40"
+        value="${item.props.padding||12}"
+        oninput="setProp('${item.uid}','padding',+this.value);document.getElementById('pd_v_${item.uid}').textContent=this.value+'px'">
+    </div>
+    <div class="prop-row">
+      <label class="prop-label">Background</label>
+      <div class="color-row">
+        <input type="color" value="${item.props.bgColor||'#111720'}"
+          oninput="setProp('${item.uid}','bgColor',this.value)"
+          style="width:30px;height:28px;border:1px solid var(--border);border-radius:6px;cursor:pointer;background:transparent">
+        <input class="prop-input" value="${item.props.bgColor||'#111720'}"
+          oninput="setProp('${item.uid}','bgColor',this.value)">
+      </div>
+    </div>
+  </div>`;
+
+  // ─ Type-specific
+  if (item.type === 'stats') {
+    const cards = item.props.cards || [];
+    const cols  = item.props.columns || 4;
+    const max   = 10;
+
+    let cardsHtml = cards.map((c, ci) => {
+      const isBar  = c.chartType === 'bar';
+      const isTech = c.chartType === 'tech';
+
+      const extraFields = c.ratio ? `
+        <div class="prop-row" style="margin-top:6px">
+          <label class="prop-label" style="font-size:10px">
+            <i class="fas fa-percent" style="font-size:9px;color:var(--accent);margin-right:4px;opacity:.6"></i>
+            Tỷ lệ % (hiển thị góc phải)
+          </label>
+          <input class="prop-input" placeholder="vd: 15.6%" value="${c.ratioValue||''}"
+            oninput="setCardProp('${item.uid}',${ci},'ratioValue',this.value)">
+        </div>` : '';
+
+      const apiField = isBar ? `
+        <div class="prop-row" style="margin-top:6px">
+          <label class="prop-label" style="font-size:10px">
+            <i class="fas fa-link" style="font-size:9px;color:var(--accent);margin-right:4px;opacity:.6"></i>
+            API Endpoint URL
+          </label>
+          <input class="prop-input" placeholder="https://…/api/data"
+            value="${c.apiUrl||''}"
+            oninput="setCardProp('${item.uid}',${ci},'apiUrl',this.value)">
+          <button class="btn btn-primary" style="margin-top:5px;width:100%;font-size:11px;padding:6px"
+            onclick="icFetchApi('${item.uid}',${ci})">
+            <i class="fas fa-sync-alt"></i> Tải dữ liệu từ API
+          </button>
+          ${c._apiState === 'ok' ? `<div style="font-family:var(--font-mono);font-size:9px;color:var(--green);margin-top:4px;display:flex;gap:4px;align-items:center"><i class="fas fa-check-circle"></i> ${c.chartData?.length||0} mục đã tải</div>` : ''}
+          ${c._apiState === 'error' ? `<div style="font-family:var(--font-mono);font-size:9px;color:var(--red);margin-top:4px;display:flex;gap:4px;align-items:center"><i class="fas fa-times-circle"></i> ${c._apiError||'Lỗi'}</div>` : ''}
+        </div>` : '';
+
+      const techValueFields = isTech && c.techData ? c.techData.series.map((s, si) => `
+        <div style="margin-top:6px">
+          <div class="prop-label" style="font-size:10px;margin-bottom:4px">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${s.color};margin-right:5px"></span>${s.label}
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
+            ${Object.entries(s.values).map(([volt, val]) => `
+              <div>
+                <div style="font-size:9px;color:var(--text-muted);margin-bottom:2px;font-family:var(--font-mono)">${volt}</div>
+                <input class="prop-input" type="number" min="0" style="padding:4px 6px;font-size:11px" value="${val}"
+                  oninput="icSetTechVal('${item.uid}',${ci},${si},'${volt}',+this.value)">
+              </div>`).join('')}
+          </div>
+        </div>`).join('') : '';
+
+      return `
+      <div class="stat-editor-card">
+        <div class="stat-editor-top">
+          <span class="stat-editor-num">Ô ${ci+1}${isBar?' · BAR':isTech?' · TECH':c.ratio?' · RATIO':''}</span>
+          ${ci > 0 ? `<button class="card-act-btn" onclick="moveCard('${item.uid}',${ci},-1)" title="Lên"><i class="fas fa-chevron-up"></i></button>` : ''}
+          ${ci < cards.length-1 ? `<button class="card-act-btn" onclick="moveCard('${item.uid}',${ci},1)" title="Xuống"><i class="fas fa-chevron-down"></i></button>` : ''}
+          <button class="card-act-btn del" onclick="removeCard('${item.uid}',${ci})" title="Xóa"><i class="fas fa-times"></i></button>
+        </div>
+        <div style="display:grid;grid-template-columns:44px 1fr;gap:6px;margin-bottom:6px">
+          <div>
+            <div class="prop-label" style="margin-bottom:3px">Icon</div>
+            <input class="prop-input" style="text-align:center;font-size:15px;padding:4px"
+              maxlength="2" value="${c.icon||''}"
+              oninput="setCardProp('${item.uid}',${ci},'icon',this.value)">
+          </div>
+          <div>
+            <div class="prop-label" style="margin-bottom:3px">Nhãn</div>
+            <input class="prop-input" value="${c.label||''}"
+              oninput="setCardProp('${item.uid}',${ci},'label',this.value)">
+          </div>
+        </div>
+        ${!isBar && !isTech ? `
+        <div style="display:grid;grid-template-columns:1fr 42px;gap:6px">
+          <div>
+            <div class="prop-label" style="margin-bottom:3px">Giá trị</div>
+            <input class="prop-input" value="${c.value||''}"
+              oninput="setCardProp('${item.uid}',${ci},'value',this.value)">
+          </div>
+          <div>
+            <div class="prop-label" style="margin-bottom:3px">Màu</div>
+            <input type="color" value="${c.color||'#00e676'}"
+              style="width:100%;height:30px;border:1px solid var(--border);border-radius:6px;cursor:pointer;background:transparent"
+              oninput="setCardProp('${item.uid}',${ci},'color',this.value)">
+          </div>
+        </div>
+        ${extraFields}` : `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+          <span class="prop-label" style="margin-bottom:3px">Màu accent</span>
+          <input type="color" value="${c.color||'#ffd740'}"
+            style="width:28px;height:22px;border:1px solid var(--border);border-radius:5px;cursor:pointer;background:transparent"
+            oninput="setCardProp('${item.uid}',${ci},'color',this.value)">
+        </div>
+        ${apiField}${techValueFields}`}
+      </div>`;
+    }).join('');
+
+    html += `<div class="props-section">
+      <div class="props-section-title"><i class="fas fa-th"></i>Cấu hình Stats</div>
+      <div class="prop-row" style="margin-bottom:12px">
+        <label class="prop-label">
+          Số cột
+          <span class="prop-label-val">${cols} cột</span>
+        </label>
+        <input class="prop-input" type="range" min="1" max="${Math.min(cards.length,10)}"
+          value="${cols}"
+          oninput="setProp('${item.uid}','columns',+this.value);renderProps()">
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--text-muted);letter-spacing:.1em">
+          CÁC Ô (${cards.length}/${max})
+        </span>
+        ${cards.length < max ? `<button class="btn" style="font-size:10px;padding:3px 9px" onclick="addCard('${item.uid}')"><i class="fas fa-plus"></i> Thêm</button>` : ''}
+      </div>
+      ${cardsHtml}
     </div>`;
   }
 
-  const hvFilter = window._hvFilterStat || 'all';
-  let ais, gis, hgis, honhop;
-  if (hvFilter === 'all') {
-    ais    = (tech220.AIS||0)      + (tech110.AIS||0);
-    gis    = (tech220.GIS||0)      + (tech110.GIS||0);
-    hgis   = (tech220.HGIS||0)    + (tech110.HGIS||0);
-    honhop = (tech220.HGIS_AIS||0) + (tech110.HGIS_AIS||0);
+  if (item.type === 'table') {
+    html += `<div class="props-section">
+      <div class="props-section-title"><i class="fas fa-table"></i>Cấu hình Bảng</div>
+      <div class="prop-row">
+        <label class="prop-label">Số hàng / trang</label>
+        <input class="prop-input" type="number" min="5" max="100"
+          value="${item.props.rowsPerPage||20}"
+          oninput="setProp('${item.uid}','rowsPerPage',+this.value)">
+      </div>
+      <div class="prop-toggle-row">
+        <span class="toggle-label">Nút xuất CSV</span>
+        <button class="toggle ${item.props.exportBtn ? 'on' : ''}" onclick="toggleProp('${item.uid}','exportBtn')"></button>
+      </div>
+    </div>`;
+  }
+
+  if (item.type === 'charts') {
+    const cMode = item.props.chartMode || 'station';
+    html += `<div class="props-section">
+      <div class="props-section-title"><i class="fas fa-chart-bar"></i>Cấu hình Biểu đồ</div>
+      <div class="prop-row">
+        <label class="prop-label">Chế độ hiển thị</label>
+        <span style="font-size:10px;color:var(--text-secondary);font-family:var(--font-mono)">
+          Stacked Bar ngang · Y=Trạm · X=Số thiết bị · màu=cấp ĐA
+        </span>
+      </div>
+      <div style="font-size:9px;color:var(--text-muted);line-height:1.6;margin-top:6px;padding:6px 8px;background:var(--bg-elevated);border-radius:5px;font-family:var(--font-mono)">
+        Loại trừ: TIchânsứ &amp; HTTĐ<br>
+        Sort: 220kV→110kV→35kV→22kV→10kV→6kV→TT<br>
+        Bên phải: Pie phân loại TB + Pie công nghệ TBA
+      </div>
+    </div>`;
+  }
+
+  if (item.type === 'timeline') {
+    html += `<div class="props-section">
+      <div class="props-section-title"><i class="fas fa-stream"></i>Cấu hình Timeline</div>
+      <div class="prop-row">
+        <label class="prop-label">Số tháng</label>
+        <input class="prop-input" type="number" min="6" max="36"
+          value="${item.props.months||24}"
+          oninput="setProp('${item.uid}','months',+this.value)">
+      </div>
+    </div>`;
+  }
+
+  // ─ Position
+  const idx = layout.findIndex(l => l.uid === selectedUid);
+  html += `<div class="props-section">
+    <div class="props-section-title"><i class="fas fa-arrows-alt-v"></i>Vị trí</div>
+    <div class="pos-btns">
+      <button class="btn pos-btn" onclick="moveSection('${item.uid}',-1)" ${idx===0?'disabled':''}>
+        <i class="fas fa-chevron-up"></i> Lên
+      </button>
+      <button class="btn pos-btn" onclick="moveSection('${item.uid}',1)" ${idx===layout.length-1?'disabled':''}>
+        <i class="fas fa-chevron-down"></i> Xuống
+      </button>
+    </div>
+    <button class="btn btn-danger" style="width:100%" onclick="removeSection('${item.uid}')">
+      <i class="fas fa-trash"></i> Xóa section
+    </button>
+  </div>`;
+
+  body.innerHTML = html;
+}
+
+/* ═══════════════════════════════════════════════
+   PREVIEW HELPERS
+═══════════════════════════════════════════════ */
+const _getRatio = (cards, ci) => {
+  const c = cards[ci];
+  if (!c || !c.ratio) return null;
+  return c.ratioValue || '—';
+};
+
+const _renderMiniBar = (c, color) => {
+  const apiUrl = c.apiUrl || '';
+  let statusHtml = '';
+  if (apiUrl) {
+    const state = c._apiState || 'idle';
+    if (state === 'loading') statusHtml = `<div class="ic-api-status loading"><i class="fas fa-circle-notch fa-spin"></i> Đang tải…</div>`;
+    else if (state === 'error') statusHtml = `<div class="ic-api-status error"><i class="fas fa-exclamation-triangle"></i> ${c._apiError||'Lỗi kết nối'}</div>`;
+  }
+  const chartData = c.chartData || [];
+  if (!chartData.length && apiUrl && c._apiState !== 'ok') {
+    return `${statusHtml}<div class="ic-api-empty"><i class="fas fa-plug"></i> Chờ dữ liệu API</div>`;
+  }
+  const maxVal = Math.max(...chartData.map(d => d.value), 1);
+  const barsHtml = chartData.map(d => {
+    const pct = Math.round(d.value / maxVal * 100);
+    return `<div class="ic-bar-row">
+      <span class="ic-bar-lbl" title="${d.label}">${d.label}</span>
+      <div class="ic-bar-track"><div class="ic-bar-fill" style="width:${pct}%;background:${d.color||color}"></div></div>
+      <span class="ic-bar-num">${d.value}</span>
+    </div>`;
+  }).join('');
+  return `${statusHtml}<div class="ic-minichart-bars">${barsHtml}</div>`;
+};
+
+const _renderTechChart = (c, cardUid, ci) => {
+  const t220 = c.tech220 || { AIS:0, GIS:0, HGIS:0, HGIS_AIS:0 };
+  const t110 = c.tech110 || { AIS:0, GIS:0, HGIS:0, HGIS_AIS:0 };
+  const t22  = c.tech22  || { GIS:0, KCK:0, GIS_KCK:0 };
+  const t35  = c.tech35  || { GIS:0, KCK:0, GIS_KCK:0 };
+
+  // Build a bar item html
+  function barItem(cls, label, val, maxVal) {
+    const pct = maxVal > 0 ? Math.round((val / maxVal) * 100) : 0;
+    return `
+      <div class="ic-tech-bar-item">
+        <span class="ic-tech-bar-label ${cls}">${label}</span>
+        <span class="ic-tech-bar-number ${cls}">${val}</span>
+        <div class="ic-tech-bar-track">
+          <div class="ic-tech-bar-fill ${cls}" style="width:${pct}%"></div>
+        </div>
+      </div>`;
+  }
+
+  function buildHVSection(hvFilter) {
+    // hvFilter: '220' | '110' | 'all' (= both)
+    let ais, gis, hgis, honhop;
+    if (hvFilter === 'all') {
+      ais    = (t220.AIS||0)      + (t110.AIS||0);
+      gis    = (t220.GIS||0)      + (t110.GIS||0);
+      hgis   = (t220.HGIS||0)    + (t110.HGIS||0);
+      honhop = (t220.HGIS_AIS||0) + (t110.HGIS_AIS||0);
+    } else {
+      const t = hvFilter === '220' ? t220 : t110;
+      ais = t.AIS||0; gis = t.GIS||0; hgis = t.HGIS||0; honhop = t.HGIS_AIS||0;
+    }
+    const maxHV = Math.max(ais, gis, hgis, honhop, 1);
+    // Dropdown embedded in cap header
+    const dropHV = `<select class="ic-tech-cap-select" id="hvdrop_${cardUid}_${ci}"
+      onchange="icTechHVFilter('${cardUid}',${ci},this.value)">
+      <option value="all"${hvFilter==='all'?' selected':''}>220 – 110kV</option>
+      <option value="220"${hvFilter==='220'?' selected':''}>220kV</option>
+      <option value="110"${hvFilter==='110'?' selected':''}>110kV</option>
+    </select>`;
+    let html = `<div class="ic-tech-cap" style="display:flex;align-items:center;gap:6px;justify-content:space-between">
+      <span>⚡</span>${dropHV}</div>`;
+    html += `<div class="ic-tech-grid">`;
+    html += barItem('ais',    'AIS',        ais,    maxHV);
+    html += barItem('honhop', 'HGIS – AIS', honhop, maxHV);
+    html += barItem('gis',    'GIS',        gis,    maxHV);
+    html += barItem('hgis',   'HGIS',       hgis,   maxHV);
+    html += `</div>`;
+    return html;
+  }
+
+  function buildLVSection() {
+    // 22kV: GIS | GIS+KCK (hỗn hợp) | KCK (Khí-Chân không)
+    const t = t22;
+    const maxV = Math.max(t.GIS||0, t.GIS_KCK||0, t.KCK||0, 1);
+    let html = `<div class="ic-tech-cap" style="margin-top:8px">⚡ 22 – 35kV</div>`;
+    html += `<div class="ic-tech-grid">`;
+    html += barItem('gis',    'GIS',              t.GIS||0,     maxV);
+    html += barItem('kck',    'Khí – Chân không', t.KCK||0,     maxV);
+    if ((t.GIS_KCK||0) > 0)
+      html += barItem('honhop', 'GIS + KCK',      t.GIS_KCK||0, maxV);
+    html += `</div>`;
+    return html;
+  }
+
+  const hvFilter = c._hvFilter || 'all';
+  const rows = buildHVSection(hvFilter) + buildLVSection();
+
+  return `<div class="ic-tech-chart" id="tc_${cardUid}_${ci}">
+    <div class="ic-tech-rows" id="tr_${cardUid}_${ci}">${rows}</div>
+  </div>`;
+};
+
+/* ═══════════════════════════════════════════════
+   PREVIEW TEMPLATES
+═══════════════════════════════════════════════ */
+function getPreview(type, props) {
+  if (type === 'filter') return `
+    <div class="hm-filter-bar" style="flex-wrap:wrap;gap:8px;padding:4px 0" id="lf_bar_${props._uid||'f'}">
+      <div class="hm-tram-sel" style="min-width:160px;max-width:240px">
+        <button type="button" class="hm-tram-trigger" id="lytDdSel_lf_tram_${props._uid||'f'}"
+          onclick="event.stopPropagation();lytFddTramToggle('${props._uid||'f'}',this)"
+          onmousedown="event.stopPropagation()">
+          <span class="hm-tram-trigger-label" id="lf_lbl_tram_${props._uid||'f'}">— Tất cả trạm —</span>
+          <i class="fas fa-chevron-down"></i>
+        </button>
+      </div>
+      <input id="lf_search_${props._uid||'f'}" type="text" placeholder="🔍 Tìm kiếm tên/loại/ngăn..."
+        class="hm-tram-search" style="flex:1;min-width:160px;max-width:280px"
+        oninput="lytFddOnSearch('${props._uid||'f'}',this.value)"
+        onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onkeydown="event.stopPropagation()">
+      <div class="hm-tram-sel" style="min-width:110px;max-width:150px">
+        <button type="button" class="hm-tram-trigger" id="lytDdSel_lf_cap_${props._uid||'f'}"
+          onclick="event.stopPropagation();lytFddCapToggle('${props._uid||'f'}',this)"
+          onmousedown="event.stopPropagation()">
+          <span class="hm-tram-trigger-label" id="lf_lbl_cap_${props._uid||'f'}">Cấp điện áp</span>
+          <i class="fas fa-chevron-down"></i>
+        </button>
+      </div>
+      <div class="hm-tram-sel" style="min-width:120px;max-width:175px">
+        <button type="button" class="hm-tram-trigger" id="lytDdSel_lf_type_${props._uid||'f'}"
+          onclick="event.stopPropagation();lytFddTypeToggle('${props._uid||'f'}',this)"
+          onmousedown="event.stopPropagation()">
+          <span class="hm-tram-trigger-label" id="lf_lbl_type_${props._uid||'f'}">Loại thiết bị</span>
+          <i class="fas fa-chevron-down"></i>
+        </button>
+      </div>
+      <div class="hm-tram-sel" style="min-width:115px;max-width:155px">
+        <button type="button" class="hm-tram-trigger" id="lytDdSel_lf_year_${props._uid||'f'}"
+          onclick="event.stopPropagation();lytFddYearToggle('${props._uid||'f'}',this)"
+          onmousedown="event.stopPropagation()">
+          <span class="hm-tram-trigger-label" id="lf_lbl_year_${props._uid||'f'}">Năm SX</span>
+          <i class="fas fa-chevron-down"></i>
+        </button>
+      </div>
+      <div class="hm-tram-sel" style="min-width:120px;max-width:160px">
+        <button type="button" class="hm-tram-trigger" id="lytDdSel_lf_opyr_${props._uid||'f'}"
+          onclick="event.stopPropagation();lytFddOpyrToggle('${props._uid||'f'}',this)"
+          onmousedown="event.stopPropagation()">
+          <span class="hm-tram-trigger-label" id="lf_lbl_opyr_${props._uid||'f'}">Năm VH</span>
+          <i class="fas fa-chevron-down"></i>
+        </button>
+      </div>
+      <button id="lf_reset_${props._uid||'f'}" class="hm-reset-btn" style="display:none" onclick="lytFddReset('${props._uid||'f'}')">
+        <i class="fas fa-times"></i> Xóa lọc
+      </button>
+      <button class="hm-export-btn" onclick="lytExportCSVFromFilter()" title="Xuất file CSV theo bộ lọc hiện tại" style="white-space:nowrap">
+        <i class="fas fa-download"></i> CSV
+      </button>
+    </div>`;
+
+  function getTechStackPlacementStyle(label) {
+    switch (normalizeStatsCardLabel(label)) {
+      // Row 1
+      case 'Tổng số TBA':            return 'grid-column:1;grid-row:1;';
+      case 'TBA 220kV':              return 'grid-column:2;grid-row:1;';
+      case 'TBA 110kV':              return 'grid-column:3;grid-row:1;';
+      // Công nghệ TBA: chiếm cột 4, span 3 rows
+      case 'Công nghệ thiết bị TBA': return 'grid-column:4;grid-row:1 / span 3;align-self:stretch;min-height:calc(108px * 3 + 16px);';
+      // Row 2
+      case 'Tổng số thiết bị':       return 'grid-column:1;grid-row:2;';
+      case 'Tổng công suất':         return 'grid-column:2;grid-row:2;';
+      case 'Tổng số ngăn':           return 'grid-column:3;grid-row:2;';
+      // Row 3
+      case 'Ngăn đường dây':         return 'grid-column:1;grid-row:3;';
+      case 'MBA': case 'Ngăn MBA':          return 'grid-column:2;grid-row:3;';
+      case 'Ngăn xuất tuyến':        return 'grid-column:3;grid-row:3;';
+      // Row 4 — 4 ngăn phụ, trải đủ 4 cột
+      case 'Ngăn liên lạc (LL)':    return 'grid-column:1;grid-row:4;';
+      case 'Ngăn tụ bù (TBN)':      return 'grid-column:2;grid-row:4;';
+      case 'Ngăn tự dùng (TD)':     return 'grid-column:3;grid-row:4;';
+      case 'Ngăn kháng':             return 'grid-column:4;grid-row:4;';
+      default: return '';
+    }
+  }
+
+  if (type === 'stats') {
+    const cols  = props.columns || 4;
+    const cards = props.cards   || [];
+    const uid   = props._uid    || '';
+    const nextC = IC_COLORS[cards.length % IC_COLORS.length];
+    const useTechStackLayout = props.layoutStyle === 'tech-stack-3x3' && cols === 4 && cards.length >= 10 && cards.some(c => c.chartType === 'tech');
+
+    const cardsHtml = cards.map((c, ci) => {
+      c.label = normalizeStatsCardLabel(c.label);
+      const ratioStr    = _getRatio(cards, ci);
+      const isBarChart  = c.chartType === 'bar';
+      const isTechChart = c.chartType === 'tech';
+      const placementStyle = useTechStackLayout ? getTechStackPlacementStyle(c.label) : '';
+
+      const ratioHtml = ratioStr !== null
+        ? `<span class="ic-ratio" style="color:${c.color};border-color:${c.color}44">${ratioStr}</span>`
+        : '';
+
+      const extraHtml = isBarChart
+        ? `<div class="ic-minichart">
+            ${c.apiUrl ? `<div class="ic-api-row">
+              <span class="ic-api-url" title="${c.apiUrl}"><i class="fas fa-link"></i> ${c.apiUrl.length>28?c.apiUrl.slice(0,28)+'…':c.apiUrl}</span>
+              <button class="ic-tbtn" onclick="icFetchApi('${uid}',${ci})" title="Tải dữ liệu"><i class="fas fa-sync-alt"></i></button>
+            </div>` : ''}
+            ${_renderMiniBar(c, c.color)}
+          </div>`
+        : isTechChart
+        ? _renderTechChart(c, uid, ci)
+        : '';
+
+      // Cards có giá trị tự động tính từ DB — KHÔNG contenteditable
+      const COMPUTED_LABELS = new Set([
+        'Tổng số TBA','TBA 220kV','TBA 110kV','Công nghệ thiết bị TBA',
+        'Tổng số thiết bị','Tổng công suất','Tổng công suất (MVA)','Tổng số ngăn',
+        'Ngăn đường dây','MBA','Ngăn MBA','Ngăn XT','Ngăn xuất tuyến',
+        'Ngăn liên lạc (LL)','Ngăn tụ bù (TBN)','Ngăn tự dùng (TD)','Ngăn kháng',
+        'Danh sách thiết bị'
+      ]);
+      const isComputed = COMPUTED_LABELS.has(c.label);
+
+      const bodyHtml = (isBarChart || isTechChart) ? `
+        <div class="ic-body">
+          <div class="ic-icon" contenteditable="true" spellcheck="false"
+            data-uid="${uid}" data-ci="${ci}" data-field="icon"
+            style="font-size:${c.iconSize||18}px"
+            onblur="icSave(this)">${c.icon||'▣'}</div>
+          <div class="ic-lbl" contenteditable="true" spellcheck="false"
+            style="color:${c.color};font-weight:600;font-size:${c.valSize ? Math.max(10, c.valSize*0.45)+'px' : '11px'};margin-bottom:6px"
+            data-uid="${uid}" data-ci="${ci}" data-field="label"
+            onblur="icSave(this)">${c.label}</div>
+          ${extraHtml}
+        </div>
+      ` : `
+        <div class="ic-body">
+          <div class="ic-icon" ${isComputed ? '' : 'contenteditable="true" spellcheck="false"'}
+            data-uid="${uid}" data-ci="${ci}" data-field="icon"
+            style="font-size:${c.iconSize||18}px"
+            ${isComputed ? '' : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'||event.key===\'Tab\'){event.preventDefault();this.closest(\'.ic-card\').querySelector(\'.ic-val\').focus()}"'}
+          >${c.icon||'▣'}</div>
+          <div class="ic-val" ${isComputed ? 'data-computed="true"' : 'contenteditable="true" spellcheck="false"'}
+            style="color:${c.color};font-size:${c.valSize||26}px"
+            data-uid="${uid}" data-ci="${ci}" data-field="value"
+            ${isComputed ? `onclick="this.closest('.ic-card').click()"` : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'||event.key===\'Tab\'){event.preventDefault();this.closest(\'.ic-card\').querySelector(\'.ic-lbl\').focus()}"'}
+          >${c.value}</div>
+          <div class="${isComputed ? 'ic-lbl' : 'ic-lbl'}" ${isComputed ? '' : 'contenteditable="true" spellcheck="false"'}
+            data-uid="${uid}" data-ci="${ci}" data-field="label"
+            ${isComputed ? `onclick="this.closest('.ic-card').click()"` : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}"'}
+          >${c.label}</div>
+        </div>
+      `;
+
+      return `
+      <div class="ic-card ${isTechChart && useTechStackLayout ? 'ic-card-tech-stack' : ''}" id="icc_${uid}_${ci}"
+        style="--card-color:${c.color};border-color:${c.color}22;border-top-color:${c.color};cursor:pointer;${placementStyle}"
+        draggable="true"
+        onclick="lytStatsCardClick('${c.label}','${c.color}')"
+        ondragstart="icDragStart(event,'${uid}',${ci})"
+        ondragover="icDragOver(event,'${uid}',${ci})"
+        ondrop="icDrop(event,'${uid}',${ci})"
+        ondragleave="icDragLeave(event,'${uid}',${ci})"
+        ondragend="icDragEnd(event,'${uid}')">
+        ${ratioHtml}
+        <div class="ic-toolbar">
+          <span class="ic-tbtn ic-drag-btn"><i class="fas fa-grip-vertical"></i></span>
+          <button class="ic-tbtn" onclick="icPickColor(event,'${uid}',${ci})" title="Màu"><i class="fas fa-palette"></i></button>
+          <div class="ic-size-ctrl" title="Cỡ icon">
+            <button class="ic-sz-btn" onclick="icAdjustSize('${uid}',${ci},'icon',-2)">−</button>
+            <span style="font-size:8px;color:var(--text-muted);font-family:var(--font-mono);padding:0 1px">i</span>
+            <button class="ic-sz-btn" onclick="icAdjustSize('${uid}',${ci},'icon',+2)">+</button>
+          </div>
+          <div class="ic-size-ctrl" title="Cỡ số">
+            <button class="ic-sz-btn" onclick="icAdjustSize('${uid}',${ci},'val',-2)">−</button>
+            <span style="font-size:8px;color:var(--text-muted);font-family:var(--font-mono);padding:0 1px">A</span>
+            <button class="ic-sz-btn" onclick="icAdjustSize('${uid}',${ci},'val',+2)">+</button>
+          </div>
+          <span style="flex:1"></span>
+          ${ci > 0 ? `<button class="ic-tbtn" onclick="icMove('${uid}',${ci},-1)"><i class="fas fa-arrow-left"></i></button>` : ''}
+          ${ci < cards.length-1 ? `<button class="ic-tbtn" onclick="icMove('${uid}',${ci},1)"><i class="fas fa-arrow-right"></i></button>` : ''}
+          <button class="ic-tbtn danger" onclick="icDelete('${uid}',${ci})"><i class="fas fa-times"></i></button>
+        </div>
+        ${bodyHtml}
+      </div>`;
+    }).join('');
+
+    // Build card html array for precise divider injection
+    const cardHtmlParts = cards.map((c2, ci2) => {
+      // find each card's html by its id marker
+      const startMark = `id="icc_${uid}_${ci2}"`;
+      return startMark; // used as lookup key only
+    });
+
+    // Inject row-divider between row1 (0..cols-1) and row2 (cols..end)
+    // by finding the opening tag of card[cols] and inserting before it
+    let finalCards = cardsHtml;
+    if (!useTechStackLayout && cards.length > cols) {
+      const rowBreakMark = `id="icc_${uid}_${cols}"`;
+      const breakIdx = finalCards.indexOf(rowBreakMark);
+      if (breakIdx > 0) {
+        // Find the start of that card's outer <div  — walk back to nearest newline+whitespace+<div
+        let insertAt = breakIdx;
+        while (insertAt > 0 && finalCards[insertAt] !== '<') insertAt--;
+        const divider = `<div class="ic-row-divider"></div>\n      `;
+        finalCards = finalCards.slice(0, insertAt) + divider + finalCards.slice(insertAt);
+      }
+    }
+
+    return `
+      <div class="ic-wrap ${useTechStackLayout ? 'ic-wrap-tech-layout' : ''}" style="grid-template-columns:repeat(${cols},1fr)">
+        ${finalCards}
+        ${(!useTechStackLayout && cards.length < 10) ? `
+          <div class="ic-add-card" onclick="icAddCard('${uid}','${nextC}')">
+            <span class="ic-add-icon"><i class="fas fa-plus"></i></span>
+            <span class="ic-add-lbl">Thêm ô</span>
+          </div>` : ''}
+      </div>`;
+  }
+
+  if (type === 'chips') return `
+    <div class="prev-chips" style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0">
+      <div style="display:flex;flex-direction:column;gap:3px;padding:7px 11px;border-radius:7px;border:1px solid rgba(0,230,118,0.35);background:rgba(0,230,118,0.07);min-width:80px">
+        <span style="font-size:11px;font-weight:600;color:#00e676">MC</span>
+        <span style="font-size:15px;font-weight:800;font-family:var(--font-mono);color:#00e676">423</span>
+        <span style="font-size:9px;color:var(--text-muted);font-family:var(--font-mono)">ABB · Siemens</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px;padding:7px 11px;border-radius:7px;border:1px solid rgba(0,200,255,0.35);background:rgba(0,200,255,0.07);min-width:80px">
+        <span style="font-size:11px;font-weight:600;color:#00c8ff">MBA</span>
+        <span style="font-size:15px;font-weight:800;font-family:var(--font-mono);color:#00c8ff">201</span>
+        <span style="font-size:9px;color:var(--text-muted);font-family:var(--font-mono)">ABB · THIBIDI</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px;padding:7px 11px;border-radius:7px;border:1px solid rgba(255,215,64,0.35);background:rgba(255,215,64,0.07);min-width:80px">
+        <span style="font-size:11px;font-weight:600;color:#ffd740">DCL</span>
+        <span style="font-size:15px;font-weight:800;font-family:var(--font-mono);color:#ffd740">318</span>
+        <span style="font-size:9px;color:var(--text-muted);font-family:var(--font-mono)">Schneider +2</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px;padding:7px 11px;border-radius:7px;border:1px solid rgba(179,136,255,0.35);background:rgba(179,136,255,0.07);min-width:80px">
+        <span style="font-size:11px;font-weight:600;color:#b388ff">TU</span>
+        <span style="font-size:15px;font-weight:800;font-family:var(--font-mono);color:#b388ff">540</span>
+        <span style="font-size:9px;color:var(--text-muted);font-family:var(--font-mono)">Mitsubishi</span>
+      </div>
+    </div>`;
+
+  if (type === 'charts') {
+    const uid = props._uid || '';
+    return `<div class="lyt-charts-wrap" id="lytChartsWrap_${uid}">
+      <div id="lytChartMain_${uid}" style="min-height:60px">
+        <div class="hm-sub-bar"><i class="fas fa-spinner fa-spin" style="color:var(--accent)"></i> Đang tải…</div>
+      </div>
+    </div>`;
+  }
+
+  if (type === 'timeline') {
+    return `<div id="lyt_tl_${props._uid||'tl'}" style="min-height:80px;padding:4px 0">
+      <div style="font-size:10px;color:var(--text-muted);text-align:center;padding:20px 0">
+        <i class="fas fa-chart-bar" style="color:var(--accent);margin-right:6px"></i>
+        Đang tải phân tích thâm niên vận hành...
+      </div>
+    </div>`;
+  }
+
+  if (type === 'table') return `
+    <div class="prev-table-wrap">
+      <table class="prev-table">
+        <thead><tr>
+          <th>#</th><th>Tên thiết bị</th><th>Loại</th><th>Trạm</th><th>Cấp ĐA</th><th>Lần TN cuối</th><th>TN tiếp theo</th><th>Trạng thái</th>
+        </tr></thead>
+        <tbody>
+          <tr><td>1</td><td style="color:var(--text-primary);font-weight:500">MC-110kV-BA1</td><td>Máy cắt</td><td>TBA Thủ Đức</td><td>110kV</td><td>06/2023</td><td style="color:var(--yellow)">06/2025</td><td><span class="pill pill-green">Bình thường</span></td></tr>
+          <tr><td>2</td><td style="color:var(--text-primary);font-weight:500">TU-220kV-F2</td><td>TU đo lường</td><td>TBA Bình Dương</td><td>220kV</td><td>02/2022</td><td style="color:var(--red)">02/2024 ⚠</td><td><span class="pill pill-red">Quá hạn</span></td></tr>
+          <tr><td>3</td><td style="color:var(--text-primary);font-weight:500">DCL-22kV-T3</td><td>Dao cách ly</td><td>TBA Hóc Môn</td><td>22kV</td><td>11/2023</td><td style="color:var(--cyan)">11/2025</td><td><span class="pill pill-green">Bình thường</span></td></tr>
+        </tbody>
+      </table>
+    </div>`;
+
+  return '<span style="color:var(--text-muted);font-size:11px">Preview không khả dụng</span>';
+}
+
+/* ═══════════════════════════════════════════════
+   ACTIONS
+═══════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════
+   RIGHT PANEL TAB SWITCHER
+═══════════════════════════════════════════════ */
+function switchRTab(tab) {
+  const layersPane = document.getElementById('paneLayersWrap');
+  const propsPane  = document.getElementById('panePropWrap');
+  const tabL = document.getElementById('tabLayers');
+  const tabP = document.getElementById('tabProps');
+  if (tab === 'layers') {
+    layersPane.style.display = 'flex';
+    propsPane.style.display  = 'none';
+    tabL.classList.add('active');
+    tabP.classList.remove('active');
   } else {
-    const t = hvFilter === '220' ? tech220 : tech110;
+    layersPane.style.display = 'none';
+    propsPane.style.display  = 'flex';
+    tabL.classList.remove('active');
+    tabP.classList.add('active');
+  }
+}
+
+function selectSection(uid, opts = {}) {
+  const prevUid = selectedUid;
+  selectedUid = uid;
+  const { preserveCanvasScroll = true } = opts;
+  const host = preserveCanvasScroll ? getCanvasScrollHost() : null;
+  const prevTop = host ? host.scrollTop : 0;
+
+  renderQuickNav();
+  renderLayers();
+  renderProps();
+  updateStatusBar();
+  renderUXAudit();
+  if (prevUid && prevUid !== uid) scheduleCanvasRender(prevUid);
+  scheduleCanvasRender(uid);
+
+  switchRTab('props');
+  document.getElementById('propsContent').scrollTop = 0;
+
+  if (host && preserveCanvasScroll) {
+    requestAnimationFrame(() => { host.scrollTop = prevTop; });
+  }
+}
+
+function destroyChartResources(uid) {
+  if (_lytPieCharts[uid]) {
+    try { _lytPieCharts[uid].destroy(); } catch (err) {}
+    delete _lytPieCharts[uid];
+  }
+  if (_lytCharts[uid]) {
+    Object.values(_lytCharts[uid] || {}).forEach(ch => { try { ch?.destroy?.(); } catch (err) {} });
+    delete _lytCharts[uid];
+  }
+}
+
+function toggleVis(uid) {
+  saveToHistory();
+  const item = layout.find(l => l.uid === uid);
+  if (!item) return;
+  item.props.visible = !item.props.visible;
+  if (!item.props.visible && item.type === 'charts') destroyChartResources(uid);
+  render();
+  showToast(item.props.visible ? '👁 Đã hiện section' : '🚫 Đã ẩn section');
+}
+
+function moveSection(uid, dir) {
+  saveToHistory();
+  const idx = layout.findIndex(l => l.uid === uid);
+  const ni = idx + dir;
+  if (ni < 0 || ni >= layout.length) return;
+  [layout[idx], layout[ni]] = [layout[ni], layout[idx]];
+  render();
+  showToast('↕ Di chuyển section');
+}
+
+function removeSection(uid) {
+  const item = layout.find(l => l.uid === uid);
+  const label = item ? DEFS[item.type].label : 'section này';
+  if (!confirm(`Xóa ${label}?`)) return;
+  saveToHistory();
+  if (item?.type === 'charts') destroyChartResources(uid);
+  layout = layout.filter(l => l.uid !== uid);
+  if (selectedUid === uid) selectedUid = null;
+  render();
+  showToast('✕ Đã xóa section');
+}
+
+function addSection(type) {
+  saveToHistory();
+  const def = DEFS[type];
+  const uid = 'uid_'+type+'_'+Date.now();
+  layout.push({ type, uid, props: {...def.defaultProps} });
+  selectedUid = uid;
+  render();
+  switchRTab('props');
+  document.getElementById('propsContent').scrollTop = 0;
+  showToast(`+ Đã thêm ${def.label}`);
+}
+
+function setProp(uid, key, value) {
+  const item = layout.find(l => l.uid === uid);
+  if (item) item.props[key] = value;
+  markModified();
+  scheduleCanvasRender(uid);
+  renderLayers();
+  renderProps();
+  updateStatusBar();
+  renderUXAudit();
+}
+
+function toggleProp(uid, key) {
+  saveToHistory();
+  const item = layout.find(l => l.uid === uid);
+  if (item) item.props[key] = !item.props[key];
+  render();
+}
+
+/* ═══════════════════════════════════════════════
+   SECTION DRAG & DROP
+═══════════════════════════════════════════════ */
+function sectionDragStart(e, idx) {
+  dragSrcIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', idx);
+  setTimeout(() => {
+    document.querySelectorAll('.section-wrapper')[idx]?.classList.add('is-dragging');
+  }, 0);
+}
+
+function sectionDragEnd() {
+  document.querySelectorAll('.section-wrapper.is-dragging').forEach(el => el.classList.remove('is-dragging'));
+  document.querySelectorAll('.drop-zone.active').forEach(el => el.classList.remove('active'));
+  dragSrcIdx = null;
+}
+
+function sectionDrop(e, targetIdx) {
+  e.preventDefault();
+  if (dragSrcIdx === null || dragSrcIdx === targetIdx) return;
+  saveToHistory();
+  const moved = layout.splice(dragSrcIdx, 1)[0];
+  layout.splice(dragSrcIdx < targetIdx ? targetIdx-1 : targetIdx, 0, moved);
+  render();
+  showToast('⠿ Sắp xếp lại');
+}
+
+function dropZoneDrop(e, dropIdx) {
+  e.preventDefault();
+  if (dragSrcIdx === null) return;
+  saveToHistory();
+  const moved = layout.splice(dragSrcIdx, 1)[0];
+  layout.splice(Math.max(0, dragSrcIdx < dropIdx ? dropIdx-1 : dropIdx), 0, moved);
+  render();
+  showToast('⠿ Sắp xếp lại');
+}
+
+/* ═══════════════════════════════════════════════
+   INLINE CARD EDITOR
+═══════════════════════════════════════════════ */
+function icSave(el) {
+  const { uid, ci, field } = el.dataset;
+  const item = layout.find(l => l.uid === uid);
+  if (!item?.props?.cards?.[+ci]) return;
+  item.props.cards[+ci][field] = el.innerText.trim();
+  markModified();
+  scheduleCanvasRender(uid);
+  renderProps();
+}
+
+function icSetTechVal(uid, ci, si, voltage, val) {
+  const item = layout.find(l => l.uid === uid);
+  const td = item?.props?.cards?.[ci]?.techData;
+  if (!td?.series?.[si]) return;
+  td.series[si].values[voltage] = val;
+  markModified();
+  scheduleCanvasRender(uid);
+}
+
+async function icFetchApi(uid, ci) {
+  const item = layout.find(l => l.uid === uid);
+  const card = item?.props?.cards?.[ci];
+  if (!card?.apiUrl) return;
+
+  card._apiState = 'loading';
+  scheduleCanvasRender(uid);
+
+  try {
+    const res = await fetch(card.apiUrl, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      card.chartData = data.map(d => ({
+        label: d.label || d.name || d.ten || String(d.key || ''),
+        value: Number(d.value ?? d.count ?? d.soLuong ?? 0),
+        color: d.color || card.color
+      }));
+      card._apiState = 'ok';
+      card._apiError = null;
+      showToast('✓ Đã tải ' + card.chartData.length + ' mục từ API');
+    } else {
+      throw new Error('Định dạng JSON không hợp lệ (cần array)');
+    }
+  } catch (err) {
+    card._apiState = 'error';
+    card._apiError = err.message.slice(0, 40);
+    showToast('✗ API lỗi: ' + card._apiError);
+  }
+  scheduleCanvasRender(uid);
+}
+
+function icTechHVFilter(uid, ci, filterKey) {
+  const item = layout.find(l => l.uid === uid);
+  const c = item?.props?.cards?.[ci];
+  if (!c) return;
+
+  // Persist selection on card object
+  c._hvFilter = filterKey;
+  markModified();
+
+  const t220 = c.tech220 || { AIS:0, GIS:0, HGIS:0, HGIS_AIS:0 };
+  const t110 = c.tech110 || { AIS:0, GIS:0, HGIS:0, HGIS_AIS:0 };
+  const t22  = c.tech22  || { GIS:0, KCK:0, GIS_KCK:0 };
+
+  function barItem(cls, label, val, maxVal) {
+    const pct = maxVal > 0 ? Math.round((val / maxVal) * 100) : 0;
+    return `
+      <div class="ic-tech-bar-item">
+        <span class="ic-tech-bar-label ${cls}">${label}</span>
+        <span class="ic-tech-bar-number ${cls}">${val}</span>
+        <div class="ic-tech-bar-track">
+          <div class="ic-tech-bar-fill ${cls}" style="width:${pct}%"></div>
+        </div>
+      </div>`;
+  }
+
+  // HV section (re-render rows div only, keep dropdown)
+  let ais, gis, hgis, honhop;
+  if (filterKey === 'all') {
+    ais    = (t220.AIS||0)      + (t110.AIS||0);
+    gis    = (t220.GIS||0)      + (t110.GIS||0);
+    hgis   = (t220.HGIS||0)    + (t110.HGIS||0);
+    honhop = (t220.HGIS_AIS||0) + (t110.HGIS_AIS||0);
+  } else {
+    const t = filterKey === '220' ? t220 : t110;
     ais = t.AIS||0; gis = t.GIS||0; hgis = t.HGIS||0; honhop = t.HGIS_AIS||0;
   }
   const maxHV = Math.max(ais, gis, hgis, honhop, 1);
 
-  // Dropdown header
-  const dropHtml = `<select class="tech-hv-select" onchange="setTechHVFilter(this.value)">
-    <option value="all"${hvFilter==='all'?' selected':''}>220 – 110kV</option>
-    <option value="220"${hvFilter==='220'?' selected':''}>220kV</option>
-    <option value="110"${hvFilter==='110'?' selected':''}>110kV</option>
-  </select>`;
+  // Also update 1 STATS total display for 220/110
+  if (filterKey === '220') {
+    setText('total220kV', (t220.AIS+t220.GIS+t220.HGIS+t220.HGIS_AIS).toLocaleString('vi-VN'));
+  } else if (filterKey === '110') {
+    setText('total110kV', (t110.AIS+t110.GIS+t110.HGIS+t110.HGIS_AIS).toLocaleString('vi-VN'));
+  }
 
-  let html = `<div class="tech-cap-header" style="display:flex;align-items:center;gap:6px;justify-content:space-between">
-    <i class="fas fa-bolt"></i>${dropHtml}</div>`;
-  html += `<div class="tech-bar-grid">`;
+  let html = `<div class="ic-tech-grid">`;
   html += barItem('ais',    'AIS',        ais,    maxHV);
   html += barItem('honhop', 'HGIS – AIS', honhop, maxHV);
   html += barItem('gis',    'GIS',        gis,    maxHV);
   html += barItem('hgis',   'HGIS',       hgis,   maxHV);
   html += `</div>`;
 
-  // 22+35kV section
-  const maxLV = Math.max(tech22.GIS||0, tech22.KCK||0, tech22.GIS_KCK||0, 1);
-  html += `<div class="tech-cap-header" style="margin-top:10px"><i class="fas fa-bolt" style="opacity:.6"></i> 22 – 35kV</div>`;
-  html += `<div class="tech-bar-grid">`;
-  html += barItem('gis',    'GIS',              tech22.GIS||0,     maxLV);
-  html += barItem('kck',    'Khí – Chân không', tech22.KCK||0,     maxLV);
-  if ((tech22.GIS_KCK||0) > 0)
-    html += barItem('honhop', 'GIS + KCK',      tech22.GIS_KCK||0, maxLV);
+  // LV section
+  const maxV = Math.max(t22.GIS||0, t22.GIS_KCK||0, t22.KCK||0, 1);
+  html += `<div class="ic-tech-cap" style="margin-top:8px">⚡ 22 – 35kV</div>`;
+  html += `<div class="ic-tech-grid">`;
+  html += barItem('gis', 'GIS',              t22.GIS||0,     maxV);
+  html += barItem('kck', 'Khí – Chân không', t22.KCK||0,     maxV);
+  if ((t22.GIS_KCK||0) > 0)
+    html += barItem('honhop', 'GIS + KCK', t22.GIS_KCK||0, maxV);
   html += `</div>`;
 
-  box.innerHTML = html;
+  const rowsEl = document.getElementById(`tr_${uid}_${ci}`);
+  if (rowsEl) {
+    // Rebuild entire rows including dropdown (to preserve selected)
+    const dropHV = `<select class="ic-tech-cap-select" id="hvdrop_${uid}_${ci}"
+      onchange="icTechHVFilter('${uid}',${ci},this.value)">
+      <option value="all"${filterKey==='all'?' selected':''}>220 – 110kV</option>
+      <option value="220"${filterKey==='220'?' selected':''}>220kV</option>
+      <option value="110"${filterKey==='110'?' selected':''}>110kV</option>
+    </select>`;
+    const fullHtml = `<div class="ic-tech-cap" style="display:flex;align-items:center;gap:6px;justify-content:space-between">
+      <span>⚡</span>${dropHV}</div>` + html;
+    rowsEl.innerHTML = fullHtml;
+  }
 }
 
-
-
-// ── 8. RENDER DEVICE CHIPS (2 CHIPS) ────────────────────────
-// ── 8. RENDER DEVICE CHIPS ──────────────────────────────────
-// Hiển thị TẤT CẢ loại thiết bị từ Phan_loai_thiet_bi (trừ TIchânsứ & HTTĐ)
-// Nguồn: allData — hiển thị toàn bộ không phụ thuộc filter hiện tại
-function renderTypeChips() {
-  const container = document.getElementById('deviceByType');
-  if (!container) return;
-
-  // Hàm kiểm tra loại trừ — robust với encoding/spaces khác nhau
-  function isExcluded(pl) {
-    if (!pl) return true;
-    const normalized = pl.trim().toUpperCase()
-      .replace(/\s+/g, '')           // bỏ tất cả khoảng trắng
-      .normalize('NFC');              // chuẩn hóa Unicode
-    // Loại trừ: TI chân sứ (các biến thể) và HTTĐ
-    if (normalized.startsWith('TICHAN') || normalized.startsWith('TI-CHAN') ||
-        normalized === 'TICHANSỨ' || normalized === 'TICHÂNSỨ' ||
-        normalized.includes('TICHÂN') || normalized.includes('TICHAN')) return true;
-    if (normalized === 'HTTĐ' || normalized === 'HTTD' ||
-        normalized.startsWith('HTTĐ') || normalized.startsWith('HTTD')) return true;
-    return false;
-  }
-
-  // ── 1. Build typeMap từ TOÀN BỘ allData ──
-  // typeMap[pl] = { totalCount (rows), soLuong (sum So_luong), hangs: Set }
-  const typeMap = {};
-  allData.forEach(d => {
-    const pl = (d.Phan_loai_thiet_bi || '').trim();
-    if (!pl || isExcluded(pl)) return;
-    if (!typeMap[pl]) typeMap[pl] = { totalCount: 0, soLuong: 0, hangs: new Set() };
-    typeMap[pl].totalCount++;
-    typeMap[pl].soLuong += Number(d.So_luong) || 0;
-    if ((d.Hang_san_xuat || '').trim()) {
-      typeMap[pl].hangs.add(d.Hang_san_xuat.trim());
-    }
-  });
-
-  // ── 2. Build filteredCounts từ filteredData (phản ánh dropdown/search filter)
-  //    KHÔNG tính selectedPhanLoai để chip không bị ẩn khi đang được chọn ──
-  const filteredCounts = {}; // pl → { count rows, soLuong }
-  filteredData.forEach(d => {
-    const pl = (d.Phan_loai_thiet_bi || '').trim();
-    if (!pl || isExcluded(pl)) return;
-    if (!filteredCounts[pl]) filteredCounts[pl] = { count: 0, soLuong: 0 };
-    filteredCounts[pl].count++;
-    filteredCounts[pl].soLuong += Number(d.So_luong) || 0;
-  });
-
-  container.innerHTML = '';
-
-  // ── Header row: tiêu đề + nút reset ──
-  const headerRow = document.createElement('div');
-  headerRow.className = 'chips-header-row';
-
-  // Active filter info
-  const activeInfo = document.createElement('span');
-  activeInfo.id = 'chipsActiveInfo';
-  activeInfo.className = 'chips-active-info' + (selectedPhanLoai.size > 0 ? ' visible' : '');
-  if (selectedPhanLoai.size > 0) {
-    activeInfo.innerHTML = `<i class="fas fa-filter"></i> Đang lọc: ${[...selectedPhanLoai].join(', ')}`;
-  }
-  headerRow.appendChild(activeInfo);
-
-  // Count display
-  const countEl = document.getElementById('typeChipsCount');
-  if (countEl) {
-    const numTypes = Object.values(typeMap).length;
-    const totalSLAll = Object.values(typeMap).reduce((s, v) => s + (v.soLuong || 0), 0);
-    countEl.textContent = `${numTypes} loại  ·  ${totalSLAll.toLocaleString('vi-VN')} thiết bị`;
-  }
-
-  // Reset button
-  const resetBtn = document.createElement('button');
-  resetBtn.className = 'chips-reset-btn';
-  resetBtn.innerHTML = '<i class="fas fa-times-circle"></i> Bỏ lựa chọn';
-  resetBtn.style.display = selectedPhanLoai.size > 0 ? 'inline-flex' : 'none';
-  resetBtn.onclick = () => {
-    selectedPhanLoai.clear();
-    applyFilters();        // re-filter → triggers renderTypeChips
-  };
-  headerRow.appendChild(resetBtn);
-  container.appendChild(headerRow);
-
-  // ── Device chip grid ──
-  const grid = document.createElement('div');
-  grid.className = 'device-chips-grid';
-
-  // Sort: active first, then by count desc
-  const sorted = Object.entries(typeMap)
-    .sort((a, b) => {
-      const aActive = selectedPhanLoai.has(a[0]) ? 1 : 0;
-      const bActive = selectedPhanLoai.has(b[0]) ? 1 : 0;
-      if (bActive !== aActive) return bActive - aActive;
-      // Sort by So_luong desc, fallback to row count
-      const aSL = a[1].soLuong || a[1].totalCount || 0;
-      const bSL = b[1].soLuong || b[1].totalCount || 0;
-      return bSL - aSL;
-    });
-
-  sorted.forEach(([type, info]) => {
-    const isActive   = selectedPhanLoai.has(type);
-    const fc         = filteredCounts[type] || { count: 0, soLuong: 0 };
-    const totalSL    = info.soLuong || 0;
-    const filtSL     = fc.soLuong || 0;
-    const isFiltered = filtSL !== totalSL && Object.keys(filteredCounts).length < Object.keys(typeMap).length;
-
-    // Hiển thị số lượng (So_luong), nếu = 0 thì dùng số rows
-    const displayNum = filtSL > 0 ? filtSL : (fc.count > 0 ? fc.count : 0);
-    const totalNum   = totalSL > 0 ? totalSL : info.totalCount;
-
-    // Build hãng list (max 4)
-    const hangsArr = [...info.hangs].sort().slice(0, 4);
-    const hangStr  = hangsArr.join(' · ') + (info.hangs.size > 4 ? ` +${info.hangs.size - 4}` : '');
-
-    const chip = document.createElement('div');
-    chip.className = 'device-chip' + (isActive ? ' active' : '');
-    chip.title = `${type}\nSố lượng: ${displayNum.toLocaleString('vi-VN')} / Tổng: ${totalNum.toLocaleString('vi-VN')}\nHãng: ${[...info.hangs].join(', ') || '—'}`;
-    chip.innerHTML = `
-      <span class="device-chip-name">${type}</span>
-      <span class="device-chip-count">
-        ${displayNum.toLocaleString('vi-VN')}
-        ${isFiltered ? `<span class="device-chip-total">/${totalNum.toLocaleString('vi-VN')}</span>` : ''}
-      </span>
-      ${hangStr ? `<span class="device-chip-hang">${hangStr}</span>` : ''}
-    `;
-    chip.onclick = () => {
-      if (selectedPhanLoai.has(type)) {
-        selectedPhanLoai.delete(type);
-      } else {
-        selectedPhanLoai.add(type);
-      }
-      applyFilters();
-    };
-    grid.appendChild(chip);
-  });
-
-  container.appendChild(grid);
+// Legacy stub — kept for any residual onclick refs
+function icTechFilter(chipEl, uid, ci, filterKey) {
+  icTechHVFilter(uid, ci, filterKey);
 }
 
+// ── SIZE ADJUST ──────────────────────────────────────────────
+function lytSetChartMode(uid, mode) {
+  const item = layout.find(l => l.uid === uid);
+  if (!item) return;
+  item.props.chartMode = mode;
+  markModified();
+  scheduleCanvasRender(uid);
+  // Re-render chart với mode mới
+  setTimeout(() => renderChartsSection(), 60);
+}
 
-// ─────────────────────────────────────────────────────────────
-// 9. CHARTS – Thiết bị theo trạm & cấp điện áp
-// Dữ liệu: cột Tram, Phan_loai_thiet_bi, Cap_dien_ap
-// Loại trừ: TIchânsứ, HTTĐ
-// Phân nhóm công nghệ: GIS / HGIS / AIS / HGIS-AIS theo trạm
-// ─────────────────────────────────────────────────────────────
+function icAdjustSize(uid, ci, field, delta) {
+  const item = layout.find(l => l.uid === uid);
+  if (!item?.props?.cards?.[ci]) return;
+  const card = item.props.cards[ci];
+  if (field === 'icon') {
+    card.iconSize = Math.min(40, Math.max(12, (card.iconSize || 18) + delta));
+  } else if (field === 'val') {
+    card.valSize  = Math.min(52, Math.max(14, (card.valSize  || 26) + delta));
+  }
+  markModified();
+  scheduleCanvasRender(uid);
+}
 
-// Hàm loại trừ thiết bị khỏi charts
-function isExcludedChart(pl) {
+function icAddCard(uid, color) {
+  const item = layout.find(l => l.uid === uid);
+  if (!item?.props?.cards) return;
+  saveToHistory();
+  item.props.cards.push({ icon: '📌', label: 'Nhãn mới', value: '0', color });
+  if (item.props.columns < item.props.cards.length) item.props.columns = item.props.cards.length;
+  scheduleCanvasRender(uid); renderProps();
+  setTimeout(() => {
+    const ci = item.props.cards.length - 1;
+    const el = document.querySelector(`[data-uid="${uid}"][data-ci="${ci}"][data-field="value"]`);
+    if (el) { el.focus(); const r = document.createRange(); r.selectNodeContents(el); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); }
+  }, 60);
+  showToast('+ Ô mới — nhập giá trị ngay');
+}
+
+function icDelete(uid, ci) {
+  const item = layout.find(l => l.uid === uid);
+  if (!item?.props?.cards || item.props.cards.length <= 1) { showToast('⚠ Cần ít nhất 1 ô'); return; }
+  saveToHistory();
+  item.props.cards.splice(ci, 1);
+  if (item.props.columns > item.props.cards.length) item.props.columns = item.props.cards.length;
+  scheduleCanvasRender(uid); renderProps();
+  showToast('✕ Đã xóa ô');
+}
+
+function icMove(uid, ci, dir) {
+  const item = layout.find(l => l.uid === uid);
+  if (!item?.props?.cards) return;
+  const ni = ci + dir;
+  if (ni < 0 || ni >= item.props.cards.length) return;
+  [item.props.cards[ci], item.props.cards[ni]] = [item.props.cards[ni], item.props.cards[ci]];
+  scheduleCanvasRender(uid); renderProps();
+}
+
+let _icDUid = null, _icDCi = null;
+function icDragStart(e, uid, ci) {
+  _icDUid = uid; _icDCi = ci;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => document.getElementById(`icc_${uid}_${ci}`)?.classList.add('ic-dragging'), 0);
+}
+function icDragOver(e, uid, ci) {
+  if (_icDUid !== uid || _icDCi === ci) return;
+  e.preventDefault();
+  document.getElementById(`icc_${uid}_${ci}`)?.classList.add('ic-drag-over');
+}
+function icDragLeave(e, uid, ci) {
+  document.getElementById(`icc_${uid}_${ci}`)?.classList.remove('ic-drag-over');
+}
+function icDrop(e, uid, ci) {
+  e.preventDefault();
+  document.getElementById(`icc_${uid}_${ci}`)?.classList.remove('ic-drag-over');
+  if (_icDUid !== uid || _icDCi === ci) return;
+  const item = layout.find(l => l.uid === uid);
+  if (!item?.props?.cards) return;
+  saveToHistory();
+  const [moved] = item.props.cards.splice(_icDCi, 1);
+  item.props.cards.splice(ci, 0, moved);
+  scheduleCanvasRender(uid); renderProps();
+  showToast('↔ Đổi vị trí ô');
+}
+function icDragEnd(e, uid) {
+  document.querySelectorAll('.ic-card').forEach(el => el.classList.remove('ic-dragging','ic-drag-over'));
+  _icDUid = null; _icDCi = null;
+}
+
+/* ═══════════════════════════════════════════════
+   COLOR PICKER
+═══════════════════════════════════════════════ */
+let _cpUid = null, _cpCi = null;
+
+function icPickColor(e, uid, ci) {
+  e.stopPropagation();
+  if (_cpUid === uid && _cpCi === ci) { closeColorPicker(); return; }
+  closeColorPicker();
+  _cpUid = uid; _cpCi = ci;
+
+  const item = layout.find(l => l.uid === uid);
+  const cur = item?.props?.cards?.[ci]?.color || '#00e676';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'cpOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:599';
+  overlay.onclick = closeColorPicker;
+
+  const picker = document.createElement('div');
+  picker.id = 'cpPicker';
+  picker.className = 'ic-colorpick';
+  picker.onclick = ev => ev.stopPropagation();
+
+  const swatches = IC_COLORS.map(c => `
+    <div class="ic-cp-swatch" style="background:${c};${c===cur?'outline:2px solid #fff;transform:scale(1.15)':''}"
+      onclick="icApplyColor('${uid}',${ci},'${c}')"></div>
+  `).join('');
+
+  picker.innerHTML = `
+    <span class="ic-colorpick-label"><i class="fas fa-palette"></i> CHỌN MÀU</span>
+    <div class="ic-colorpick-swatches">${swatches}</div>
+    <div class="ic-colorpick-custom">
+      <input type="color" value="${cur}"
+        oninput="icApplyColor('${uid}',${ci},this.value);this.nextElementSibling.value=this.value">
+      <input class="ic-hex-input" maxlength="7" value="${cur}"
+        oninput="if(/^#[0-9a-fA-F]{6}$/.test(this.value)){icApplyColor('${uid}',${ci},this.value);this.previousElementSibling.value=this.value}">
+    </div>`;
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(picker);
+
+  const r = e.currentTarget.getBoundingClientRect();
+  let top = r.bottom + 6, left = r.left - 70;
+  if (left + 180 > window.innerWidth - 8) left = window.innerWidth - 188;
+  if (top + 170 > window.innerHeight - 8) top = r.top - 178;
+  picker.style.top  = Math.max(4, top)+'px';
+  picker.style.left = Math.max(4, left)+'px';
+}
+
+function closeColorPicker() {
+  document.getElementById('cpOverlay')?.remove();
+  document.getElementById('cpPicker')?.remove();
+  _cpUid = null; _cpCi = null;
+}
+
+function icApplyColor(uid, ci, color) {
+  const item = layout.find(l => l.uid === uid);
+  if (!item?.props?.cards?.[ci]) return;
+  item.props.cards[ci].color = color;
+  const card = document.getElementById(`icc_${uid}_${ci}`);
+  if (card) {
+    card.style.setProperty('--card-color', color);
+    card.style.borderColor = color + '22';
+    card.style.borderTopColor = color;
+    const v = card.querySelector('.ic-val');
+    if (v) v.style.color = color;
+  }
+  markModified();
+  renderProps();
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeColorPicker();
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undoLayout(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); exportLayout(); return; }
+  if (isTypingContext(document.activeElement)) return;
+  if (e.key === '/') {
+    const input = document.getElementById('layerSearchInput');
+    if (input) { e.preventDefault(); input.focus(); input.select(); }
+    return;
+  }
+  if (e.key === 'ArrowDown') { e.preventDefault(); selectRelativeSection(1); return; }
+  if (e.key === 'ArrowUp') { e.preventDefault(); selectRelativeSection(-1); return; }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selectedUid) {
+    e.preventDefault();
+    removeSection(selectedUid);
+  }
+});
+
+window.addEventListener('beforeunload', e => {
+  if (!isModified) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+/* ═══════════════════════════════════════════════
+   EXPORT / RESET / APPLY
+═══════════════════════════════════════════════ */
+function exportLayout() {
+  const json = JSON.stringify(layout.map(l => ({
+    type: l.type, id: DEFS[l.type].id, props: l.props
+  })), null, 2);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([json], {type:'application/json'}));
+  a.download = 'evn-dashboard-layout.json';
+  a.click();
+  isModified = false;
+  history = [];
+  updateModifiedUI();
+  updateHistoryUI();
+  clearDraft();
+  showToast('⬇ Đã xuất evn-dashboard-layout.json');
+}
+
+function resetLayout() {
+  if (!confirm('Khôi phục layout mặc định? Các thay đổi chưa xuất sẽ bị thay thế.')) return;
+  saveToHistory();
+  layout = freshLayout();
+  selectedUid = null;
+  clearLayerSearch();
+  render();
+  showToast('↺ Đã reset về mặc định');
+}
+
+function forceReloadData() {
+  // Xóa cache hàng và tải lại từ Supabase để đảm bảo số liệu mới nhất
+  try {
+    localStorage.removeItem(LYT_DATA_CACHE_KEY);
+    localStorage.removeItem(LYT_DATA_CACHE_META_KEY);
+  } catch(_) {}
+  _chipAllData = [];
+  _chipFiltered = [];
+  _lytNganCache = null;
+  _lytNganSig = '';
+  showToast('🔄 Đang tải lại dữ liệu từ Supabase...');
+  loadStatsFromSupabase();
+}
+
+function applyLayout() {
+  const visible = layout.filter(l => l.props.visible);
+  const hidden  = layout.filter(l => !l.props.visible);
+  const sticky  = layout.filter(l => l.props.sticky);
+
+  const lines = layout.map((l,i) => {
+    const def = DEFS[l.type];
+    const vis = l.props.visible ? '✓' : '✗';
+    const stk = l.props.sticky ? ' 📌' : '';
+    return `${vis} ${i+1}. [${def.badgeText}] ${def.label}${stk}`;
+  }).join('\n');
+
+  alert(
+    `✓ Layout sẵn sàng áp dụng\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `Tổng: ${layout.length} sections\n` +
+    `Hiển thị: ${visible.length}  |  Ẩn: ${hidden.length}  |  Sticky: ${sticky.length}\n\n` +
+    lines + '\n\n' +
+    `Dùng "Export JSON" để lưu cấu hình.`
+  );
+
+  commitLayoutState({ clearHistory: true });
+  showToast('✓ Đã áp dụng layout');
+}
+
+/* ═══════════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════════ */
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+/* ═══════════════════════════════════════════════
+   LEGACY STUBS
+═══════════════════════════════════════════════ */
+function setCardProp(uid, ci, key, val) {
+  const item = layout.find(l => l.uid === uid);
+  if (item?.props?.cards?.[ci]) {
+    item.props.cards[ci][key] = val;
+    markModified();
+    scheduleCanvasRender(uid);
+  }
+}
+function addCard(uid)          { icAddCard(uid, IC_COLORS[0]); }
+function removeCard(uid, ci)   { icDelete(uid, ci); }
+function moveCard(uid, ci, dir){ icMove(uid, ci, dir); }
+
+/* ═══════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════
+   SUPABASE LIVE STATS LOADER
+   Tự động tính toán các chỉ số từ bảng TongHopThietBi
+   và cập nhật các ô thống kê trên canvas
+═══════════════════════════════════════════════ */
+const _SB_URL = 'https://xqqmfmljwycpehfyknoy.supabase.co';
+const _SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxcW1mbWxqd3ljcGVoZnlrbm95Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODM4MDQsImV4cCI6MjA4Nzg1OTgwNH0.J_z0cFqq_Yet-n2X2L_VREdkcAqbkRFpYUp-ti3Fukc';
+
+// ── LIVE CHARTS RENDERER ─────────────────────────────────────
+// Đồng bộ với app.js: buildStationInfo, classifyTechChart, CAP_ORDER/COLORS
+const _lytCharts = {}; // uid → { device, type, tech }
+
+function lytIsExcluded(pl) {
   if (!pl) return true;
   const n = pl.trim().toUpperCase().replace(/\s+/g,'').normalize('NFC');
-  if (n.startsWith('TICHAN') || n.includes('TICHÂN')) return true;
-  if (n === 'HTTĐ' || n === 'HTTD' || n.startsWith('HTTD')) return true;
-  if (n === 'DẦU' || n === 'DAU' || n.startsWith('DẦU') || n.startsWith('DAU')) return true;
-  if (n === 'RL') return true;
+  if (n.startsWith('TICHAN')||n.includes('TICHÂN')) return true;
+  if (n==='HTTĐ'||n==='HTTD'||n.startsWith('HTTD')) return true;
+  if (n==='DẦU'||n==='DAU'||n.startsWith('DẦU')||n.startsWith('DAU')) return true;
+  if (n==='RL') return true;
   return false;
 }
 
-// Phân loại công nghệ của 1 trạm dựa vào Set<Phan_loai_thiet_bi> ở cấp hiệu lực
-function classifyTechChart(typeSet) {
-  const arr = [...typeSet].map(t => t.toUpperCase());
+function lytClassifyTech(typeSet) {
+  // typeSet chứa các giá trị Phan_loai_thiet_bi (uppercase) của trạm ở cấp hiệu lực
+  // GIS   : có 'GIS' (exact), không có HGIS, không có MC
+  // HGIS  : có 'HGIS' (exact), không có MC
+  // HGIS-AIS : có 'HGIS' VÀ có 'MC' trong cùng cấp
+  // AIS   : còn lại (có MC, không có GIS/HGIS)
+  const arr = [...typeSet];
   const hasGIS  = arr.some(t => t === 'GIS');
   const hasHGIS = arr.some(t => t === 'HGIS');
   const hasMC   = arr.some(t => t === 'MC');
@@ -676,1279 +2433,3687 @@ function classifyTechChart(typeSet) {
   return 'AIS';
 }
 
-// Xây dựng thông tin tổng hợp theo trạm
-// Mỗi trạm: { tram, maxCap, techClass, caps:{cap→soLuong}, devTypes:{pl→sl}, total }
-// Cấp hiệu lực = cấp cao nhất (220 > 110 > 35 > 22 > 10 > 6 > TT)
-function buildStationInfo(data) {
+function lytBuildStations(rows) {
   const map = {};
-  data.forEach(d => {
-    const tram = (d.Tram || '').trim(); if (!tram) return;
-    const pl   = (d.Phan_loai_thiet_bi || '').trim();
-    const cap  = (d.Cap_dien_ap !== null && d.Cap_dien_ap !== undefined) ? String(d.Cap_dien_ap) : null;
-    const sl   = Number(d.So_luong) || 0;
-    if (!map[tram]) map[tram] = { caps:{}, plByCap:{}, total:0, maxCap:null };
+  const capPrio = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
+  rows.forEach(d => {
+    const tram = (d.Tram||'').trim(); if (!tram) return;
+    const cap  = (d.Cap_dien_ap!==null&&d.Cap_dien_ap!==undefined)?String(d.Cap_dien_ap):null;
+    const pl   = (d.Phan_loai_thiet_bi||'').trim();
+    const sl   = Number(d.So_luong)||0;
+    if (!map[tram]) map[tram]={caps:{},plByCap:{},total:0,maxCap:null};
     if (cap) {
-      // Track max cap bằng TẤT CẢ thiết bị (kể cả loại trừ) để xác định cấp ĐA trạm
-      const ni = CAP_ORDER.indexOf(cap), xi = CAP_ORDER.indexOf(map[tram].maxCap);
-      if (ni !== -1 && (xi === -1 || ni < xi)) map[tram].maxCap = cap;
-      // caps chỉ tính thiết bị KHÔNG bị loại trừ (giống bảng nhiệt cũ)
-      if (!isExcludedChart(pl)) {
-        map[tram].caps[cap] = (map[tram].caps[cap] || 0) + sl;
-        if (!map[tram].plByCap[cap]) map[tram].plByCap[cap] = new Set();
+      // Track maxCap từ TẤT CẢ thiết bị để xác định cấp ĐA trạm
+      const ni=capPrio[cap]??99, xi=capPrio[map[tram].maxCap]??99;
+      if (map[tram].maxCap===null||ni<xi) map[tram].maxCap=cap;
+      // caps chỉ tính thiết bị không bị loại trừ
+      if (!lytIsExcluded(pl)) {
+        map[tram].caps[cap]=(map[tram].caps[cap]||0)+sl;
+        if (!map[tram].plByCap[cap]) map[tram].plByCap[cap]=new Set();
         map[tram].plByCap[cap].add(pl.toUpperCase());
       }
     }
-    if (!isExcludedChart(pl)) map[tram].total += sl;
+    if (!lytIsExcluded(pl)) map[tram].total+=sl;
   });
-
-  // Classify tech for each station based on its effective cap
-  return Object.entries(map).map(([tram, info]) => {
-    const effCap = info.maxCap;
-    // For HV stations (220/110): classify using that cap's PL set
-    let tech = null;
-    if (effCap === '2' || effCap === '1') {
-      const plSet = info.plByCap[effCap] || new Set();
-      tech = classifyTechChart(plSet);
-    }
-    return { tram, maxCap: effCap, tech, ...info };
-  }).sort((a, b) => {
-    const ai = CAP_ORDER.indexOf(a.maxCap ?? ''), bi = CAP_ORDER.indexOf(b.maxCap ?? '');
-    const an = ai === -1 ? 99 : ai, bn = bi === -1 ? 99 : bi;
-    if (an !== bn) return an - bn;
-    return b.total - a.total;
+  return Object.entries(map).map(([tram,info])=>{
+    const effCap=info.maxCap;
+    let tech=null;
+    if (effCap==='2'||effCap==='1') tech=lytClassifyTech(info.plByCap[effCap]||new Set());
+    return {tram,maxCap:effCap,tech,...info};
+  }).sort((a,b)=>{
+    const capPrio2={'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
+    const ai=capPrio2[a.maxCap??'']??99, bi=capPrio2[b.maxCap??'']??99;
+    if(ai!==bi) return ai-bi;
+    return b.total-a.total;
   });
 }
 
-function hexToRgba(hex, a) {
-  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+function lytHexToRgba(hex,a){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
   return `rgba(${r},${g},${b},${a})`;
 }
 
-// ── Populate chart tram dropdown ─────────────────────────────
-function populateChartTramSelect(data) {
-  const sel = document.getElementById('chartTramSelect');
-  if (!sel) return;
-  const cur = sel.value;
-  while (sel.options.length > 1) sel.remove(1);
-  const allSt = buildStationInfo(data);
-  const byCapGroup = {};
-  allSt.forEach(s => {
-    const capLbl = CAP_LABEL[s.maxCap] || s.maxCap || 'Khác';
-    if (!byCapGroup[capLbl]) byCapGroup[capLbl] = [];
-    byCapGroup[capLbl].push(s);
-  });
-  Object.entries(byCapGroup).forEach(([capLbl, arr]) => {
-    const grp = document.createElement('optgroup');
-    grp.label = `── ${capLbl} ──`;
-    arr.forEach(s => {
-      const opt = document.createElement('option');
-      opt.value = s.tram;
-      const tl = (s.tech || '').replace('_AIS', ' – AIS');
-      opt.textContent = `${s.tram}${tl ? '  [' + tl + ']' : ''}`;
-      grp.appendChild(opt);
-    });
-    sel.appendChild(grp);
-  });
-  if (cur && [...sel.options].some(o => o.value === cur)) sel.value = cur;
-  else { sel.value = ''; selectedChartTram = ''; }
+function lytChartTooltipOpts() {
+  return { backgroundColor:'#1a2332', borderColor:'#1f2d3d', borderWidth:1,
+    titleColor:'#e2e8f0', bodyColor:'#8fa3bd', padding:10 };
 }
 
-// ── Filter chart by tram ──────────────────────────────────────
-function filterChartByTram(tramName) {
-  selectedChartTram = tramName;
-  const sel = document.getElementById('chartTramSelect');
-  if (sel && sel.value !== tramName) sel.value = tramName;
-  renderBarChart(filteredData);
-  renderPieChart(filteredData);
-}
+// ── Tram state per chart uid ────────────────────────────────
+// ══════════════════════════════════════════════════════
+// CHARTS — state, helpers, render
+// ══════════════════════════════════════════════════════
+const _lytSelectedTram = {};
+const _lytHeatmapGroup = {};
+let _lytNganCache = null, _lytNganSig = '';
 
-// ── 9. BAR CHART ──────────────────────────────────────────────
-// Stacked horizontal bar: trục Y = Trạm, trục X = Số thiết bị
-// Màu = Cấp điện áp  (220kV→110kV→35kV→22kV→10kV→6kV→TT)
-// Nếu selectedChartTram ≠ '' → chỉ hiện trạm đó (bar to, rõ)
-function renderBarChart(data) {
-  // Đảm bảo canvas tồn tại
-  const wrap = document.getElementById('deviceChartWrap');
-  if (!wrap) return;
-  if (!wrap.querySelector('canvas')) {
-    wrap.innerHTML = '<canvas id="deviceChart"></canvas>';
-    deviceChart = null;
-  }
-
-  const allStations = buildStationInfo(data);
-
-  // Lọc theo trạm được chọn
-  const stations = selectedChartTram
-    ? allStations.filter(s => s.tram === selectedChartTram)
-    : allStations;
-
-  // Sub-label
-  const sub = document.getElementById('chartSubLabel');
-  if (sub) {
-    if (selectedChartTram && stations[0]) {
-      const st = stations[0];
-      const tech = (st.tech || '').replace('_AIS', ' – AIS');
-      sub.textContent = `📍 ${st.tram}  ·  Cấp: ${CAP_LABEL[st.maxCap] || ''}  ·  CN: ${tech || '—'}`;
-    } else {
-      sub.textContent = `${allStations.length} trạm  ·  220kV → 110kV → 35kV → 22kV → …  ·  hover để xem chi tiết`;
-    }
-  }
-
-  // Chỉ lấy các cấp ĐA thực sự có trong toàn bộ data (không chỉ trạm đang xem)
-  const activeCaps = CAP_ORDER.filter(cap => allStations.some(s => (s.caps[cap] || 0) > 0));
-
-  const datasets = activeCaps.map(cap => ({
-    label: CAP_LABEL[cap] || cap,
-    data:  stations.map(s => s.caps[cap] || 0),
-    backgroundColor: (CAP_COLORS[cap] || '#888') + 'cc',
-    borderColor:      CAP_COLORS[cap] || '#888',
-    borderWidth: 1,
-    borderRadius: 3,
-    barThickness: selectedChartTram ? 28 : 14,
-  }));
-
-  // Chiều cao canvas: động theo số trạm
-  const barPx  = selectedChartTram ? 70 : 22;
-  const totalH = Math.max(300, stations.length * barPx + 60);
-  const canvas  = wrap.querySelector('canvas') || document.getElementById('deviceChart');
-  if (canvas) {
-    canvas.style.height = totalH + 'px';
-    canvas.style.width  = '100%';
-    // Lấy width thực: nếu wrap chưa render xong thì dùng parentElement hoặc fallback
-    const w = wrap.clientWidth || wrap.parentElement?.clientWidth || 700;
-    canvas.height = totalH;
-    canvas.width  = w;
-  }
-
-  const ctx = document.getElementById('deviceChart')?.getContext('2d');
-  if (!ctx) return;
-  if (deviceChart) deviceChart.destroy();
-  deviceChart = new Chart(ctx, {
-    type: 'bar',
-    data: { labels: stations.map(s => s.tram), datasets },
-    options: {
-      indexAxis: 'y',
-      responsive: false,
-      maintainAspectRatio: false,
-      animation: { duration: 350 },
-      layout: { padding: { right: 16 } },
-      plugins: {
-        legend: {
-          position: 'top',
-          labels: { color:'#8fa3bd', font:{size:10}, boxWidth:12, padding:12 }
-        },
-        tooltip: {
-          ...chartTooltipOpts(),
-          callbacks: {
-            title:  i => `🏭 ${i[0].label}`,
-            label:  i => ` ${i.dataset.label}: ${Number(i.parsed.x).toLocaleString('vi-VN')} thiết bị`,
-            footer: i => `Tổng: ${i.reduce((s,x) => s + Number(x.parsed.x), 0).toLocaleString('vi-VN')}`,
-          }
+// ── Cache nganMap ───────────────────────────────────────
+function lytBuildNganMap(rows) {
+  const sig = rows.length + '|' + (rows[0]?.Tram||'');
+  if (_lytNganCache && _lytNganSig === sig) return _lytNganCache;
+  const NDEFS = [
+    { key:'DZ',    fn: d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn ĐZ' },
+    { key:'MBA',   fn: d => (d.Phan_loai_thiet_bi||'').trim() === 'MBA' },
+    { key:'XT',    fn: d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn XT' },
+    { key:'LL',    fn: d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn LL' },
+    { key:'TBN',   fn: d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn TBN' },
+    { key:'TD',    fn: d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'NgănTD' },
+    { key:'KHANG', fn: d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn Kháng' ||
+                            (d.Phan_loai_thiet_bi || '').trim() === 'K' },
+  ];
+  const map = {};
+  rows.forEach(d => {
+    const tram = (d.Tram||'').trim();
+    if (!tram || !d.Ngan_thiet_bi) return;
+    const pl = (d.Phan_loai_thiet_bi||'').trim().toUpperCase().replace(/\s+/g,'').normalize('NFC');
+    // Loại HTTĐ khỏi tổng ngăn
+    if (pl === 'HTTĐ' || pl === 'HTTD' || pl.startsWith('HTTD')) return;
+    if (!map[tram]) map[tram] = { allNgan:new Set(), totalTB:0 };
+    const nm  = map[tram];
+    const cap = String(d.Cap_dien_ap ?? '');
+    const key = tram + '|||' + d.Ngan_thiet_bi;
+    nm.allNgan.add(key);
+    if (cap && cap !== '0') {
+      NDEFS.forEach(n => {
+        if (n.fn(d)) {
+          const slot = n.key + '_' + cap;
+          if (!nm[slot]) nm[slot] = new Set();
+          nm[slot].add(key);
         }
-      },
-      scales: {
-        x: {
-          stacked: true,
-          beginAtZero: true,
-          position: 'top',
-          ticks: { color:'#4d6480', font:{size:9} },
-          grid:  { color:'rgba(255,255,255,0.06)' }
-        },
-        y: {
-          stacked: true,
-          ticks: {
-            color: '#c0d0e8',
-            font:  { size: selectedChartTram ? 12 : 9.5,
-                     weight: selectedChartTram ? '600' : '400' },
-            crossAlign: 'far',
-          },
-          grid: { color:'rgba(255,255,255,0.03)' }
-        }
-      }
+      });
     }
+    if (!lytIsExcluded((d.Phan_loai_thiet_bi||'').trim()))
+      nm.totalTB += Number(d.So_luong) || 0;
   });
+  _lytNganCache = map;
+  _lytNganSig   = sig;
+  return map;
 }
 
-// ── Pie/Donut chart: phân loại thiết bị + công nghệ TBA ────────
-function renderPieChart(data) {
-  // Lọc theo trạm nếu đang chọn
-  const srcData = selectedChartTram
-    ? data.filter(d => (d.Tram || '').trim() === selectedChartTram)
-    : data;
-  // Pie phân loại thiết bị, loại trừ TIchânsứ, HTTĐ, Dầu, RL
-  const counts = {};
-  srcData.forEach(d => {
-    const pl = (d.Phan_loai_thiet_bi || '').trim();
-    if (!pl || isExcludedChart(pl)) return;
-    counts[pl] = (counts[pl] || 0) + (Number(d.So_luong) || 0);
-  });
-  const sorted  = Object.entries(counts).sort((a,b) => b[1]-a[1]);
-  const top     = sorted.slice(0,12);
-  const others  = sorted.slice(12).reduce((s,e) => s+e[1], 0);
-  if (others > 0) top.push(['Khác', others]);
-  const labels  = top.map(e=>e[0]), values = top.map(e=>e[1]);
-  const total   = values.reduce((a,b)=>a+b,0);
-  const colors  = labels.map((_,i) => PALETTE[i % PALETTE.length]);
+// ── Dropdown helpers ────────────────────────────────────
+// Tất cả function dùng id string để tránh closure stale
+// ── Dropdown list dùng position:fixed — không bị clip bởi overflow ──
+// Hiển thị danh sách trạm, tính vị trí từ anchor element
 
-  const ctx = document.getElementById('typeChart').getContext('2d');
-  if (typeChart) typeChart.destroy();
-  typeChart = new Chart(ctx, {
-    type: 'doughnut',
-    data: { labels, datasets:[{ data:values, backgroundColor:colors.map(c=>c+'bb'), borderColor:colors, borderWidth:2, hoverOffset:12 }] },
-    options: {
-      responsive: true, maintainAspectRatio: false, cutout: '50%',
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: { color:'#8fa3bd', font:{size:9.5}, boxWidth:10, padding:8,
-            generateLabels: chart => chart.data.labels.map((lbl,i) => ({
-              text: `${lbl}  ${values[i].toLocaleString('vi-VN')}  (${((values[i]/total)*100).toFixed(1)}%)`,
-              fillStyle: colors[i]+'bb', strokeStyle: colors[i], lineWidth:1, hidden:false, index:i
-            }))
-          }
-        },
-        tooltip: { ...chartTooltipOpts(), callbacks: {
-          title: c => c[0].label,
-          label: c => [
-            ` ${Number(c.parsed).toLocaleString('vi-VN')} thiết bị`,
-            ` Tỷ lệ: ${((c.parsed/total)*100).toFixed(1)}%`
-          ]
-        }}
-      }
-    }
-  });
-  // Cập nhật label trạm trên tiêu đề pie
-  const pieLabel = document.getElementById('pieChartTramLabel');
-  if (pieLabel) pieLabel.textContent = selectedChartTram ? `· ${selectedChartTram}` : '';
+function lytDdRoot() {
+  return document.querySelector('.canvas-area') || document.body;
 }
 
-
-
-// ── 11. TIMELINE: Năm sản xuất & Năm vận hành (req 14) ─────
-function renderTNTimeline(data) {
-  const years = new Set();
-  data.forEach(d => {
-    if (d.Nam_san_xuat) years.add(Number(d.Nam_san_xuat));
-    if (d.Nam_van_hanh) years.add(Number(d.Nam_van_hanh));
-  });
-  if (!years.size) return;
-  const minY = Math.min(...years);
-  const maxY = Math.max(...years);
-  const labels = [];
-  for (let y = minY; y <= maxY; y++) labels.push(y);
-
-  const countsSX = {}, countsVH = {};
-  labels.forEach(y => { countsSX[y] = 0; countsVH[y] = 0; });
-  data.forEach(d => {
-    const sx = Number(d.Nam_san_xuat), vh = Number(d.Nam_van_hanh);
-    const sl = Number(d.So_luong) || 1;
-    if (sx && countsSX[sx] !== undefined) countsSX[sx] += sl;
-    if (vh && countsVH[vh] !== undefined) countsVH[vh] += sl;
-  });
-
-  const ctx = document.getElementById('tnTimelineChart').getContext('2d');
-  if (tnChart) tnChart.destroy();
-  tnChart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: 'Năm sản xuất',
-          data: labels.map(y => countsSX[y] || 0),
-          backgroundColor: 'rgba(0,200,255,0.55)',
-          borderColor: '#00c8ff',
-          borderWidth: 1, borderRadius: 3,
-        },
-        {
-          label: 'Năm vận hành',
-          data: labels.map(y => countsVH[y] || 0),
-          backgroundColor: 'rgba(0,230,118,0.55)',
-          borderColor: '#00e676',
-          borderWidth: 1, borderRadius: 3,
-        }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { display: true, labels: { color: '#8fa3bd', font: { size: 10 }, boxWidth: 10, padding: 10 } },
-        tooltip: chartTooltipOpts()
-      },
-      scales: {
-        x: { ticks: { color: '#4d6480', font: { size: 9 }, maxRotation: 45 }, grid: { color: '#1a2332' } },
-        y: { beginAtZero: true, ticks: { color: '#4d6480', font: { size: 9 } }, grid: { color: '#1a2332' } }
-      }
+function lytDdClose(uid) {
+  const list = document.getElementById('lytDdL_' + uid);
+  const trigger = document.getElementById('lytDdSel_' + uid);
+  if (list) {
+    list.classList.remove('open', 'open-up');
+    if (list._outsideHandler) {
+      document.removeEventListener('mousedown', list._outsideHandler, true);
+      list._outsideHandler = null;
     }
-  });
+    if (list._resizeHandler) {
+      window.removeEventListener('resize', list._resizeHandler, true);
+      list._resizeHandler = null;
+    }
+    list._anchorEl = null;
+  }
+  if (trigger) trigger.classList.remove('open');
+  document.body.classList.remove('lyt-dd-open');
 }
 
-// ── 12. TABLE (req 15) ───────────────────────────────────────
-// Cột: Tram | Ten_thiet_bi | Hang_san_xuat | Kieu | Thong_so | Ly_lich
-function renderTable(data) {
-  const tbody = document.getElementById('dashboard-tbody');
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const page  = data.slice(start, start + PAGE_SIZE);
-  const count = document.getElementById('tableCount');
-  count.textContent = `${data.length.toLocaleString('vi-VN')} bản ghi`;
-
-  if (!data.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="no-data">Không có dữ liệu phù hợp</td></tr>';
+function lytDdPosition(uid) {
+  const list = document.getElementById('lytDdL_' + uid);
+  const anchorEl = list?._anchorEl;
+  const root = lytDdRoot();
+  if (!list || !anchorEl || !root || !document.body.contains(anchorEl)) {
+    lytDdClose(uid);
     return;
   }
 
-  tbody.innerHTML = '';
-  page.forEach(d => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><span class="station-name">${esc(d.Tram)}</span></td>
-      <td>${esc(d.Ten_thiet_bi)}</td>
-      <td><span class="hang-badge">${esc(d.Hang_san_xuat)}</span></td>
-      <td style="font-family:var(--font-mono);font-size:11px">${esc(d.Kieu)}</td>
-      <td style="font-size:11px;color:var(--text-secondary)">${esc(d.Thong_so)}</td>
-      <td style="font-size:11px;color:var(--text-muted)">${esc(d.Ly_lich)}</td>
-    `;
-    tbody.appendChild(tr);
-  });
+  if (list.parentElement !== root) root.appendChild(list);
+
+  const ar = anchorEl.getBoundingClientRect();
+  const rr = root.getBoundingClientRect();
+  const width = Math.max(anchorEl.offsetWidth || 0, 280);
+
+  const rootVisibleHeight = root === document.body ? window.innerHeight : root.clientHeight;
+  const rootVisibleWidth  = root === document.body ? window.innerWidth  : root.clientWidth;
+  const rootScrollTop  = root === document.body ? window.scrollY : root.scrollTop;
+  const rootScrollLeft = root === document.body ? window.scrollX : root.scrollLeft;
+
+  const maxH = Math.max(160, Math.min(320, rootVisibleHeight - 16));
+  list.style.maxHeight = maxH + 'px';
+
+  const listH = Math.min(maxH, list.scrollHeight || 300);
+  const spaceBelow = rr.bottom - ar.bottom;
+  const spaceAbove = ar.top - rr.top;
+  const openUp = spaceAbove > spaceBelow && spaceBelow < Math.min(220, listH);
+
+  let left = ar.left - rr.left + rootScrollLeft;
+  const minLeft = rootScrollLeft + 8;
+  const maxLeft = rootScrollLeft + rootVisibleWidth - width - 8;
+  left = Math.max(minLeft, Math.min(left, maxLeft));
+
+  let top = openUp
+    ? (ar.top - rr.top + rootScrollTop - listH - 4)
+    : (ar.bottom - rr.top + rootScrollTop + 4);
+
+  const minTop = rootScrollTop + 8;
+  const maxTop = rootScrollTop + rootVisibleHeight - listH - 8;
+  top = Math.max(minTop, Math.min(top, maxTop));
+
+  list.style.width = width + 'px';
+  list.style.left = left + 'px';
+  list.style.top = top + 'px';
+  list.classList.toggle('open-up', openUp);
 }
 
-// ── 13. SORT TABLE ───────────────────────────────────────────
-function sortTable(col) {
-  const keys = ['Tram','Ten_thiet_bi','Hang_san_xuat','Kieu','Thong_so','Ly_lich'];
-  if (col >= keys.length) return;
-  if (sortCol === col) sortAsc = !sortAsc;
-  else { sortCol = col; sortAsc = true; }
-  const key = keys[col];
-  filteredData.sort((a,b) => {
-    const av = a[key] ?? '';
-    const bv = b[key] ?? '';
-    if (av < bv) return sortAsc ? -1 : 1;
-    if (av > bv) return sortAsc ? 1 : -1;
-    return 0;
+function lytDdShow(uid, anchorEl) {
+  const list = document.getElementById('lytDdL_' + uid);
+  const trigger = document.getElementById('lytDdSel_' + uid);
+  const anchor = anchorEl || trigger;
+  const root = lytDdRoot();
+  if (!list || !anchor || !root) return;
+
+  const isOpen = list.classList.contains('open');
+
+  document.querySelectorAll('.hm-dd-list-fixed.open').forEach(x => {
+    const id = (x.id || '').replace('lytDdL_', '');
+    if (id && id !== uid) lytDdClose(id);
   });
-  currentPage = 1;
-  renderTable(filteredData);
-  renderPagination();
-}
+  document.querySelectorAll('.hm-tram-trigger.open').forEach(x => {
+    if (x !== trigger) x.classList.remove('open');
+  });
 
-// ── 14. PAGINATION ───────────────────────────────────────────
-function renderPagination() {
-  const total = Math.ceil(filteredData.length / PAGE_SIZE);
-  const pag   = document.getElementById('pagination');
-  pag.innerHTML = '';
-  if (total <= 1) return;
+  if (list.parentElement !== root) root.appendChild(list);
 
-  const add = (label, page, disabled=false) => {
-    const btn = document.createElement('button');
-    btn.className = 'page-btn' + (page === currentPage ? ' active' : '');
-    btn.textContent = label;
-    btn.disabled = disabled;
-    btn.onclick = () => { currentPage = page; renderTable(filteredData); renderPagination(); };
-    pag.appendChild(btn);
+  list._anchorEl = anchor;
+
+  if (isOpen) {
+    lytDdPosition(uid);
+    return;
+  }
+
+  list.classList.add('open');
+  if (trigger) trigger.classList.add('open');
+  document.body.classList.add('lyt-dd-open');
+  lytDdPosition(uid);
+
+  if (!list._wheelHandler) {
+    list._wheelHandler = ev => {
+      ev.stopPropagation();
+      const maxScroll = Math.max(0, list.scrollHeight - list.clientHeight);
+      if (maxScroll <= 0) return;
+      const next = Math.max(0, Math.min(maxScroll, list.scrollTop + ev.deltaY));
+      if (next !== list.scrollTop) {
+        ev.preventDefault();
+        list.scrollTop = next;
+      }
+    };
+    list.addEventListener('wheel', list._wheelHandler, { passive:false });
+  }
+
+  const onOut = ev => {
+    const currentAnchor = list._anchorEl;
+    const search = document.getElementById('lytDdS_' + uid);
+    const triggerNow = document.getElementById('lytDdSel_' + uid);
+    if (!list.contains(ev.target) && !(currentAnchor && currentAnchor.contains(ev.target)) && !(triggerNow && triggerNow.contains(ev.target)) && !(search && search.contains(ev.target))) {
+      lytDdClose(uid);
+    }
   };
 
-  add('«', 1, currentPage === 1);
-  add('‹', currentPage - 1, currentPage === 1);
+  if (list._outsideHandler) document.removeEventListener('mousedown', list._outsideHandler, true);
+  list._outsideHandler = onOut;
+  setTimeout(() => document.addEventListener('mousedown', onOut, true), 30);
 
-  let start = Math.max(1, currentPage - 2);
-  let end   = Math.min(total, start + 4);
-  if (end - start < 4) start = Math.max(1, end - 4);
-  for (let i = start; i <= end; i++) add(i, i);
-
-  add('›', currentPage + 1, currentPage === total);
-  add('»', total, currentPage === total);
+  if (list._resizeHandler) {
+    window.removeEventListener('resize', list._resizeHandler, true);
+  }
+  list._resizeHandler = () => lytDdPosition(uid);
+  window.addEventListener('resize', list._resizeHandler, true);
 }
 
-// ── 15. CSV EXPORT ───────────────────────────────────────────
-function exportCSV() {
-  const cols = ['Tram','Ten_thiet_bi','Hang_san_xuat','Kieu','Thong_so','Ly_lich',
-                'Phan_loai_thiet_bi','Cap_dien_ap','So_luong','Ngan_thiet_bi',
-                'Nam_san_xuat','Nam_van_hanh','Doi','Cong_suat','Loai_ngan_lo'];
-  const hdrs = ['Trạm','Tên thiết bị','Hãng sản xuất','Kiểu','Thông số','Lý lịch',
-                'Phân loại','Cấp ĐA','Số lượng','Ngăn TB',
-                'Năm SX','Năm VH','Đội','Công suất','Loại ngăn'];
+function lytDdToggle(uid, anchorEl) {
+  const list = document.getElementById('lytDdL_' + uid);
+  if (!list) return;
+  if (list.classList.contains('open')) {
+    lytDdClose(uid);
+    return;
+  }
+  lytDdShow(uid, anchorEl);
+}
 
-  const rows = [hdrs.join(',')];
-  filteredData.forEach(d => {
-    rows.push(cols.map(c => {
-      let v = d[c] ?? '';
-      if (c === 'Cap_dien_ap' && v !== '') v = CAP_LABEL[v] || v;
-      return `"${String(v).replace(/"/g,'""')}"`;
-    }).join(','));
+function lytDdFilter(uid, q) {
+
+  const list = document.getElementById('lytDdL_' + uid);
+  if (!list) return;
+  const lq = (q || '').trim().toLowerCase();
+  let cnt = 0;
+  list.querySelectorAll('.hm-dd-item').forEach(el => {
+    const txt = (el.dataset.val || '').toLowerCase();
+    const ok  = !lq || txt.includes(lq);
+    el.style.display = ok ? '' : 'none';
+    if (ok) {
+      cnt++;
+      const orig = el.dataset.lbl || '';
+      if (lq && orig) {
+        const re = new RegExp('(' + lq.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+        el.innerHTML = orig.replace(re, '<mark>$1</mark>');
+      } else {
+        el.textContent = orig;
+      }
+    }
   });
+  list.querySelectorAll('.hm-dd-grp').forEach(g => {
+    let sib = g.nextElementSibling, any = false;
+    while (sib && !sib.classList.contains('hm-dd-grp')) {
+      if (sib.style.display !== 'none') any = true;
+      sib = sib.nextElementSibling;
+    }
+    g.style.display = any ? '' : 'none';
+  });
+  let empty = list.querySelector('.hm-dd-empty');
+  if (!empty) {
+    empty = document.createElement('div');
+    empty.className = 'hm-dd-empty';
+    list.appendChild(empty);
+  }
+  empty.style.display = cnt ? 'none' : '';
+  empty.textContent   = cnt ? '' : 'Không tìm thấy "' + q + '"';
 
-  const blob = new Blob(['\uFEFF' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `tonghopthietbi_${new Date().toISOString().slice(0,10)}.csv`;
+  // Tự mở list nếu đang đóng
+  if (!list.classList.contains('open')) {
+    const search = document.getElementById('lytDdS_' + uid);
+    if (search) lytDdShow(uid, search);
+  }
+}
+
+function lytDdPick(uid, val, lbl) {
+  const trigger = document.getElementById('lytDdSel_' + uid);
+  const triggerLabel = trigger ? trigger.querySelector('.hm-tram-trigger-label') : null;
+  if (trigger) trigger.dataset.value = val || '';
+  if (triggerLabel) triggerLabel.textContent = val ? lbl : '— Tất cả trạm —';
+
+  const search = document.getElementById('lytDdS_' + uid);
+  if (search) {
+    search.value = '';
+    search.placeholder = val ? ('🔍  ' + lbl) : '🔍  Tìm trạm…';
+  }
+
+  const list = document.getElementById('lytDdL_' + uid);
+  if (list) {
+    lytDdClose(uid);
+    list.querySelectorAll('.hm-dd-item').forEach(el => {
+      el.style.display = '';
+      el.textContent   = el.dataset.lbl || '';
+      el.classList.toggle('active', el.dataset.val === val);
+    });
+    list.querySelectorAll('.hm-dd-grp').forEach(g => g.style.display = '');
+    const empty = list.querySelector('.hm-dd-empty');
+    if (empty) empty.style.display = 'none';
+    if (list._outsideHandler) {
+      document.removeEventListener('mousedown', list._outsideHandler);
+      list._outsideHandler = null;
+    }
+  }
+  lytFilterByTram(uid, val);
+}
+
+function lytFilterByTram(uid, tram) {
+  _lytSelectedTram[uid] = tram;
+  renderChartsSection();
+}
+
+// ── Cap pills ───────────────────────────────────────────
+if (!window._lytSelCaps)   window._lytSelCaps   = {};
+if (!window._lytSortState) window._lytSortState = {};
+
+function lytToggleCap(uid, cap) {
+  if (!_lytSelCaps[uid]) _lytSelCaps[uid] = new Set();
+  _lytSelCaps[uid].has(cap) ? _lytSelCaps[uid].delete(cap) : _lytSelCaps[uid].add(cap);
+  renderChartsSection();
+}
+
+function lytSortCol(uid, col) {
+  const cur = _lytSortState[uid] || { col:null, dir:'desc' };
+  _lytSortState[uid] = { col, dir: (cur.col===col && cur.dir==='desc') ? 'asc' : 'desc' };
+  renderChartsSection();
+}
+
+function lytToggleChartDetail(uid) {
+  window._lytChartDetailOpen = window._lytChartDetailOpen || {};
+  // Mặc định false (chế độ nhanh). Bấm = bật chi tiết; bấm lại = tắt
+  window._lytChartDetailOpen[uid] = window._lytChartDetailOpen[uid] === true ? false : true;
+  renderChartsSection();
+}
+
+// ── Export CSV ──────────────────────────────────────────
+function lytExportCSVFromFilter() {
+  const rows = _chipFiltered.length ? _chipFiltered : _chipAllData;
+  if (!rows.length) { showToast('⚠ Không có dữ liệu để xuất'); return; }
+  const cols = ['Tram','Cap_dien_ap','Phan_loai_thiet_bi','So_luong','Ngan_thiet_bi','Loai_ngan_lo','Cong_suat','Nam_san_xuat','Nam_van_hanh'];
+  const CAP_LBL = {'0':'TT','1':'110kV','2':'220kV','3':'35kV','4':'22kV','6':'6kV','9':'10kV'};
+  const header = ['Trạm','Cấp ĐA','Loại TB','Số lượng','Ngăn TB','Loại ngăn','Công suất','Năm SX','Năm VH'];
+  const csv = [header.join(','), ...rows.map(d =>
+    [d.Tram||'', CAP_LBL[d.Cap_dien_ap]||d.Cap_dien_ap||'', d.Phan_loai_thiet_bi||'',
+     d.So_luong||'', d.Ngan_thiet_bi||'', d.Loai_ngan_lo||'',
+     d.Cong_suat||'', d.Nam_san_xuat||'', d.Nam_van_hanh||'']
+    .map(v => `"${String(v).replace(/"/g,'""')}"`)
+    .join(',')
+  )].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'}));
+  a.download = `EVN_ThietBi_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
-  URL.revokeObjectURL(url);
 }
 
-// ── 16. UI HELPERS ───────────────────────────────────────────
-function setText(id, val) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = val;
+function lytExportCSV(uid) {
+  const tbl = document.querySelector('#lytChartMain_' + uid + ' .hm-table');
+  if (!tbl) return;
+  const rows = [];
+  tbl.querySelectorAll('thead tr').forEach(tr => {
+    const cells = [];
+    tr.querySelectorAll('th').forEach(th => {
+      const t = (th.innerText||'').replace(/[↑↓\n]/g,' ').trim().replace(/,/g,';');
+      for (let i=0; i<(+th.colSpan||1); i++) cells.push(t);
+    });
+    rows.push(cells.join(','));
+  });
+  tbl.querySelectorAll('tbody tr').forEach(tr => {
+    const c = []; tr.querySelectorAll('td').forEach(td => c.push((td.textContent||'').trim().replace(/,/g,';')));
+    if (c.length) rows.push(c.join(','));
+  });
+  const a = document.createElement('a');
+  a.href     = URL.createObjectURL(new Blob(['\uFEFF'+rows.join('\n')], {type:'text/csv;charset=utf-8'}));
+  a.download = 'ngan_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click(); URL.revokeObjectURL(a.href);
 }
 
-function esc(v) {
-  return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+// ── Detail panel ────────────────────────────────────────
+function lytCellClick(td) {
+  const tram = td.dataset.tram, lbl = td.dataset.lbl, ttb = +(td.dataset.ttb)||0;
+  const list = (td.dataset.ngan||'').split('|').filter(Boolean);
+  let p = document.getElementById('hm-detail-panel');
+  if (!p) { p = document.createElement('div'); p.id='hm-detail-panel'; p.className='hm-detail-panel'; document.body.appendChild(p); }
+  p.innerHTML = `<div class="hm-resize-grip"></div><div class="hm-detail-hd"><span>📍 ${tram} · ${lbl}</span>
+    <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span></div>
+    <div style="padding:8px 16px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.07)">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px;font-family:var(--font-mono)">
+        ${list.length} ngăn · TB: <b style="color:var(--text-primary)">${ttb.toLocaleString('vi-VN')}</b></div>
+    </div>
+    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;padding:8px 0;overscroll-behavior:contain">
+      ${list.map((n,i)=>`<div class="hm-detail-item" style="padding:5px 16px">${i+1}. ${n}</div>`).join('')}
+    </div>`;
+  p.classList.add('open');
+  _hmOpenPanel(p);
 }
 
-function fmtDate(v) {
-  if (!v) return '<span style="color:var(--text-muted)">—</span>';
-  return v.slice(0, 10);
+// ══════════════════════════════════════════════════════
+// renderChartsSection — MAIN
+// ══════════════════════════════════════════════════════
+function lytSetHeatmapGroup(uid, key) {
+  _lytHeatmapGroup[uid] = key;
+  renderChartsSection();
 }
 
-function chartTooltipOpts() {
-  return {
-    backgroundColor: '#1a2332',
-    borderColor: '#1f2d3d',
-    borderWidth: 1,
-    titleColor: '#e2e8f0',
-    bodyColor: '#8fa3bd',
-    padding: 10,
-  };
+
+function buildChartMiniPreview(viewSt, nganMap) {
+  if (!viewSt.length) return '';
+  const CAP_COL  = LYT_CAP_COLORS;
+  const CAP_LBL  = LYT_CAP_LABEL;
+  const CAP_PRIO = ['2','1','3','4','9','6','0'];
+
+  // Top 12 trạm theo tổng ngăn, giữ màu theo cấp ĐA
+  const ranked = [...viewSt]
+    .map(st => ({
+      tram: st.tram,
+      maxCap: st.maxCap,
+      totalNgan: nganMap[st.tram]?.allNgan?.size || 0,
+      totalTB:   nganMap[st.tram]?.totalTB || 0,
+      color: CAP_COL[st.maxCap] || '#64748b'
+    }))
+    .sort((a, b) => b.totalNgan - a.totalNgan)
+    .slice(0, 12);
+
+  if (!ranked.length) return '';
+  const maxVal = Math.max(...ranked.map(r => r.totalNgan), 1);
+
+  return `
+  <div style="margin-top:14px">
+    <div style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.08em;margin-bottom:8px;padding:0 4px">
+      TOP TRẠM THEO TỔNG NGĂN
+    </div>
+    <div style="display:grid;gap:5px">
+      ${ranked.map(item => {
+        const pct = Math.max(6, Math.round((item.totalNgan / maxVal) * 100));
+        const capLbl = CAP_LBL[item.maxCap] || '?';
+        return `<div style="display:grid;grid-template-columns:140px 1fr 70px;align-items:center;gap:10px">
+          <div style="display:flex;align-items:center;gap:6px;overflow:hidden">
+            <span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;
+              background:${item.color}22;color:${item.color};border:1px solid ${item.color}55;
+              flex-shrink:0;white-space:nowrap">${capLbl}</span>
+            <span style="font-size:10px;color:#d0ddf0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500">${item.tram}</span>
+          </div>
+          <div style="height:10px;border-radius:999px;background:rgba(255,255,255,0.07);overflow:hidden">
+            <div style="height:100%;width:${pct}%;border-radius:999px;
+              background:linear-gradient(90deg,${item.color}ee,${item.color}88);
+              box-shadow:0 0 8px ${item.color}66;transition:width .4s"></div>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:${item.color};font-weight:700;text-align:right;white-space:nowrap">
+            ${item.totalNgan.toLocaleString('vi-VN')} <span style="font-weight:400;opacity:.7;font-size:9px">ngăn</span>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
 }
 
-function setLoading(visible) {
-  document.getElementById('loadingOverlay').classList.toggle('visible', visible);
-  document.getElementById('refreshBtn').classList.toggle('loading', visible);
-}
+function renderChartsSection() {
+  if (!_chipAllData.length) return;
+  const chartsItem = layout.find(l => l.type === 'charts');
+  if (!chartsItem) return;
+  if (!document.querySelector(`.section-wrapper[data-uid="${chartsItem.uid}"]`)) return;
+  if (!chartsItem.props.visible) { destroyChartResources(chartsItem.uid); return; }
 
-function setConnectionStatus(state) {
-  const dot  = document.querySelector('.status-dot');
-  const text = document.querySelector('.status-text');
-  const map  = {
-    online:     ['online', 'Đã kết nối'],
-    error:      ['error',  'Lỗi kết nối'],
-    connecting: ['',       'Đang kết nối...'],
-  };
-  const [cls, txt] = map[state] || map.connecting;
-  dot.className  = 'status-dot' + (cls ? ' ' + cls : '');
-  text.textContent = txt;
-}
-
-function updateTimestamp() {
-  const fmt = new Date().toLocaleTimeString('vi-VN', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
-  document.getElementById('lastUpdate').textContent = `Cập nhật: ${fmt}`;
-}
-
-// ── 17. MAIN LOAD ────────────────────────────────────────────
-// CSS overrides for extended stat cards (injected once)
-const STATS_EXTRA_CSS = `
-  <style id="statsExtraCSS">
-    #statsGrid { grid-template-columns: repeat(4, 1fr) !important; }
-    .stat-ratio {
-      display: inline-block;
-      font-size: 11px; font-weight: 600;
-      color: #ff9100;
-      background: rgba(255,145,0,0.12);
-      border: 1px solid rgba(255,145,0,0.3);
-      border-radius: 4px; padding: 1px 6px; margin-top: 3px;
-      font-family: var(--font-mono, monospace);
-    }
-    .stat-icon.pink   { background: rgba(255,64,129,0.15); color: #ff4081; }
-    .stat-icon.teal   { background: rgba(0,230,118,0.15);  color: #00e676; }
-    .stat-icon.cyan2  { background: rgba(24,255,255,0.12); color: #18ffff; }
-    .stat-icon.yellow { background: rgba(255,215,64,0.15); color: #ffd740; }
-    .stat-icon.green  { background: rgba(0,230,118,0.15);  color: #00e676; }
-    .stat-tech-tag { font-size:11px; font-family:var(--font-mono); padding:3px 10px;
-      border-radius:5px; border:1px solid rgba(255,255,255,0.1);
-      display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
-    .stat-tech-tag.gis    { background:rgba(179,136,255,0.15); color:#b388ff; border-color:rgba(179,136,255,0.3); }
-    .stat-tech-tag.hgis   { background:rgba(24,255,255,0.1);   color:#18ffff; border-color:rgba(24,255,255,0.25); }
-    .stat-tech-tag.ais    { background:rgba(0,200,255,0.1);    color:#00c8ff; border-color:rgba(0,200,255,0.25); }
-    .stat-tech-tag.honhop { background:rgba(255,145,0,0.1);    color:#ff9100; border-color:rgba(255,145,0,0.3); }
-    .stat-tech-tag.kck    { background:rgba(0,230,118,0.1);    color:#00e676; border-color:rgba(0,230,118,0.25); }
-    .tech-cap-header {
-      font-size:10px; font-family:var(--font-mono); font-weight:600; letter-spacing:.08em;
-      color:var(--text-secondary); margin:8px 0 5px; width:100%;
-      padding-bottom:4px; border-bottom:1px solid rgba(255,255,255,0.07);
-      display:flex; align-items:center; gap:5px;
-    }
-    .tech-cap-header:first-child { margin-top:2px; }
-    .tech-tag-grid { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:2px; }
-    .tech-bar-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; margin-bottom:4px; }
-    .tech-bar-item { display:flex; flex-direction:column; gap:3px; }
-    .tech-bar-header { display:flex; justify-content:space-between; align-items:baseline; }
-    .tech-bar-label { font-size:10px; font-family:var(--font-mono); font-weight:700; letter-spacing:.04em; }
-    .tech-bar-label.ais    { color:#00c8ff; }
-    .tech-bar-label.gis    { color:#b388ff; }
-    .tech-bar-label.hgis   { color:#18ffff; }
-    .tech-bar-label.honhop { color:#ff9100; }
-    .tech-bar-label.kck    { color:#00e676; }
-    .tech-bar-num { font-size:18px; font-weight:800; font-family:var(--font-mono); line-height:1; }
-    .tech-bar-num.ais    { color:#00c8ff; }
-    .tech-bar-num.gis    { color:#b388ff; }
-    .tech-bar-num.hgis   { color:#18ffff; }
-    .tech-bar-num.honhop { color:#ff9100; }
-    .tech-bar-num.kck    { color:#00e676; }
-    .tech-bar-track { width:100%; height:5px; background:rgba(255,255,255,0.07); border-radius:3px; overflow:hidden; }
-    .tech-bar-fill { height:100%; border-radius:3px; transition:width .5s cubic-bezier(.4,0,.2,1); }
-    .tech-bar-fill.ais    { background:#00c8ff; box-shadow:0 0 6px rgba(0,200,255,.5); }
-    .tech-bar-fill.gis    { background:#b388ff; box-shadow:0 0 6px rgba(179,136,255,.5); }
-    .tech-bar-fill.hgis   { background:#18ffff; box-shadow:0 0 6px rgba(24,255,255,.5); }
-    .tech-bar-fill.honhop { background:#ff9100; box-shadow:0 0 6px rgba(255,145,0,.5); }
-    .tech-bar-fill.kck    { background:#00e676; box-shadow:0 0 6px rgba(0,230,118,.5); }
-    .tech-hv-select {
-      font-size:10px; font-family:var(--font-mono); font-weight:600;
-      background:var(--bg-elevated,#182030); border:1px solid rgba(0,200,255,0.4);
-      color:#00c8ff; border-radius:4px; padding:2px 6px; cursor:pointer; outline:none;
-    }
-    /* ── Stat card ngăn — clickable ── */
-    .stat-card-ngan {
-      cursor: pointer;
-      transition: border-color .18s, background .18s, transform .15s;
-    }
-    .stat-card-ngan:hover {
-      border-color: rgba(0,200,255,0.4) !important;
-      background: rgba(0,200,255,0.05);
-      transform: translateY(-2px);
-    }
-    .stat-card-ngan.stat-card-active {
-      border-color: rgba(0,200,255,0.7) !important;
-      background: rgba(0,200,255,0.1);
-      box-shadow: 0 0 0 1px rgba(0,200,255,0.4), 0 4px 16px rgba(0,0,0,0.3);
-    }
-    .stat-card-ngan.stat-card-active .stat-value { color: var(--accent) !important; }
-    .stat-card-ngan.stat-card-active::after {
-      content: '▼ đang lọc';
-      display: block;
-      font-size: 8px;
-      color: var(--accent);
-      font-family: var(--font-mono);
-      margin-top: 3px;
-      letter-spacing: .06em;
-    }
-    /* ── 2 CHIPS: Device card grid ── */
-    .chips-header-row {
-      display:flex; align-items:center; justify-content:space-between;
-      margin-bottom:10px; flex-wrap:wrap; gap:8px;
-    }
-    .chips-reset-btn {
-      display:inline-flex; align-items:center; gap:6px;
-      padding:5px 12px; border-radius:6px; cursor:pointer;
-      border:1px solid rgba(255,82,82,0.35); background:rgba(255,82,82,0.08);
-      color:#ff5252; font-size:11px; font-weight:500; transition:all .15s;
-    }
-    .chips-reset-btn:hover { background:rgba(255,82,82,0.18); border-color:rgba(255,82,82,0.6); }
-    .chips-reset-btn i { font-size:10px; }
-    .chips-active-info {
-      font-size:11px; color:var(--accent); font-family:var(--font-mono);
-      background:rgba(0,200,255,0.08); border:1px solid rgba(0,200,255,0.2);
-      border-radius:5px; padding:3px 10px; display:none;
-    }
-    .chips-active-info.visible { display:inline-flex; align-items:center; gap:6px; }
-    /* Device card chips */
-    .device-chips-grid {
-      display:flex; flex-wrap:wrap; gap:8px;
-    }
-    .device-chip {
-      display:flex; flex-direction:column; gap:4px;
-      padding:8px 12px; border-radius:8px; cursor:pointer;
-      border:1px solid rgba(255,255,255,0.08);
-      background:rgba(255,255,255,0.03);
-      transition:all .18s; min-width:100px; position:relative;
-      user-select:none;
-    }
-    .device-chip:hover {
-      background:rgba(0,200,255,0.07);
-      border-color:rgba(0,200,255,0.3);
-      transform:translateY(-1px);
-      box-shadow:0 4px 16px rgba(0,0,0,0.3);
-    }
-    .device-chip.active {
-      background:rgba(0,200,255,0.12);
-      border-color:rgba(0,200,255,0.55);
-      box-shadow:0 0 0 1px rgba(0,200,255,0.3), 0 4px 16px rgba(0,0,0,0.3);
-    }
-    .device-chip.active::after {
-      content:'✓';
-      position:absolute; top:4px; right:7px;
-      font-size:9px; color:var(--accent); font-weight:700;
-    }
-    .device-chip-name {
-      font-size:12px; font-weight:600;
-      color:var(--text-primary); line-height:1.2;
-    }
-    .device-chip.active .device-chip-name { color:var(--accent); }
-    .device-chip-count {
-      font-size:16px; font-weight:800;
-      font-family:var(--font-mono); color:var(--accent); line-height:1;
-    }
-    .device-chip-hang {
-      font-size:9px; color:var(--text-muted);
-      font-family:var(--font-mono); white-space:nowrap;
-      overflow:hidden; text-overflow:ellipsis; max-width:130px;
-    }
-    .device-chip-total {
-      font-size:10px; font-weight:400; opacity:0.45;
-      font-family:var(--font-mono);
-    }
-    .hang-badge {
-      font-size:10px; padding:2px 7px; border-radius:4px;
-      background:rgba(0,200,255,0.1); color:var(--accent);
-      border:1px solid rgba(0,200,255,0.2);
-    }
-    /* ── Chart filter row ── */
-    .chart-filter-row {
-      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-      padding:8px 16px 10px; border-bottom:1px solid rgba(255,255,255,0.05);
-    }
-    .chart-filter-label { font-size:10px; color:var(--text-muted); font-family:var(--font-mono); }
-    .chart-tram-select {
-      font-size:10.5px; padding:5px 10px; border-radius:6px; cursor:pointer;
-      border:1px solid rgba(0,200,255,0.3); background:var(--bg-elevated,#182030);
-      color:var(--text-primary); font-family:var(--font-mono); min-width:220px;
-      outline:none; transition:border-color .15s; max-width:380px;
-    }
-    .chart-tram-select:hover { border-color:rgba(0,200,255,0.6); }
-    .chart-tram-select optgroup { color:var(--accent); font-size:9px; }
-    .chart-reset-btn {
-      font-size:10px; padding:5px 11px; border-radius:6px; cursor:pointer;
-      border:1px solid rgba(255,82,82,0.3); background:rgba(255,82,82,0.08);
-      color:#ff5252; font-family:var(--font-mono); transition:all .15s;
-    }
-    .chart-reset-btn:hover { background:rgba(255,82,82,0.18); border-color:rgba(255,82,82,0.6); }
-    /* ── Heatmap ── */
-    .heatmap-wrap { width:100%; overflow:auto; }
-    .heatmap-table { border-collapse:collapse; width:100%; font-family:var(--font-mono); font-size:10px; }
-    .heatmap-table thead { position:sticky; top:0; z-index:2; background:var(--bg-surface); }
-    .heatmap-table tr:hover td { filter:brightness(1.18); }
-    .hm-tram-th { text-align:left; padding:4px 8px; color:var(--text-muted); font-size:9px; font-weight:600;
-      min-width:130px; position:sticky; left:0; background:var(--bg-surface); z-index:3; }
-    .hm-tram-cell { font-size:9.5px; color:var(--text-secondary); padding:3px 8px; white-space:nowrap;
-      position:sticky; left:0; background:var(--bg-base); z-index:1; border-right:1px solid rgba(255,255,255,0.06); }
-    .hm-cell { text-align:center; padding:3px 5px; font-size:9px; font-weight:600;
-      border:1px solid rgba(255,255,255,0.04); min-width:42px; cursor:default; }
-    .hm-total-cell { text-align:right; padding:3px 8px; font-size:9.5px; font-weight:700;
-      color:var(--text-secondary); border-left:1px solid rgba(255,255,255,0.08); }
-  </style>
-`;
-
-const DASHBOARD_HTML = `
-  ${STATS_EXTRA_CSS}
-  <!-- FILTER PANEL -->
-  <section class="filter-panel" id="filterPanel">
-    <div class="filter-header">
-      <span class="filter-title"><i class="fas fa-filter"></i> Bộ lọc</span>
-      <button class="filter-reset-btn" onclick="resetFilters()">
-        <i class="fas fa-times"></i> Xóa bộ lọc
-      </button>
-    </div>
-    <div class="filter-row">
-      <div class="filter-group">
-        <label class="filter-label">Đội</label>
-        <select id="filterDoi" class="filter-select" onchange="applyFilters()">
-          <option value="">Tất cả</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label class="filter-label">Cấp điện áp</label>
-        <select id="filterCap" class="filter-select" onchange="applyFilters()">
-          <option value="">Tất cả</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label class="filter-label">Phân loại thiết bị</label>
-        <select id="filterPhanLoai" class="filter-select" onchange="applyFilters()">
-          <option value="">Tất cả</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label class="filter-label">Trạm</label>
-        <select id="filterTram" class="filter-select" onchange="applyFilters()">
-          <option value="">Tất cả</option>
-        </select>
-      </div>
-      <div class="filter-group filter-group-search">
-        <label class="filter-label">Tìm kiếm</label>
-        <div class="search-wrap">
-          <i class="fas fa-search search-icon"></i>
-          <input type="text" id="searchInput" class="search-box" placeholder="Tên thiết bị, trạm, ngăn..." oninput="applyFilters()">
-        </div>
-      </div>
-    </div>
-    <div class="filter-active-row" id="activeFilterRow" style="display:none">
-      <span class="active-filter-label">Đang lọc:</span>
-      <div class="active-filter-chips" id="activeFilterChips"></div>
-    </div>
-  </section>
-
-  <!-- 1 STATS: STAT CARDS -->
-  <section class="stats-grid" id="statsGrid">
-    <!-- Row 1: TBA tổng quan -->
-    <div class="stat-card">
-      <div class="stat-icon green"><i class="fas fa-building"></i></div>
-      <div class="stat-info">
-        <span class="stat-label">Tổng số TBA</span>
-        <span class="stat-value" id="totalStations">—</span>
-      </div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon orange"><i class="fas fa-industry"></i></div>
-      <div class="stat-info">
-        <span class="stat-label">TBA 220kV</span>
-        <span class="stat-value" id="total220kV">—</span>
-        <span class="stat-ratio" id="ratio220kV"></span>
-      </div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon pink"><i class="fas fa-bolt"></i></div>
-      <div class="stat-info">
-        <span class="stat-label">TBA 110kV</span>
-        <span class="stat-value" id="total110kV">—</span>
-        <span class="stat-ratio" id="ratio110kV"></span>
-      </div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon cyan"><i class="fas fa-microchip"></i></div>
-      <div class="stat-info">
-        <span class="stat-label">Tổng số thiết bị</span>
-        <span class="stat-value" id="totalDevices">—</span>
-      </div>
-    </div>
-    <!-- Row 2: Công nghệ TBA (span full) -->
-    <div class="stat-card" style="grid-column:span 4">
-      <div class="stat-icon purple"><i class="fas fa-network-wired"></i></div>
-      <div class="stat-info" style="flex:1">
-        <span class="stat-label">Công nghệ thiết bị TBA</span>
-        <div id="techTBABox" style="margin-top:6px"></div>
-      </div>
-    </div>
-    <!-- Row 3: Ngăn tổng quan + các ngăn chính -->
-    <div class="stat-card">
-      <div class="stat-icon purple"><i class="fas fa-layer-group"></i></div>
-      <div class="stat-info">
-        <span class="stat-label">Tổng số ngăn</span>
-        <span class="stat-value" id="totalNgan">—</span>
-      </div>
-    </div>
-    <div class="stat-card stat-card-ngan" data-ngan="Ngăn ĐZ" onclick="filterByLoaiNgan('Ngăn ĐZ')" title="Click để lọc ngăn đường dây">
-      <div class="stat-icon teal"><i class="fas fa-route"></i></div>
-      <div class="stat-info">
-        <span class="stat-label">Ngăn đường dây</span>
-        <span class="stat-value" id="nganDuongDay">—</span>
-      </div>
-    </div>
-    <div class="stat-card stat-card-ngan" data-ngan="Ngăn MBA" onclick="filterByLoaiNgan('Ngăn MBA')" title="Click để lọc ngăn MBA">
-      <div class="stat-icon yellow"><i class="fas fa-wrench"></i></div>
-      <div class="stat-info">
-        <span class="stat-label">Ngăn MBA</span>
-        <span class="stat-value" id="nganMBA">—</span>
-      </div>
-    </div>
-    <div class="stat-card stat-card-ngan" data-ngan="Ngăn XT" onclick="filterByLoaiNgan('Ngăn XT')" title="Click để lọc ngăn xuất tuyến">
-      <div class="stat-icon pink"><i class="fas fa-sitemap"></i></div>
-      <div class="stat-info">
-        <span class="stat-label">Ngăn xuất tuyến (XT)</span>
-        <span class="stat-value" id="nganXT">—</span>
-      </div>
-    </div>
-    <!-- Row 4: Các ngăn phụ -->
-    <div class="stat-card stat-card-ngan" data-ngan="Ngăn LL" onclick="filterByLoaiNgan('Ngăn LL')" title="Click để lọc ngăn liên lạc">
-      <div class="stat-icon cyan2"><i class="fas fa-exchange-alt"></i></div>
-      <div class="stat-info">
-        <span class="stat-label">Ngăn liên lạc (LL)</span>
-        <span class="stat-value" id="nganLL">—</span>
-      </div>
-    </div>
-    <div class="stat-card stat-card-ngan" data-ngan="Ngăn TBN" onclick="filterByLoaiNgan('Ngăn TBN')" title="Click để lọc ngăn tụ bù">
-      <div class="stat-icon green"><i class="fas fa-battery-half"></i></div>
-      <div class="stat-info">
-        <span class="stat-label">Ngăn tụ bù (TBN)</span>
-        <span class="stat-value" id="nganTBN">—</span>
-      </div>
-    </div>
-    <div class="stat-card stat-card-ngan" data-ngan="NgănTD" onclick="filterByLoaiNgan('NgănTD')" title="Click để lọc ngăn tự dùng">
-      <div class="stat-icon orange"><i class="fas fa-plug"></i></div>
-      <div class="stat-info">
-        <span class="stat-label">Ngăn tự dùng (TD)</span>
-        <span class="stat-value" id="nganTD">—</span>
-      </div>
-    </div>
-    <div class="stat-card stat-card-ngan" data-ngan="Ngăn Kháng" onclick="filterByLoaiNgan('Ngăn Kháng')" title="Click để lọc ngăn kháng">
-      <div class="stat-icon purple"><i class="fas fa-magnet"></i></div>
-      <div class="stat-info">
-        <span class="stat-label">Ngăn kháng</span>
-        <span class="stat-value" id="nganKhang">—</span>
-      </div>
-    </div>
-    <!-- Row 5: Tổng công suất -->
-    <div class="stat-card" style="grid-column:span 4">
-      <div class="stat-icon cyan2"><i class="fas fa-bolt"></i></div>
-      <div class="stat-info">
-        <span class="stat-label">Tổng công suất (MVA)</span>
-        <span class="stat-value" id="tongCongSuat">—</span>
-      </div>
-    </div>
-  </section>
-
-  <!-- 2 CHIPS: Danh sách thiết bị -->
-  <section class="section-block">
-    <div class="section-header">
-      <h2><i class="fas fa-microchip"></i> Danh sách thiết bị</h2>
-      <span class="section-count" id="typeChipsCount"></span>
-    </div>
-    <div id="deviceByType"></div>
-  </section>
-
-  <!-- 3 CHARTS -->
-  <section class="section-block" style="padding:0">
-    <div class="section-header" style="padding:14px 16px 10px">
-      <h2><i class="fas fa-chart-bar"></i> Số lượng thiết bị theo trạm</h2>
-    </div>
-    <!-- Filter: dropdown chọn trạm -->
-    <div class="chart-filter-row">
-      <span class="chart-filter-label"><i class="fas fa-search-location"></i> Trạm:</span>
-      <select class="chart-tram-select" id="chartTramSelect" onchange="filterChartByTram(this.value)">
-        <option value="">— Tất cả trạm —</option>
-      </select>
-      <button class="chart-reset-btn" onclick="filterChartByTram('')">
-        <i class="fas fa-times"></i> Bỏ chọn
-      </button>
-      <span id="chartSubLabel" style="font-size:9px;color:var(--text-muted);font-family:var(--font-mono);margin-left:auto">
-        220kV→110kV→35kV→22kV · hover để xem chi tiết
-      </span>
-    </div>
-    <!-- Chart: bar trái rộng + pie phải -->
-    <div style="display:grid;grid-template-columns:1fr 300px;gap:32px;padding:12px 16px 16px;align-items:start">
-      <div id="deviceChartWrap" style="max-height:75vh;overflow-y:auto;overflow-x:hidden">
-        <canvas id="deviceChart"></canvas>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:6px;padding-top:4px">
-        <div style="font-size:10px;font-weight:600;color:var(--text-secondary)">
-          <i class="fas fa-chart-pie" style="color:var(--accent)"></i>
-          Tỷ lệ phân loại thiết bị
-          <span id="pieChartTramLabel" style="font-size:9px;font-weight:400;color:var(--accent);margin-left:6px"></span>
-        </div>
-        <div style="height:500px">
-          <canvas id="typeChart"></canvas>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 4 TIMELINE: Năm sản xuất & Năm vận hành -->
-  <section class="section-block">
-    <div class="section-header">
-      <h2><i class="fas fa-calendar-alt"></i> Năm sản xuất &amp; Năm vận hành</h2>
-      <span class="section-sub">Phân bố số lượng thiết bị theo năm</span>
-    </div>
-    <div class="chart-wrapper" style="height:220px">
-      <canvas id="tnTimelineChart"></canvas>
-    </div>
-  </section>
-
-  <!-- 5 TABLE: Danh sách thiết bị -->
-  <section class="section-block">
-    <div class="section-header">
-      <h2><i class="fas fa-table"></i> Danh sách thiết bị</h2>
-      <div style="display:flex;gap:10px;align-items:center">
-        <span class="table-count" id="tableCount"></span>
-        <button class="export-btn" onclick="exportCSV()">
-          <i class="fas fa-download"></i> Xuất CSV
-        </button>
-      </div>
-    </div>
-    <div class="table-container">
-      <table class="data-table" id="dashboard-table">
-        <thead>
-          <tr>
-            <th onclick="sortTable(0)">Trạm <i class="fas fa-sort"></i></th>
-            <th onclick="sortTable(1)">Tên thiết bị <i class="fas fa-sort"></i></th>
-            <th onclick="sortTable(2)">Hãng sản xuất <i class="fas fa-sort"></i></th>
-            <th onclick="sortTable(3)">Kiểu <i class="fas fa-sort"></i></th>
-            <th onclick="sortTable(4)">Thông số <i class="fas fa-sort"></i></th>
-            <th onclick="sortTable(5)">Lý lịch <i class="fas fa-sort"></i></th>
-          </tr>
-        </thead>
-        <tbody id="dashboard-tbody">
-          <tr><td colspan="6" class="no-data">Đang tải...</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="pagination" id="pagination"></div>
-  </section>
-`;
-
-async function loadDashboard() {
-  // Khôi phục HTML dashboard nếu bị thay bởi placeholder
-  const mainEl = document.getElementById('mainSections');
-  if (mainEl && !document.getElementById('filterPanel')) {
-    mainEl.innerHTML = DASHBOARD_HTML;
-    // Inject extra CSS once
-    if (!document.getElementById('statsExtraCSS')) {
-      document.head.insertAdjacentHTML('beforeend', STATS_EXTRA_CSS);
-    }
-    // Reset chart instances vì canvas mới được tạo
-    deviceChart = null;
-    typeChart   = null;
-    tnChart     = null;
+  const uid = chartsItem.uid;
+  // ── Guard: nếu mainEl đã có nội dung real (không phải spinner) VÀ
+  //    cùng data signature → skip re-render hoàn toàn (0ms)
+  const mainElCheck = document.getElementById('lytChartMain_' + uid);
+  const currentSig  = (_chipFiltered.length || _chipAllData.length) + '|' + (_lytSelectedTram[uid]||'') + '|' + ((window._lytChartDetailOpen||{})[uid]);
+  if (mainElCheck && mainElCheck._renderSig === currentSig && !mainElCheck.querySelector('.fa-spinner')) {
+    return; // nội dung đã đúng, không cần render lại
   }
 
-  setLoading(true);
-  setConnectionStatus('connecting');
-  try {
-    const data = await fetchData();
-    if (!data) {
-      setConnectionStatus('error');
-      const tbody = document.getElementById('dashboard-tbody');
-      if (tbody) tbody.innerHTML =
-        '<tr><td colspan="6" class="no-data">Không thể tải dữ liệu. Kiểm tra kết nối Supabase.</td></tr>';
-      return;
+  // ── Self-healing: nếu lytChartMain_uid bị xoá (do skeleton hay rebuild),
+  //    tạo lại element trước khi render nội dung vào
+  if (!mainElCheck) {
+    const wrapper = document.querySelector(`.section-wrapper[data-uid="${uid}"]`);
+    const prev = wrapper?.querySelector('.card-preview');
+    if (!prev) return;
+    // Đảm bảo lytChartsWrap tồn tại hoặc tạo mới
+    let wrap = document.getElementById('lytChartsWrap_' + uid);
+    if (!wrap) {
+      prev.innerHTML = `<div class="lyt-charts-wrap" id="lytChartsWrap_${uid}">
+        <div id="lytChartMain_${uid}" style="min-height:60px"></div>
+      </div>`;
+    } else {
+      wrap.innerHTML = `<div id="lytChartMain_${uid}" style="min-height:60px"></div>`;
     }
-
-    allData = data;
-    filteredData = [...allData];
-
-    populateFilters(allData);
-    renderStats(allData);
-    renderTypeChips();
-    selectedChartTram = '';
-    populateChartTramSelect(allData);
-    // Đợi DOM render xong để wrap có clientWidth trước khi vẽ chart
-    setTimeout(() => {
-      renderBarChart(allData);
-      renderPieChart(allData);
-    }, 50);
-    renderTNTimeline(allData);
-    renderTable(allData);
-    renderPagination();
-    updateTimestamp();
-    setConnectionStatus('online');
-  } catch (err) {
-    console.error('[loadDashboard Error]', err);
-    setConnectionStatus('error');
-  } finally {
-    setLoading(false);
+    // Xác nhận đã tạo xong
+    if (!document.getElementById('lytChartMain_' + uid)) return;
   }
-}
 
-// ── 18. ROUTER / NAV ─────────────────────────────────────────
-const PAGES = {
-  dashboard: {
-    title: 'Quản lý Thiết Bị',
-    sub:   'Tổng quan dữ liệu thời gian thực',
-    render: () => loadDashboard()
-  },
-  // ── THIẾT BỊ ─────────────────────────────────
-  MBA: {
-    title: 'Máy biến áp',
-    sub:   'MBA — Danh sách, thông số kỹ thuật và lý lịch',
-    render: () => appRenderThietBi('MBA')
-  },
-  MC: {
-    title: 'Máy cắt (MC)',
-    sub:   'MC, GIS, HGIS — Danh sách, thông số và lý lịch',
-    render: () => appRenderThietBi('MC')
-  },
-  DCL: {
-    title: 'Dao cách ly & FCO',
-    sub:   'DCL, FCO — Danh sách, thông số và lý lịch',
-    render: () => appRenderThietBi('DCL')
-  },
-  TUTI: {
-    title: 'TU, TI đo lường',
-    sub:   'TU, TI, TIO — Danh sách, thông số và lý lịch',
-    render: () => appRenderThietBi('TUTI')
-  },
-  CSV: {
-    title: 'Chống sét van (CSV)',
-    sub:   'CSV — Danh sách, thông số và lý lịch',
-    render: () => appRenderThietBi('CSV')
-  },
-  CAP: {
-    title: 'Cáp điện lực',
-    sub:   'Cáp — Danh sách, thông số và lý lịch',
-    render: () => appRenderThietBi('CAP')
-  },
-  // ── THÍ NGHIỆM ───────────────────────────────
-  TNDK: {
-    title: 'Thí nghiệm định kỳ (TNĐK)',
-    sub:   'Theo dõi kế hoạch và kết quả thí nghiệm định kỳ',
-    render: () => appRenderTN('TNDK')
-  },
-  TNDX: {
-    title: 'Thí nghiệm đột xuất (TNĐX)',
-    sub:   'Theo dõi thí nghiệm đột xuất phát sinh',
-    render: () => appRenderTN('TNDX')
-  },
-  // ── GIỮ NGUYÊN PAGES CŨ ──────────────────────
-  congtac: {
-    title: 'Công tác',
-    sub:   'Quản lý lệnh công tác và phiếu công tác',
-    render: () => renderPlaceholder('congtac')
-  },
-  kehoachsx: {
-    title: 'Kế hoạch sản xuất',
-    sub:   'Kế hoạch sản xuất và vận hành',
-    render: () => renderPlaceholder('kehoachsx')
-  },
-  maycattrungthe: {
-    title: 'Máy cắt trung thế',
-    sub:   'Danh sách và trạng thái máy cắt trung thế',
-    render: () => appRenderThietBi('MC')
-  },
-  suco: {
-    title: 'Sự cố',
-    sub:   'Quản lý và theo dõi sự cố',
-    render: () => renderPlaceholder('suco')
-  },
-  kehoachtn: {
-    title: 'Kế hoạch TN',
-    sub:   'Lập và theo dõi kế hoạch thử nghiệm',
-    render: () => appRenderTN('TNDK')
-  },
-  lichsutn: {
-    title: 'Lịch sử TN',
-    sub:   'Tra cứu lịch sử thử nghiệm thiết bị',
-    render: () => renderPlaceholder('lichsutn')
+  const baseRows = _chipFiltered.length ? _chipFiltered : _chipAllData;
+  const CAP_LBL  = LYT_CAP_LABEL;    // {0:TT, 1:110kV, 2:220kV, 3:35kV, 4:22kV, 6:6kV, 9:10kV}
+  const CAP_COL  = LYT_CAP_COLORS;
+  const CAP_ORDER_LBL = ['220kV','110kV','35kV','22kV','10kV','6kV'];
+
+  const allSt   = lytBuildStations(baseRows);
+  const nganMap = lytBuildNganMap(baseRows);   // cached
+
+  const NGAN_DEFS = [
+    { key:'DZ',    label:'Ngăn ĐZ',       color:'#00c8ff' },
+    { key:'MBA',   label:'MBA',       color:'#ffd740' },
+    { key:'XT',    label:'Ngăn XT',        color:'#00e676' },
+    { key:'LL',    label:'Ngăn LL',        color:'#18ffff' },
+    { key:'TBN',   label:'Ngăn TBN',       color:'#b388ff' },
+    { key:'TD',    label:'Ngăn TD',        color:'#ff9100' },
+    { key:'KHANG', label:'Ngăn Kháng',     color:'#ff4081' },
+  ];
+
+  const selTram   = _lytSelectedTram[uid] || '';
+  const selCaps   = _lytSelCaps[uid]   || new Set();
+  const sortState = _lytSortState[uid] || { col:null, dir:'desc' };
+  // Mặc định hiển thị bảng đầy đủ (heatmap); người dùng bấm "Thu gọn" để chuyển chế độ nhanh
+  const detailOpen = (window._lytChartDetailOpen || {})[uid] !== false;
+
+  // Danh sách trạm hiển thị
+  let viewSt = selTram ? allSt.filter(s => s.tram === selTram) : allSt;
+  if (selCaps.size > 0) viewSt = viewSt.filter(s => selCaps.has(s.maxCap));
+
+
+  // Fast path: nếu chỉ đang xem preview gọn thì không dựng heatmap chi tiết để tránh lag.
+  const capPFast = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
+  const capsUsedFast=[...new Set(allSt.map(s=>s.maxCap).filter(c=>c&&c!=='0'))].sort((a,b)=>(capPFast[a]??9)-(capPFast[b]??9));
+  const byGrpFast={};
+  allSt.forEach(s=>{const l=CAP_LBL[s.maxCap]||'?';if(!byGrpFast[l])byGrpFast[l]=[];byGrpFast[l].push(s);});
+  let ddHTMLFast=`<div class="hm-dd-item${!selTram?' active':''}" data-val="" data-lbl="— Tất cả trạm —"
+    onmousedown="event.preventDefault();event.stopPropagation();lytDdPick('${uid}','','')">— Tất cả trạm —</div>`;
+  CAP_ORDER_LBL.forEach(capLbl=>{
+    const arr=byGrpFast[capLbl];if(!arr||!arr.length)return;
+    ddHTMLFast+=`<div class="hm-dd-grp">── ${capLbl} ──</div>`;
+    arr.forEach(s=>{
+      const tl=(s.tech||'').replace('_AIS',' – AIS');
+      const lbl=s.tram+(tl?'  ['+tl+']':'');
+      const ev=s.tram.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const el=lbl.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      ddHTMLFast+=`<div class="hm-dd-item${selTram===s.tram?' active':''}" data-val="${s.tram}" data-lbl="${lbl}"
+        onmousedown="event.preventDefault();event.stopPropagation();lytDdPick('${uid}','${ev}','${el}')">${lbl}</div>`;
+    });
+  });
+  const totalTBPreview = viewSt.reduce((sum, st) => sum + (nganMap[st.tram]?.totalTB || 0), 0);
+  const totalNganPreview = viewSt.reduce((sum, st) => sum + (nganMap[st.tram]?.allNgan.size || 0), 0);
+  let subFast='';
+  if (selTram&&viewSt[0]) {
+    const st=viewSt[0],nm=nganMap[st.tram],tk=st.tech||(st.maxCap==='2'||st.maxCap==='1'?'AIS':'OTHER');
+    const TECH_LBL = {GIS:'GIS',HGIS:'HGIS',HGIS_AIS:'HGIS – AIS',AIS:'AIS',OTHER:'35kV/22kV/6kV'};
+    const TECH_COL = {GIS:'#b388ff',HGIS:'#18ffff',HGIS_AIS:'#ff9100',AIS:'#00c8ff',OTHER:'#7a8fa8'};
+    subFast=`<b style="color:var(--accent)">📍 ${selTram}</b> · Cấp:<b style="color:${CAP_COL[st.maxCap]||'#888'}">${CAP_LBL[st.maxCap]||''}</b>`+
+      ` · CN:<b style="color:${TECH_COL[tk]}">${TECH_LBL[tk]}</b>`+
+      ` · Ngăn:<b style="color:var(--text-primary)">${nm?.allNgan.size||0}</b>`+
+      ` · TB:<b style="color:var(--text-primary)">${(nm?.totalTB||0).toLocaleString('vi-VN')}</b>`;
+  } else {
+    const totalTBPreview = viewSt.reduce((s,x)=>{
+      const nm=nganMap[x.tram]; return s+(nm?.totalTB||0);
+    },0);
+    const selTBPreview = baseRows.reduce((s,d)=>s+(Number(d.So_luong)||0),0);
+    subFast=`<span style="color:var(--text-muted)">Trạm:</span> <b style="color:var(--accent)">${viewSt.length}</b><span style="color:var(--text-muted)">/${allSt.length}</span>`+
+      ` &nbsp;│&nbsp; <span style="color:var(--text-muted)">Ngăn:</span> <b style="color:var(--accent)">${totalNganPreview.toLocaleString('vi-VN')}</b>`+
+      ` &nbsp;│&nbsp; <span style="color:var(--text-muted)">Thiết bị:</span> <b style="color:#00e676">${selTBPreview.toLocaleString('vi-VN')}</b>`;
   }
-};
-
-// Nội dung placeholder cho các trang chưa xây dựng
-function renderPlaceholder(pageId) {
-  const page    = PAGES[pageId];
-  const mainEl  = document.getElementById('mainSections');
-  if (!mainEl) return;
-
-  const icons = {
-    congtac:        { icon: 'fa-tools',            color: '#3b82f6', desc: 'Tạo và quản lý lệnh công tác, phân công nhân viên, theo dõi tiến độ thực hiện.' },
-    kehoachsx:      { icon: 'fa-calendar-alt',     color: '#10b981', desc: 'Lập kế hoạch sản xuất theo tháng/quý/năm, theo dõi tiến độ vận hành.' },
-    maycattrungthe: { icon: 'fa-bolt',             color: '#f59e0b', desc: 'Danh sách toàn bộ máy cắt trung thế, trạng thái vận hành, lịch bảo dưỡng.' },
-    suco:           { icon: 'fa-exclamation-triangle', color: '#ef4444', desc: 'Ghi nhận, phân loại và theo dõi xử lý sự cố lưới điện.' },
-    kehoachtn:      { icon: 'fa-file-alt',         color: '#8b5cf6', desc: 'Lập kế hoạch thử nghiệm định kỳ, phân công đội thực hiện, đặt lịch.' },
-    lichsutn:       { icon: 'fa-history',          color: '#06b6d4', desc: 'Xem toàn bộ lịch sử thử nghiệm: ngày thực hiện, kết quả, biên bản.' },
-  };
-  const info = icons[pageId] || { icon: 'fa-cog', color: '#64748b', desc: '' };
-
-  mainEl.innerHTML = `
-    <div class="placeholder-page">
-      <div class="ph-icon" style="background:${info.color}22;color:${info.color}">
-        <i class="fas ${info.icon}"></i>
+  const mainElFast=document.getElementById(`lytChartMain_${uid}`);
+  if(!mainElFast)return;
+  let ddListElFast = document.getElementById('lytDdL_' + uid);
+  if (!ddListElFast) {
+    ddListElFast = document.createElement('div');
+    ddListElFast.id        = 'lytDdL_' + uid;
+    ddListElFast.className = 'hm-dd-list-fixed';
+  }
+  ddListElFast.innerHTML = ddHTMLFast;
+  const ddRootFast = lytDdRoot();
+  if (!ddListElFast.isConnected || ddListElFast.parentElement !== ddRootFast) ddRootFast.appendChild(ddListElFast);
+  if (!detailOpen) {
+    mainElFast.innerHTML=`
+      <div class="hm-filter-bar" style="padding:6px 0">
+        ${_selectedChips.size ? `<span class="chart-sync-badge"><i class="fas fa-filter"></i> Đang lọc theo: ${[..._selectedChips].slice(0,4).join(', ')}${_selectedChips.size > 4 ? ` +${_selectedChips.size - 4}` : ''}</span>` : ''}
       </div>
-      <h2 class="ph-title">${page.title}</h2>
-      <p class="ph-desc">${info.desc}</p>
-      <div class="ph-badge">
-        <i class="fas fa-hammer"></i> Tính năng đang được phát triển
-      </div>
-      <button class="ph-back-btn" onclick="navigateTo('dashboard')">
-        <i class="fas fa-arrow-left"></i> Quay lại Dashboard
-      </button>
-    </div>
-  `;
-}
+      <div class="hm-sub-bar">${subFast}</div>
+      <div class="chart-preview-note"><i class="fas fa-bolt" style="color:var(--accent);margin-right:6px"></i>Đang dùng chế độ xem nhanh để mở layout mượt hơn. Heatmap đầy đủ hiện có <b>${viewSt.length.toLocaleString('vi-VN')}</b> trạm và khoảng <b>${NGAN_DEFS.length * Math.max(1, capsUsedFast.length)}</b> cột dữ liệu. Chỉ dựng bảng heatmap khi bạn bấm <b>Xem bảng chi tiết</b>.</div>
+      <div style="display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start;margin-top:10px">
+        <div>${buildChartMiniPreview(viewSt, nganMap)}</div>
+        <div>
+          <div style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.08em;margin-bottom:8px">TỶ LỆ PHÂN LOẠI THIẾT BỊ <span id="lytPieTramLbl_${uid}" style="color:var(--accent);font-weight:400;margin-left:4px"></span></div>
+          <div style="display:grid;grid-template-columns:160px 1fr;gap:10px;align-items:start">
+            <div style="position:relative;height:180px"><canvas id="lytPieChart_${uid}"></canvas></div>
+            <div id="lytPieLegend_${uid}" style="display:grid;gap:4px;align-content:start;padding-top:2px;max-height:180px;overflow-y:auto;font-size:9.5px"></div>
+          </div>
+        </div>
+      </div>`;
+    lytRenderPieChart(uid, baseRows, selTram);
+    // Lưu signature cho fast mode
+    if (mainElFast) mainElFast._renderSig = currentSig;
+    return;
+  }
 
-function navigateTo(pageId) {
-  const page = PAGES[pageId];
-  if (!page) return;
+  // Tổ hợp (nganKey × cap) — scan TOÀN BỘ nganMap, không qua allSt.caps[]
+  // Lấy tất cả cấp ĐA thực có trong data (theo thứ tự ưu tiên, bỏ TT=0)
+  const CAP_PRIO = ['2','1','3','4','9','6','0'];
+  const ALL_CAPS = CAP_PRIO.filter(cap =>
+    cap !== '0' &&
+    Object.values(nganMap).some(nm =>
+      Object.keys(nm).some(k => k.endsWith('_' + cap) && nm[k]?.size > 0)
+    )
+  );
+  const usedHeatDefs = NGAN_DEFS.filter(n => ALL_CAPS.some(cap => Object.values(nganMap).some(nm => nm[n.key + '_' + cap]?.size > 0)));
+  const activeHeatGroup = _lytHeatmapGroup[uid] || ((window.innerWidth < 1180 && usedHeatDefs[0]) ? usedHeatDefs[0].key : 'all');
+  if (!_lytHeatmapGroup[uid]) _lytHeatmapGroup[uid] = activeHeatGroup;
+  const scopedHeatDefs = activeHeatGroup === 'all' ? usedHeatDefs : usedHeatDefs.filter(n => n.key === activeHeatGroup);
+  const activeCombos = [];
+  scopedHeatDefs.forEach(n => {
+    ALL_CAPS.forEach(cap => {
+      const slot = n.key + '_' + cap;
+      const has  = Object.values(nganMap).some(nm => nm[slot]?.size > 0);
+      if (has) activeCombos.push({
+        nganKey: n.key, cap, slot,
+        nganLbl: n.label, capLbl: CAP_LBL[cap]||cap,
+        color: n.color, capColor: CAP_COL[cap]||'#888'
+      });
+    });
+  });
+  const heatModeHTML = ['all', ...usedHeatDefs.map(n => n.key)].map(key => {
+    const isAll = key === 'all';
+    const def = usedHeatDefs.find(n => n.key === key);
+    const label = isAll ? 'Tất cả cột' : (def?.label || key);
+    return `<span class="heat-mode-pill ${activeHeatGroup === key ? 'active' : ''}" onclick="lytSetHeatmapGroup('${uid}','${key}')">${label}</span>`;
+  }).join('');
 
-  // Cập nhật active state sidebar
-  document.querySelectorAll('.nav-item').forEach(el => {
-    el.classList.toggle('active', el.dataset.page === pageId);
+  // Nhóm CN
+  const TECH_ORD = ['GIS','HGIS','HGIS_AIS','AIS','OTHER'];
+  const TECH_LBL = {GIS:'GIS',HGIS:'HGIS',HGIS_AIS:'HGIS – AIS',AIS:'AIS',OTHER:'35kV/22kV/6kV'};
+  const TECH_COL = {GIS:'#b388ff',HGIS:'#18ffff',HGIS_AIS:'#ff9100',AIS:'#00c8ff',OTHER:'#7a8fa8'};
+  const capP = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
+  const groups = {GIS:[],HGIS:[],HGIS_AIS:[],AIS:[],OTHER:[]};
+  viewSt.forEach(s => {
+    if (s.maxCap==='2'||s.maxCap==='1') (groups[s.tech]||groups['AIS']).push(s);
+    else groups['OTHER'].push(s);
+  });
+  Object.values(groups).forEach(arr =>
+    arr.sort((a,b) => (capP[a.maxCap??'']??9)-(capP[b.maxCap??'']??9)||b.total-a.total)
+  );
+  if (sortState.col) {
+    const flat = TECH_ORD.flatMap(tk => groups[tk]);
+    flat.sort((a,b) => {
+      const va = sortState.col==='total'?(nganMap[a.tram]?.allNgan.size||0):(nganMap[a.tram]?.[sortState.col]?.size||0);
+      const vb = sortState.col==='total'?(nganMap[b.tram]?.allNgan.size||0):(nganMap[b.tram]?.[sortState.col]?.size||0);
+      return sortState.dir==='asc'?va-vb:vb-va;
+    });
+    TECH_ORD.forEach(tk=>groups[tk]=[]);
+    flat.forEach(s=>{if(s.maxCap==='2'||s.maxCap==='1')(groups[s.tech]||groups['AIS']).push(s);else groups['OTHER'].push(s);});
+  }
+
+  // maxVal
+  const colMax = {};
+  activeCombos.forEach(c => { colMax[c.slot]=Math.max(...viewSt.map(s=>nganMap[s.tram]?.[c.slot]?.size||0),1); });
+  const maxTot = Math.max(...viewSt.map(s=>nganMap[s.tram]?.allNgan.size||0),1);
+
+  // Anomaly
+  const anomaly = {};
+  activeCombos.forEach(c => {
+    const vals = viewSt.map(s=>nganMap[s.tram]?.[c.slot]?.size||0).filter(v=>v>0);
+    if (vals.length<3) return;
+    const mean=vals.reduce((a,b)=>a+b,0)/vals.length;
+    const std=Math.sqrt(vals.reduce((a,v)=>a+(v-mean)**2,0)/vals.length);
+    if (std===0) return;
+    viewSt.forEach(s=>{const v=nganMap[s.tram]?.[c.slot]?.size||0;if(v>0&&Math.abs(v-mean)>2*std){if(!anomaly[s.tram])anomaly[s.tram]=new Set();anomaly[s.tram].add(c.slot);}});
   });
 
-  // Cập nhật tiêu đề
-  const titleEl = document.querySelector('.page-title');
-  const subEl   = document.querySelector('.page-sub');
-  if (titleEl) titleEl.textContent = page.title;
-  if (subEl)   subEl.textContent   = page.sub;
+  // Dropdown items
+  const byGrp={};
+  allSt.forEach(s=>{const l=CAP_LBL[s.maxCap]||'?';if(!byGrp[l])byGrp[l]=[];byGrp[l].push(s);});
+  let ddHTML=`<div class="hm-dd-item${!selTram?' active':''}" data-val="" data-lbl="— Tất cả trạm —"
+    onmousedown="event.preventDefault();event.stopPropagation();lytDdPick('${uid}','','')">— Tất cả trạm —</div>`;
+  CAP_ORDER_LBL.forEach(capLbl=>{
+    const arr=byGrp[capLbl];if(!arr||!arr.length)return;
+    ddHTML+=`<div class="hm-dd-grp">── ${capLbl} ──</div>`;
+    arr.forEach(s=>{
+      const tl=(s.tech||'').replace('_AIS',' – AIS');
+      const lbl=s.tram+(tl?'  ['+tl+']':'');
+      const ev=s.tram.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const el=lbl.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      ddHTML+=`<div class="hm-dd-item${selTram===s.tram?' active':''}" data-val="${s.tram}" data-lbl="${lbl}"
+        onmousedown="event.preventDefault();event.stopPropagation();lytDdPick('${uid}','${ev}','${el}')">${lbl}</div>`;
+    });
+  });
 
-  // Ẩn/hiện nút Làm mới (chỉ hiện ở dashboard)
-  const refreshBtn = document.getElementById('refreshBtn');
-  if (refreshBtn) refreshBtn.style.display = pageId === 'dashboard' ? 'flex' : 'none';
+  // Cap pills
+  const capsUsed=[...new Set(allSt.map(s=>s.maxCap).filter(c=>c&&c!=='0'))].sort((a,b)=>(capP[a]??9)-(capP[b]??9));
+  const pillsHTML=capsUsed.map(cap=>
+    `<span class="hm-cap-pill${selCaps.has(cap)?' active':''}" style="color:${CAP_COL[cap]||'#888'}"
+      onclick="lytToggleCap('${uid}','${cap}')">${CAP_LBL[cap]||cap}</span>`
+  ).join('');
 
-  // Render trang
-  page.render();
+  // Sub-label
+  let sub='';
+  if (selTram&&viewSt[0]) {
+    const st=viewSt[0],nm=nganMap[st.tram],tk=st.tech||(st.maxCap==='2'||st.maxCap==='1'?'AIS':'OTHER');
+    sub=`<b style="color:var(--accent)">📍 ${selTram}</b> · Cấp:<b style="color:${CAP_COL[st.maxCap]||'#888'}">${CAP_LBL[st.maxCap]||''}</b>`+
+      ` · CN:<b style="color:${TECH_COL[tk]}">${TECH_LBL[tk]}</b>`+
+      ` · Ngăn:<b style="color:var(--text-primary)">${nm?.allNgan.size||0}</b>`+
+      ` · TB:<b style="color:var(--text-primary)">${(nm?.totalTB||0).toLocaleString('vi-VN')}</b>`;
+  } else {
+    const tot=viewSt.reduce((s,x)=>s+(nganMap[x.tram]?.allNgan.size||0),0);
+    const totalTBDetail = baseRows.reduce((s,d)=>s+(Number(d.So_luong)||0),0);
+    sub=`<span style="color:var(--text-muted)">Trạm:</span> <b style="color:var(--accent)">${viewSt.length}</b><span style="color:var(--text-muted)">/${allSt.length}</span>`+
+      ` &nbsp;│&nbsp; <span style="color:var(--text-muted)">Ngăn:</span> <b style="color:var(--accent)">${tot.toLocaleString('vi-VN')}</b>`+
+      ` &nbsp;│&nbsp; <span style="color:var(--text-muted)">Thiết bị:</span> <b style="color:#00e676">${totalTBDetail.toLocaleString('vi-VN')}</b>`;
+  }
+
+  // Header 2 tầng
+  const nganGrps={};
+  activeCombos.forEach(c=>{if(!nganGrps[c.nganKey])nganGrps[c.nganKey]=[];nganGrps[c.nganKey].push(c);});
+  let hR1=`<tr>`,hR2=`<tr>`;
+  hR1+=`<th class="hm-th-grp" rowspan="2" style="vertical-align:middle">CN<span class="hm-resize-handle" data-col="0"></span></th>`;
+  hR1+=`<th class="hm-th-tram" rowspan="2" style="vertical-align:middle">Trạm<span class="hm-resize-handle" data-col="1"></span></th>`;
+  let ci=2; const colOrder=[];
+  scopedHeatDefs.forEach(n=>{
+    const combo=nganGrps[n.key];if(!combo||!combo.length)return;
+    hR1+=`<th class="hm-th-ngan-grp" colspan="${combo.length}" style="color:${n.color};border-left:2px solid ${n.color}44">${n.label}</th>`;
+    combo.forEach(c=>{
+      const sc=sortState.col===c.slot?(sortState.dir==='asc'?' sort-asc':' sort-desc'):'';
+      hR2+=`<th class="hm-th-cap${sc}" style="color:${c.capColor}" onclick="lytSortCol('${uid}','${c.slot}')">${c.capLbl}<span class="hm-resize-handle" data-col="${ci}"></span></th>`;
+      colOrder.push({...c,ci});ci++;
+    });
+  });
+  const scT=sortState.col==='total'?(sortState.dir==='asc'?' sort-asc':' sort-desc'):'';
+  hR1+=`<th class="hm-th-total${scT}" rowspan="2" style="vertical-align:middle" onclick="lytSortCol('${uid}','total')">Tổng ngăn<span class="hm-resize-handle" data-col="${ci}"></span></th>`;
+  hR1+=`<th class="hm-th-total" rowspan="2" style="vertical-align:middle">Tổng TB<span class="hm-resize-handle" data-col="${ci+1}"></span></th>`;
+  hR1+=`</tr>`;hR2+=`</tr>`;
+
+  // Rows
+  function rgba(hex,a){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return `rgba(${r},${g},${b},${a})`;}
+  let rows='',hasData=false;
+  TECH_ORD.forEach(tk=>{
+    const arr=groups[tk];if(!arr.length)return;hasData=true;
+    arr.forEach((s,i)=>{
+      const nm=nganMap[s.tram],tot=nm?.allNgan.size||0;
+      rows+=`<tr>`;
+      if(i===0) rows+=`<td class="hm-cell-grp" rowspan="${arr.length}" style="color:${TECH_COL[tk]};border-top:2px solid ${TECH_COL[tk]}55"><span style="display:inline-flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:2px;background:${TECH_COL[tk]};display:inline-block;flex-shrink:0"></span>${TECH_LBL[tk]}</span></td>`;
+      const cl=CAP_LBL[s.maxCap]||'';
+      rows+=`<td class="hm-cell-tram" style="color:#c8d8ec">${s.tram}<span style="font-size:7.5px;color:${CAP_COL[s.maxCap]||'#888'};margin-left:4px;font-weight:700">${cl}</span></td>`;
+      colOrder.forEach(c=>{
+        const v=nm?.[c.slot]?.size||0;
+        if(!v){rows+=`<td class="hm-cell-cap" style="color:rgba(255,255,255,0.18)">—</td>`;}
+        else{
+          const it=0.20+(v/colMax[c.slot])*0.72,ia=anomaly[s.tram]?.has(c.slot);
+          const nl=[...(nm[c.slot]||[])].map(k=>k.split('|||')[1]).join('|');
+          rows+=`<td class="hm-cell-cap${ia?' hm-cell-anomaly':''}" style="background:${rgba(c.color,it)};color:${it>0.42?'#ffffff':c.color};font-weight:${it>0.42?'700':'600'}" data-tram="${s.tram}" data-lbl="${c.nganLbl} ${c.capLbl}" data-ngan="${nl}" data-ttb="${nm?.totalTB||0}" data-tip="${s.tram}·${c.nganLbl} ${c.capLbl}:${v}ngăn" onclick="lytCellClick(this)">${v}</td>`;
+        }
+      });
+      const it=tot?0.15+(tot/maxTot)*0.65:0;
+      rows+=tot?`<td class="hm-cell-total" style="background:rgba(232,237,245,${it*0.22});color:#e8edf5;font-weight:800">${tot}</td>`:`<td class="hm-cell-total" style="color:rgba(255,255,255,0.2)">—</td>`;
+      rows+=`<td class="hm-cell-total">${(nm?.totalTB||0).toLocaleString('vi-VN')}</td></tr>`;
+    });
+  });
+  if(!hasData)rows=`<tr><td colspan="${colOrder.length+4}" style="text-align:center;padding:24px;color:var(--text-muted);font-family:var(--font-mono)"><i class="fas fa-inbox"></i> Không có dữ liệu</td></tr>`;
+
+  // colWidths từ localStorage
+  const lsKey=`hm_${uid}`;
+  let W;try{W=JSON.parse(localStorage.getItem(lsKey)||'null');}catch(e){W=null;}
+  if(!W||W.length!==colOrder.length+4) W=[90,130,...colOrder.map(()=>58),68,68];
+
+  // Inject
+  const totalTBPreviewHeavy = viewSt.reduce((sum, st) => sum + (nganMap[st.tram]?.totalTB || 0), 0);
+  const totalNganPreviewHeavy = viewSt.reduce((sum, st) => sum + (nganMap[st.tram]?.allNgan.size || 0), 0);
+  const mainEl=document.getElementById(`lytChartMain_${uid}`);
+  if(!mainEl)return;
+  // Dropdown list dạng popup chuẩn, mount vào canvas-area để bám đúng theo vùng cuộn
+  let ddListEl = document.getElementById('lytDdL_' + uid);
+  if (!ddListEl) {
+    ddListEl = document.createElement('div');
+    ddListEl.id        = 'lytDdL_' + uid;
+    ddListEl.className = 'hm-dd-list-fixed';
+  }
+  ddListEl.innerHTML = ddHTML;
+  const ddRoot = lytDdRoot();
+  if (!ddListEl.isConnected || ddListEl.parentElement !== ddRoot) {
+    ddRoot.appendChild(ddListEl);
+  }
+
+  mainEl.innerHTML=`
+    <div id="hm-tooltip"></div>
+    <div class="hm-filter-bar" style="padding:4px 0">
+      ${_selectedChips.size ? `<span class="chart-sync-badge"><i class="fas fa-filter"></i> Đang lọc theo: ${[..._selectedChips].slice(0,4).join(', ')}${_selectedChips.size > 4 ? ` +${_selectedChips.size - 4}` : ''}</span>` : ''}
+
+
+      </div>
+    <div class="hm-sub-bar">${sub}</div>
+    <div style="display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start;margin-top:10px">
+      <div>
+        ${detailOpen ? `
+          <div class="hm-filter-bar" style="padding:0"></div>
+          <div class="hm-wrap" id="lytHW_${uid}">
+            <table class="hm-table" id="lytHT_${uid}">
+              <colgroup id="lytCG_${uid}">${W.map(w=>`<col style="width:${w}px">`).join('')}</colgroup>
+              <thead>${hR1}${hR2}</thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        ` : `<div class="chart-preview-note"><i class="fas fa-eye-slash" style="color:var(--accent);margin-right:6px"></i>Bảng chi tiết theo trạm/cấp đang được ẩn để màn hình dễ đọc hơn. Chỉ mở khi cần rà soát từng cột hoặc xuất CSV.</div>`}
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.08em;margin-bottom:8px">
+          TỶ LỆ PHÂN LOẠI THIẾT BỊ
+          <span id="lytPieTramLbl_${uid}" style="color:var(--accent);font-weight:400;margin-left:4px"></span>
+        </div>
+        <div style="display:grid;grid-template-columns:160px 1fr;gap:10px;align-items:start">
+          <div style="position:relative;height:180px"><canvas id="lytPieChart_${uid}"></canvas></div>
+          <div id="lytPieLegend_${uid}" style="display:grid;gap:4px;align-content:start;padding-top:2px;max-height:180px;overflow-y:auto;font-size:9.5px"></div>
+        </div>
+      </div>
+    </div>`;
+
+
+  if (ddListEl.parentElement !== ddRoot) ddRoot.appendChild(ddListEl);
+
+  if (detailOpen) lytInitHmTable(uid, W, lsKey);
+  lytRenderPieChart(uid, baseRows, selTram);
+
+  // Lưu signature để guard có thể skip re-render lần sau
+  if (mainEl) mainEl._renderSig = currentSig;
+
+  // Tooltip
+  const tip=document.getElementById('hm-tooltip');
+  if(tip) mainEl.querySelectorAll('[data-tip]').forEach(td=>{
+    td.addEventListener('mouseenter',()=>{
+      tip.innerHTML=`<b>${td.dataset.tram}</b><br>${td.dataset.lbl}: <b>${td.textContent}</b> ngăn`;
+      tip.style.display='block';
+      const r=td.getBoundingClientRect();
+      tip.style.left=Math.min(r.left,window.innerWidth-230)+'px';
+      tip.style.top=(r.bottom+5)+'px';
+    });
+    td.addEventListener('mouseleave',()=>tip.style.display='none');
+  });
 }
 
-// ── 19. INIT ─────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  // Gắn data-page cho từng nav-item
-  const navMap = {
-    'Dashboard':           'dashboard',
-    'Công tác':            'congtac',
-    'Kế hoạch sản xuất':  'kehoachsx',
-    'Máy cắt trung thế':  'maycattrungthe',
-    'Sự cố':              'suco',
-    'Kế hoạch TN':        'kehoachtn',
-    'Lịch sử TN':         'lichsutn',
+// ── Sticky + resize ─────────────────────────────────────
+function lytInitHmTable(uid, W, lsKey) {
+  const colg=document.getElementById('lytCG_'+uid);
+  const tbl =document.getElementById('lytHT_'+uid);
+  if(!colg||!tbl)return;
+  const cols=Array.from(colg.querySelectorAll('col'));
+  function upSticky(){
+    tbl.querySelectorAll('.hm-th-grp,.hm-cell-grp').forEach(el=>el.style.left='0px');
+    tbl.querySelectorAll('.hm-th-tram,.hm-cell-tram').forEach(el=>el.style.left=W[0]+'px');
+  }
+  upSticky();
+  let raf=0;
+  tbl.querySelectorAll('.hm-resize-handle').forEach(h=>{
+    h.addEventListener('mousedown',e=>{
+      e.preventDefault();e.stopPropagation();
+      const idx=+h.dataset.col,sx=e.clientX,sw=W[idx];
+      document.body.style.cursor='col-resize';document.body.style.userSelect='none';
+      const mv=ev=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>{
+        const nw=Math.max(36,sw+ev.clientX-sx);W[idx]=nw;
+        if(cols[idx])cols[idx].style.width=nw+'px';
+        upSticky();
+        if(lsKey)try{localStorage.setItem(lsKey,JSON.stringify(W));}catch(_){}
+      });};
+      const up=()=>{document.body.style.cursor='';document.body.style.userSelect='';
+        document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);};
+      document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);
+    });
+  });
+}
+
+
+// ── Pie chart thiết bị (đồng bộ logic với app.js renderPieChart) ─
+const _lytPieCharts = {};
+
+function lytRenderPieChart(uid, rows, selTram) {
+  const cvs = document.getElementById('lytPieChart_' + uid);
+  if (!cvs || typeof Chart === 'undefined') return;
+
+  function isExcl(pl) {
+    if (!pl) return true;
+    const n = pl.trim().toUpperCase().replace(/\s+/g,'').normalize('NFC');
+    if (n.startsWith('TICHAN')||n.includes('TICHAN')) return true;
+    if (n==='HTTD'||n.startsWith('HTTD')) return true;
+    if (n==='RL') return true;
+    return false;
+  }
+
+  const src = selTram ? rows.filter(d=>(d.Tram||'').trim()===selTram) : rows;
+  const counts = {};
+  src.forEach(d => {
+    const pl = (d.Phan_loai_thiet_bi||'').trim();
+    if (!pl || isExcl(pl)) return;
+    counts[pl] = (counts[pl]||0) + (Number(d.So_luong)||0);
+  });
+
+  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const top    = sorted.slice(0,12);
+  const others = sorted.slice(12).reduce((s,e)=>s+e[1],0);
+  if (others>0) top.push(['Khác', others]);
+  if (!top.length) return;
+
+  const labels = top.map(e=>e[0]);
+  const values = top.map(e=>e[1]);
+  const total  = values.reduce((a,b)=>a+b,0);
+  const PAL    = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#06b6d4','#ef4444','#ec4899','#14b8a6','#f97316','#84cc16','#a78bfa','#fb923c','#60a5fa'];
+  const colors = labels.map((_,i)=>PAL[i%PAL.length]);
+
+  if (_lytPieCharts[uid]) { _lytPieCharts[uid].destroy(); delete _lytPieCharts[uid]; }
+
+  _lytPieCharts[uid] = new Chart(cvs.getContext('2d'), {
+    type: 'doughnut',
+    data: { labels, datasets:[{ data:values, backgroundColor:colors.map(c=>c+'cc'), borderColor:colors, borderWidth:2, hoverOffset:10 }] },
+    options: {
+      responsive:true, maintainAspectRatio:false, cutout:'55%', animation:{duration:300},
+      plugins:{
+        legend:{ display: false },
+        tooltip:{
+          backgroundColor:'rgba(15,23,42,0.92)', titleColor:'#e8edf5', bodyColor:'#8fa3bd',
+          borderColor:'rgba(255,255,255,0.12)', borderWidth:1,
+          callbacks:{
+            title: c=>c[0].label,
+            label: c=>[' '+Number(c.parsed).toLocaleString('vi-VN')+' thiết bị',' '+((c.parsed/total)*100).toFixed(1)+'%']
+          }
+        }
+      }
+    }
+  });
+
+  // Render custom legend — readable, compact rows
+  const legendEl = document.getElementById('lytPieLegend_' + uid);
+  if (legendEl) {
+    legendEl.innerHTML = labels.map((lbl, i) => {
+      const pct = ((values[i]/total)*100).toFixed(1);
+      const val = values[i].toLocaleString('vi-VN');
+      const barW = Math.max(4, Math.round((values[i]/values[0])*100));
+      return `<div style="display:grid;grid-template-columns:10px 52px 1fr 46px;gap:6px;align-items:center;cursor:pointer"
+                   title="${lbl}: ${val} (${pct}%)">
+        <span style="width:10px;height:10px;border-radius:2px;background:${colors[i]};flex-shrink:0;display:inline-block"></span>
+        <span style="font-size:10px;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lbl}</span>
+        <div style="height:6px;border-radius:999px;background:var(--border);overflow:hidden">
+          <div style="height:100%;width:${barW}%;background:${colors[i]}cc;border-radius:999px"></div>
+        </div>
+        <span style="font-size:9px;color:${colors[i]};font-family:var(--font-mono);font-weight:700;text-align:right">${pct}%</span>
+      </div>`;
+    }).join('');
+  }
+
+  const lbl = document.getElementById('lytPieTramLbl_'+uid);
+  if (lbl) lbl.textContent = selTram ? '· '+selTram : '';
+}
+
+// ── LIVE FILTER SECTION ─────────────────────────────────────
+const _lf = { tram:'', cap:'', type:'', year:'', opyr:'', search:'' };
+
+function _lfUid() {
+  const fi = layout.find(l => l.type === 'filter');
+  return fi ? (fi.uid || 'f') : 'f';
+}
+
+// Called after data loads → init default labels (no populate yet)
+function renderLiveFilterSection() {
+  if (!_chipAllData.length) return;
+  const uid = _lfUid();
+  const hasFilter = _lf.tram||_lf.cap||_lf.type||_lf.year||_lf.opyr||_lf.search;
+  const CAP_LBL = {'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+
+  // Update active state of triggers
+  const labels = {
+    tram: _lf.tram || '— Tất cả trạm —',
+    cap:  _lf.cap  ? (CAP_LBL[_lf.cap]||_lf.cap) : 'Cấp điện áp',
+    type: _lf.type || 'Loại thiết bị',
+    year: _lf.year || 'Năm SX',
+    opyr: _lf.opyr || 'Năm VH',
+  };
+  ['tram','cap','type','year','opyr'].forEach(key => {
+    const lbl = document.getElementById(`lf_lbl_${key}_${uid}`);
+    const btn = document.getElementById(`lytDdSel_lf_${key}_${uid}`);
+    if (lbl) lbl.textContent = labels[key];
+    if (btn) {
+      const active = !!_lf[key];
+      btn.classList.toggle('open', active);
+      btn.style.borderColor = active ? 'rgba(0,200,255,.5)' : '';
+      btn.style.color       = active ? 'var(--accent)'      : '';
+      btn.style.background  = active ? 'var(--accent-dim)'  : '';
+    }
+  });
+  const rst = document.getElementById(`lf_reset_${uid}`);
+  if (rst) rst.style.display = hasFilter ? 'inline-flex' : 'none';
+}
+
+// ── LAZY POPULATE: populate list when user clicks trigger ──
+function _lfPopulate(key, anchorBtn) {
+  if (!_chipAllData.length) return;
+  const uid = _lfUid();
+  const ddUid = `lf_${key}_${uid}`;
+  const listId = `lytDdL_lf_${key}_${uid}`;
+  const CAP_ORDER = ['2','1','3','4','9','6','0'];
+  const CAP_LBL   = {'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+  const capPrio   = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
+
+  // Ensure list element exists and is in canvas-area (same as Charts)
+  let list = document.getElementById(listId);
+  if (!list) {
+    list = document.createElement('div');
+    list.id = listId;
+    list.className = 'hm-dd-list-fixed';
+    lytDdRoot().appendChild(list);
+  }
+
+  let html = '';
+
+  if (key === 'tram') {
+    // Build tramMaxCap + tramCaps for linkage
+    const tramMaxCap = {}, tramCaps = {};
+    _chipAllData.forEach(d => {
+      const t = (d.Tram||'').trim(); if(!t) return;
+      const cv = String(d.Cap_dien_ap??''); if(!cv||cv==='null') return;
+      if(!tramMaxCap[t]||(capPrio[cv]??9)<(capPrio[tramMaxCap[t]]??9)) tramMaxCap[t]=cv;
+      if(!tramCaps[t]) tramCaps[t]=new Set();
+      tramCaps[t].add(cv);
+    });
+    // Store tramCaps for cap dropdown linkage
+    list._tramCaps = tramCaps;
+    list._tramMaxCap = tramMaxCap;
+
+    const tramsAll = [...new Set(_chipAllData.map(d=>(d.Tram||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
+    const byGrp = {};
+    tramsAll.forEach(t => {
+      const cap = tramMaxCap[t] || '?';
+      const lbl = CAP_LBL[cap] || cap;
+      if(!byGrp[lbl]) byGrp[lbl] = [];
+      byGrp[lbl].push(t);
+    });
+
+    // Search box
+    html = `<div style="padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;background:var(--bg-surface);z-index:1">
+      <input type="text" id="lytDdS_lf_tram_${uid}" placeholder="🔍 Tìm trạm..."
+        style="width:100%;box-sizing:border-box;padding:4px 8px;border-radius:5px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:var(--text-primary);font-size:10px;outline:none"
+        oninput="lytDdFilter('lf_tram_${uid}',this.value)" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onkeydown="event.stopPropagation()">
+    </div>`;
+
+    html += `<div class="hm-dd-item${!_lf.tram?' active':''}" data-val="" data-lbl="— Tất cả trạm —"
+      onmousedown="event.preventDefault();event.stopPropagation();lytFddPick('tram','','— Tất cả trạm —')">— Tất cả trạm —</div>`;
+
+    CAP_ORDER.forEach(cap => {
+      const grpLbl = CAP_LBL[cap];
+      const arr = byGrp[grpLbl]; if(!arr||!arr.length) return;
+      html += `<div class="hm-dd-grp">── ${grpLbl} ──</div>`;
+      arr.forEach(t => {
+        const ev = t.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        html += `<div class="hm-dd-item${_lf.tram===t?' active':''}" data-val="${t}" data-lbl="${t}"
+          onmousedown="event.preventDefault();event.stopPropagation();lytFddPick('tram','${ev}','${ev}')">${t}</div>`;
+      });
+    });
+
+  } else if (key === 'cap') {
+    // Caps available depend on selected tram (linkage)
+    const tramList = document.getElementById(`lytDdL_lf_tram_${uid}`);
+    const tramCaps = _lf.tram && tramList?._tramCaps?.[_lf.tram];
+    const capsAvail = tramCaps
+      ? [...tramCaps].sort((a,b)=>(capPrio[a]??9)-(capPrio[b]??9))
+      : [...new Set(_chipAllData.map(d=>String(d.Cap_dien_ap??'')).filter(c=>c&&c!=='null'))].sort((a,b)=>(capPrio[a]??9)-(capPrio[b]??9));
+
+    html = `<div class="hm-dd-item${!_lf.cap?' active':''}" data-val="" data-lbl="— Tất cả cấp —"
+      onmousedown="event.preventDefault();event.stopPropagation();lytFddPick('cap','','')">— Tất cả cấp —</div>`;
+    capsAvail.forEach(cap => {
+      const lbl = CAP_LBL[cap]||cap;
+      html += `<div class="hm-dd-item${_lf.cap===cap?' active':''}" data-val="${cap}" data-lbl="${lbl}"
+        onmousedown="event.preventDefault();event.stopPropagation();lytFddPick('cap','${cap}','${lbl}')">${lbl}</div>`;
+    });
+
+  } else if (key === 'type') {
+    const excl = pl => { const n=(pl||'').trim().toUpperCase().replace(/\s+/g,''); return n.startsWith('TICHAN')||n==='HTTD'||n.startsWith('HTTD'); };
+    const types = [...new Set(_chipAllData.map(d=>(d.Phan_loai_thiet_bi||'').trim()).filter(Boolean).filter(t=>!excl(t)))].sort((a,b)=>a.localeCompare(b,'vi'));
+
+    html = `<div style="padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;background:var(--bg-surface);z-index:1">
+      <input type="text" id="lytDdS_lf_type_${uid}" placeholder="🔍 Tìm loại..."
+        style="width:100%;box-sizing:border-box;padding:4px 8px;border-radius:5px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:var(--text-primary);font-size:10px;outline:none"
+        oninput="lytDdFilter('lf_type_${uid}',this.value)" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onkeydown="event.stopPropagation()">
+    </div>`;
+    html += `<div class="hm-dd-item${!_lf.type?' active':''}" data-val="" data-lbl="— Tất cả loại —"
+      onmousedown="event.preventDefault();event.stopPropagation();lytFddPick('type','','')">— Tất cả loại —</div>`;
+    types.forEach(t => {
+      const ev = t.replace(/'/g,"\\'");
+      html += `<div class="hm-dd-item${_lf.type===t?' active':''}" data-val="${t}" data-lbl="${t}"
+        onmousedown="event.preventDefault();event.stopPropagation();lytFddPick('type','${ev}','${ev}')">${t}</div>`;
+    });
+
+  } else if (key === 'year') {
+    const years = [...new Set(_chipAllData.map(d=>Number(d.Nam_san_xuat)).filter(y=>y>1970))].sort((a,b)=>b-a);
+    html = `<div class="hm-dd-item${!_lf.year?' active':''}" data-val="" data-lbl="— Tất cả năm —"
+      onmousedown="event.preventDefault();event.stopPropagation();lytFddPick('year','','')">— Tất cả năm —</div>`;
+    years.forEach(y => {
+      html += `<div class="hm-dd-item${_lf.year===String(y)?' active':''}" data-val="${y}" data-lbl="${y}"
+        onmousedown="event.preventDefault();event.stopPropagation();lytFddPick('year','${y}','${y}')">${y}</div>`;
+    });
+
+  } else if (key === 'opyr') {
+    const years = [...new Set(_chipAllData.map(d=>Number(d.Nam_van_hanh)).filter(y=>y>1970))].sort((a,b)=>b-a);
+    html = `<div class="hm-dd-item${!_lf.opyr?' active':''}" data-val="" data-lbl="— Tất cả năm —"
+      onmousedown="event.preventDefault();event.stopPropagation();lytFddPick('opyr','','')">— Tất cả năm —</div>`;
+    years.forEach(y => {
+      html += `<div class="hm-dd-item${_lf.opyr===String(y)?' active':''}" data-val="${y}" data-lbl="${y}"
+        onmousedown="event.preventDefault();event.stopPropagation();lytFddPick('opyr','${y}','${y}')">${y}</div>`;
+    });
+  }
+
+  list.innerHTML = html;
+  lytDdToggle(ddUid, anchorBtn);
+}
+
+// Toggle handlers — populate then show
+function lytFddTramToggle(uid, btn) { event.stopPropagation(); _lfPopulate('tram', btn); }
+function lytFddCapToggle(uid, btn)  { event.stopPropagation(); _lfPopulate('cap',  btn); }
+function lytFddTypeToggle(uid, btn) { event.stopPropagation(); _lfPopulate('type', btn); }
+function lytFddYearToggle(uid, btn) { event.stopPropagation(); _lfPopulate('year', btn); }
+function lytFddOpyrToggle(uid, btn) { event.stopPropagation(); _lfPopulate('opyr', btn); }
+
+function lytFddPick(key, val, lbl) {
+  const uid = _lfUid();
+  lytDdClose(`lf_${key}_${uid}`);
+  _lf[key] = val;
+  if (key === 'tram') _lf.cap = ''; // linkage: reset cap when tram changes
+  renderLiveFilterSection();
+  _lfApply();
+}
+
+function lytFddOnSearch(uid, val) {
+  _lf.search = (val||'').toLowerCase().trim();
+  _lfApply();
+  renderLiveFilterSection();
+}
+
+function _lfApply() {
+  const {tram, cap, type, year, opyr, search} = _lf;
+  _chipFiltered = _chipAllData.filter(d => {
+    if (tram && (d.Tram||'').trim() !== tram) return false;
+    if (cap  && String(d.Cap_dien_ap??'') !== cap)  return false;
+    if (type && (d.Phan_loai_thiet_bi||'').trim() !== type) return false;
+    if (year && String(Number(d.Nam_san_xuat)||0) !== year) return false;
+    if (opyr && String(Number(d.Nam_van_hanh)||0) !== opyr) return false;
+    if (search) {
+      const hay = [(d.Tram||''),(d.Phan_loai_thiet_bi||''),(d.Ngan_thiet_bi||''),(d.Loai_ngan_lo||'')].join(' ').toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+  _selectedChips.clear();
+  _lytNganCache = null; _lytNganSig = '';
+  _recomputeStatsWithFilter();
+  renderChipsSection();
+  renderChartsSection();
+  renderTimelineSection();
+}
+
+function lytFddReset(uid) {
+  Object.assign(_lf, {tram:'',cap:'',type:'',year:'',opyr:'',search:''});
+  const si = document.getElementById(`lf_search_${uid||_lfUid()}`);
+  if (si) si.value = '';
+  _chipFiltered = [..._chipAllData];
+  _selectedChips.clear();
+  _lytNganCache = null; _lytNganSig = '';
+  renderLiveFilterSection();
+  _recomputeStatsWithFilter();
+  renderChipsSection();
+  renderChartsSection();
+  renderTimelineSection();
+}
+
+// ── TIMELINE SECTION ─────────────────────────────────────────
+const TL_DEVICE_TYPES = ['MBA','MBA TD','MC','TU','TI','DCL','Cáp'];
+const TL_BUCKETS = [
+  { key:'lt10',    label:'< 10 năm',    color:'#00e676', textColor:'#00e676' },
+  { key:'b1015',   label:'10–<15 năm',  color:'#ffd740', textColor:'#ffd740' },
+  { key:'gt15',    label:'≥ 15 năm',    color:'#ff5252', textColor:'#ff5252' },
+  { key:'unknown', label:'Không rõ',    color:'#607d8b', textColor:'#8fa3bd' },
+];
+
+function _tlNormPl(pl) {
+  if (!pl) return '';
+  const n = pl.trim();
+  // Normalize common variants
+  if (/^MBA/i.test(n) && /TD|tự dùng/i.test(n)) return 'MBA TD';
+  if (/^MBA/i.test(n)) return 'MBA';
+  if (/^MC/i.test(n)) return 'MC';
+  if (/^TU/i.test(n) || /^Tụ/i.test(n)) return 'TU';
+  if (/^TI/i.test(n) && !/^TIO/i.test(n) && !/^TI1/i.test(n)) return 'TI';
+  if (/^DCL/i.test(n)) return 'DCL';
+  if (/^Cáp/i.test(n) || /^Cap/i.test(n)) return 'Cáp';
+  return n;
+}
+
+function renderTimelineSection() {
+  if (!_chipAllData.length) return;
+  const tlItem = layout.find(l => l.type === 'timeline');
+  if (!tlItem || !tlItem.props.visible) return;
+  const wrapper = document.querySelector(`.section-wrapper[data-uid="${tlItem.uid}"]`);
+  if (!wrapper) return;
+  const preview = wrapper.querySelector('.card-preview');
+  if (!preview) return;
+
+  const nowY = new Date().getFullYear();
+  const baseRows = _chipFiltered.length ? _chipFiltered : _chipAllData;
+
+  // Build data per device type
+  const typeData = {};
+  TL_DEVICE_TYPES.forEach(t => { typeData[t] = { lt10:0, b1015:0, gt15:0, unknown:0, total:0, years:[] }; });
+
+  baseRows.forEach(d => {
+    const pl = _tlNormPl(d.Phan_loai_thiet_bi);
+    if (!typeData[pl]) return;
+    const nvh = Number(d.Nam_van_hanh);
+    const nsx = Number(d.Nam_san_xuat);
+    const refY = nvh > 1970 ? nvh : (nsx > 1970 ? nsx : 0);
+    const age  = refY > 0 ? (nowY - refY) : -1;
+    const qty  = Number(d.So_luong) || 1;
+    typeData[pl].total += qty;
+    if (refY > 1970) typeData[pl].years.push({ y: refY, qty });
+    if      (age < 0)           typeData[pl].unknown += qty;
+    else if (age < 10)          typeData[pl].lt10    += qty;
+    else if (age < 15)          typeData[pl].b1015   += qty;
+    else                        typeData[pl].gt15    += qty;
+  });
+
+  const fmt = n => Number(n).toLocaleString('vi-VN');
+
+  // Summary stats
+  let totalAll=0, total15=0;
+  TL_DEVICE_TYPES.forEach(t => { totalAll += typeData[t].total; total15 += typeData[t].gt15; });
+  const pct15 = totalAll > 0 ? ((total15/totalAll)*100).toFixed(1) : '0.0';
+
+  // Find oldest device
+  let oldestY = nowY, oldestType = '';
+  TL_DEVICE_TYPES.forEach(t => {
+    typeData[t].years.forEach(({y}) => { if(y < oldestY){ oldestY=y; oldestType=t; } });
+  });
+
+  let html = `
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
+    <div style="background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.2);border-radius:8px;padding:10px 14px">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-calculator" style="margin-right:4px"></i>Tổng phân tích</div>
+      <div style="font-size:20px;font-weight:800;font-family:var(--font-mono);color:var(--accent)">${fmt(totalAll)}</div>
+    </div>
+    <div style="background:rgba(255,82,82,.07);border:1px solid rgba(255,82,82,.2);border-radius:8px;padding:10px 14px">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>Thiết bị > 15 năm</div>
+      <div style="font-size:20px;font-weight:800;font-family:var(--font-mono);color:#ff5252">${fmt(total15)}</div>
+    </div>
+    <div style="background:rgba(255,215,64,.07);border:1px solid rgba(255,215,64,.2);border-radius:8px;padding:10px 14px">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-clock" style="margin-right:4px"></i>Thiết bị lâu nhất</div>
+      <div style="font-size:20px;font-weight:800;font-family:var(--font-mono);color:#ffd740">${oldestY < nowY ? oldestY + ' (' + (nowY-oldestY) + 'n)' : '—'}</div>
+    </div>
+    <div style="background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.2);border-radius:8px;padding:10px 14px">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-percent" style="margin-right:4px"></i>Tỷ lệ > 15 năm</div>
+      <div style="font-size:20px;font-weight:800;font-family:var(--font-mono);color:#00e676">${pct15}%</div>
+    </div>
+  </div>
+
+  <div style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.08em;margin-bottom:8px">
+    PHÂN TÍCH THÂM NIÊN VẬN HÀNH THEO LOẠI THIẾT BỊ
+    <span style="margin-left:12px;font-weight:400">
+      ${TL_BUCKETS.map(b=>`<span style="color:${b.color};margin-right:10px">■ ${b.label}</span>`).join('')}
+    </span>
+    <span style="float:right;font-weight:400;color:var(--text-muted);font-size:8px">
+      <i class="fas fa-info-circle"></i> Ưu tiên Nam_van_hanh, fallback Nam_san_xuat
+    </span>
+  </div>`;
+
+  TL_DEVICE_TYPES.forEach(t => {
+    const d = typeData[t];
+    if (!d.total) return;
+    const maxVal = Math.max(d.lt10, d.b1015, d.gt15, d.unknown, 1);
+    const yrMin = d.years.length ? Math.min(...d.years.map(x=>x.y)) : null;
+    const yrMax = d.years.length ? Math.max(...d.years.map(x=>x.y)) : null;
+    const yrRange = yrMin ? `${yrMin}–${yrMax}` : '';
+
+    // Stacked bar
+    const barTotal = d.lt10 + d.b1015 + d.gt15 + d.unknown;
+    const barHtml = barTotal > 0 ? TL_BUCKETS.map(b => {
+      const w = (d[b.key]/barTotal*100).toFixed(1);
+      return w > 0 ? `<div style="width:${w}%;background:${b.color};height:100%;display:inline-block" title="${b.label}: ${fmt(d[b.key])}"></div>` : '';
+    }).join('') : '';
+
+    html += `
+    <div style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="font-size:10px;font-weight:700;color:var(--text-primary);min-width:60px">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:5px"></span>${t}
+        </span>
+        <div style="flex:1;height:14px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden">${barHtml}</div>
+        ${d.gt15 > 0 ? `<span style="font-size:9px;color:#ff5252;font-weight:700;min-width:28px">▲${d.gt15}</span>` : '<span style="min-width:28px"></span>'}
+        <span style="font-size:8px;color:var(--text-muted);min-width:70px;text-align:right">${yrRange ? yrRange : ''}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-left:68px">
+        ${TL_BUCKETS.map(b=>`
+        <div style="background:${b.color}18;border:1px solid ${b.color}33;border-radius:4px;padding:4px 8px;cursor:pointer;transition:filter .15s"
+          onmouseenter="this.style.filter='brightness(1.2)'" onmouseleave="this.style.filter=''"
+          onmouseup="lytTLBucketClick('${t}','${b.key}','${b.label}','${b.color}')">
+          <div style="font-size:7.5px;color:${b.textColor};font-weight:700">${b.label}</div>
+          <div style="font-size:14px;font-weight:800;font-family:var(--font-mono);color:${b.textColor}">${fmt(d[b.key])}</div>
+          <div style="font-size:7.5px;color:${b.textColor};opacity:.6">${d.total>0?((d[b.key]/d.total)*100).toFixed(0)+'%':'—'}</div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  });
+
+
+
+
+  preview.innerHTML = html;
+}
+
+// Timeline bucket click → detail panel (reuse _lytShowDetailPanel)
+function lytTLBucketClick(type, bucketKey, bucketLabel, color) {
+  const baseRows = _chipFiltered.length ? _chipFiltered : _chipAllData;
+  if (!baseRows.length) return;
+  const nowY = new Date().getFullYear();
+  const capPrio = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
+  const capColor= {'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
+  const capLbl  = {'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+  const tramMaxCap = {};
+  _chipAllData.forEach(d => {
+    const t=(d.Tram||'').trim(); if(!t)return;
+    const cv=String(d.Cap_dien_ap??''); if(!cv||cv==='null')return;
+    if(!tramMaxCap[t]||(capPrio[cv]??9)<(capPrio[tramMaxCap[t]]??9)) tramMaxCap[t]=cv;
+  });
+  const matched = baseRows.filter(d => {
+    if (_tlNormPl(d.Phan_loai_thiet_bi) !== type) return false;
+    const nvh=Number(d.Nam_van_hanh), nsx=Number(d.Nam_san_xuat);
+    const refY = nvh>1970?nvh:(nsx>1970?nsx:0);
+    const age  = refY>0?(nowY-refY):-1;
+    if (bucketKey==='lt10')    return age>=0&&age<10;
+    if (bucketKey==='b1015')   return age>=10&&age<15;
+    if (bucketKey==='gt15')    return age>=15;
+    if (bucketKey==='unknown') return age<0;
+    return false;
+  });
+  if (!matched.length) return;
+  const byTram = {};
+  matched.forEach(d => {
+    const t=(d.Tram||'').trim(); if(!t)return;
+    if(!byTram[t]) byTram[t]={qty:0,years:new Set(),ngans:new Set()};
+    byTram[t].qty += Number(d.So_luong)||1;
+    const nvh=Number(d.Nam_van_hanh),nsx=Number(d.Nam_san_xuat);
+    const y=nvh>1970?nvh:(nsx>1970?nsx:0);
+    if(y>1970) byTram[t].years.add(y);
+    if(d.Ngan_thiet_bi) byTram[t].ngans.add(d.Ngan_thiet_bi);
+  });
+  const tramList = Object.keys(byTram).sort((a,b)=>{
+    const pa=capPrio[tramMaxCap[a]]??9,pb=capPrio[tramMaxCap[b]]??9;
+    return pa!==pb?pa-pb:a.localeCompare(b,'vi');
+  });
+  const items=[]; const byC={};
+  tramList.forEach(t=>{const cv=tramMaxCap[t]||'?';if(!byC[cv])byC[cv]=[];byC[cv].push(t);});
+  ['2','1','3','4','9','6','0'].forEach(cap=>{
+    const arr=byC[cap];if(!arr?.length)return;
+    items.push({isGroup:true,text:`── ${capLbl[cap]||cap} (${arr.length} trạm) ──`,color:capColor[cap]||'#888'});
+    arr.forEach(t=>{
+      const info=byTram[t];
+      const yrs=[...info.years].sort();
+      const yrStr=yrs.length?(yrs[0]===yrs[yrs.length-1]?`${yrs[0]}`:`${yrs[0]}–${yrs[yrs.length-1]}`):'—';
+      const ages=yrs.map(y=>nowY-y);
+      const ageStr=ages.length?`~${Math.round(ages.reduce((s,a)=>s+a,0)/ages.length)}n`:'';
+      items.push({text:t,badge:`${info.qty}TB · ${yrStr}${ageStr?' · '+ageStr:''}`,color:capColor[cap]||'#888'});
+    });
+  });
+  const totalQty = matched.reduce((s,d)=>s+(Number(d.So_luong)||1),0);
+  _lytShowDetailPanel(`${type} · ${bucketLabel}`, color||'#00c8ff',
+    `${totalQty.toLocaleString('vi-VN')} thiết bị · ${tramList.length} trạm`, items);
+}
+
+// ── Shared detail panel (reused by all sections) ──────────────
+function _lytShowDetailPanel(title, color, totalLine, items, mbaSection) {
+  if (!items || !items.length) return;
+  let p = document.getElementById('hm-detail-panel');
+  if (!p) {
+    p = document.createElement('div');
+    p.id = 'hm-detail-panel';
+    p.className = 'hm-detail-panel';
+    document.body.appendChild(p);
+  }
+  const bodyHtml = items.map(item => {
+    if (item.isGroup) return `<div class="hm-detail-group" style="color:${item.color}">${item.text}</div>`;
+    const detHtml = item.detail
+      ? `<div class="hm-detail-sub-list">${item.detail.map(n=>`<div class="hm-detail-sub-item">• ${n}</div>`).join('')}</div>`
+      : '';
+    const badge = item.badge || item.sub || '';
+    return `<div class="hm-detail-row" data-search="${(item.text||'').toLowerCase()}">
+      <span class="hm-dr-name">${item.text}</span>
+      <span class="hm-dr-badge" style="background:${item.color}22;color:${item.color}">${badge}</span>
+    </div>${detHtml}`;
+  }).join('');
+
+  p.innerHTML = `
+    <div class="hm-resize-grip" id="hm-resize-grip"></div>
+    <div class="hm-detail-hd" style="border-left:3px solid ${color||'var(--accent)'}" id="hm-detail-hd-drag">
+      <span style="color:${color||'var(--accent)'}">${title}</span>
+      <span class="hm-detail-close"
+        onclick="this.closest('.hm-detail-panel').classList.remove('open');let b=document.getElementById('hm-detail-backdrop');if(b)b.style.display='none'">✕</span>
+    </div>
+    <div style="padding:6px 16px 8px;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0">
+      <div style="font-size:9px;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:6px">${totalLine}</div>
+      <input type="text" placeholder="🔍 Tìm kiếm..." id="hm-detail-search"
+        style="width:100%;box-sizing:border-box;padding:5px 9px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text-primary);font-size:10px;outline:none"
+        oninput="_lytDetailSearchFn(this.value)"/>
+    </div>
+    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;overscroll-behavior:contain;-webkit-overflow-scrolling:touch">${bodyHtml}</div>`;
+  p.classList.add('open');
+  _hmOpenPanel(p);
+  let bd = document.getElementById('hm-detail-backdrop');
+  if (!bd) {
+    bd = document.createElement('div');
+    bd.id = 'hm-detail-backdrop';
+    bd.style.cssText = 'position:fixed;inset:0;z-index:9190;background:rgba(0,0,0,.35);display:none;backdrop-filter:blur(1px)';
+    bd.onclick = () => { p.classList.remove('open'); bd.style.display='none'; };
+    document.body.appendChild(bd);
+  }
+  bd.style.display = 'block';
+  setTimeout(()=>{ const s=document.getElementById('hm-detail-search'); if(s)s.focus(); }, 80);
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  DETAIL PANEL – EVENT DELEGATION (không dùng _dragInited flag)
+//  Bind một lần vào document khi trang load. Hoạt động đúng
+//  ngay cả khi innerHTML bị ghi đè nhiều lần.
+// ═══════════════════════════════════════════════════════════════
+(function _initPanelSystem() {
+  let _resizing = false, _resizeStartX = 0, _resizeStartW = 0;
+  let _dragging  = false, _dragStartY  = 0, _dragStartTop = 0;
+
+  // ── RESIZE (kéo cạnh trái) ──
+  document.addEventListener('mousedown', e => {
+    const grip = e.target.closest('.hm-resize-grip');
+    if (!grip) return;
+    const panel = grip.closest('.hm-detail-panel');
+    if (!panel) return;
+    e.preventDefault();
+    _resizing = true;
+    _resizeStartX = e.clientX;
+    _resizeStartW = panel.offsetWidth;
+    grip.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (_resizing) {
+      const panel = document.querySelector('.hm-detail-panel.open');
+      if (!panel) { _resizing = false; return; }
+      const newW = Math.max(280, Math.min(window.innerWidth * 0.75, _resizeStartW + (_resizeStartX - e.clientX)));
+      panel.style.width = newW + 'px';
+    }
+    if (_dragging) {
+      const panel = document.querySelector('.hm-detail-panel.open');
+      if (!panel) { _dragging = false; return; }
+      const newTop = Math.max(0, Math.min(window.innerHeight - 100, _dragStartTop + (e.clientY - _dragStartY)));
+      panel.style.top    = newTop + 'px';
+      panel.style.bottom = 'auto';
+      panel.style.height = (window.innerHeight - newTop) + 'px';
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (_resizing) {
+      document.querySelectorAll('.hm-resize-grip').forEach(g => g.classList.remove('dragging'));
+      _resizing = false;
+      document.body.style.userSelect = '';
+    }
+    if (_dragging) {
+      _dragging = false;
+      document.body.style.userSelect = '';
+    }
+  });
+
+  // ── DRAG HEADER (kéo lên/xuống) ──
+  document.addEventListener('mousedown', e => {
+    if (e.target.classList.contains('hm-detail-close')) return;
+    if (e.target.closest('.hm-resize-grip')) return;
+    const hd = e.target.closest('.hm-detail-hd');
+    if (!hd) return;
+    const panel = hd.closest('.hm-detail-panel');
+    if (!panel) return;
+    e.preventDefault();
+    _dragging = true;
+    _dragStartY   = e.clientY;
+    _dragStartTop = panel.style.top ? parseInt(panel.style.top, 10) : 0;
+    document.body.style.userSelect = 'none';
+  });
+
+  // ── TOUCH RESIZE ──
+  document.addEventListener('touchstart', e => {
+    const grip = e.target.closest('.hm-resize-grip');
+    if (!grip) return;
+    const panel = grip.closest('.hm-detail-panel');
+    if (!panel) return;
+    _resizing = true;
+    _resizeStartX = e.touches[0].clientX;
+    _resizeStartW = panel.offsetWidth;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', e => {
+    if (!_resizing) return;
+    const panel = document.querySelector('.hm-detail-panel.open');
+    if (!panel) { _resizing = false; return; }
+    const newW = Math.max(280, Math.min(window.innerWidth * 0.75, _resizeStartW + (_resizeStartX - e.touches[0].clientX)));
+    panel.style.width = newW + 'px';
+  }, { passive: true });
+
+  document.addEventListener('touchend', () => { _resizing = false; });
+
+  // ── ESCAPE để đóng ──
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const panel = document.getElementById('hm-detail-panel');
+    if (panel && panel.classList.contains('open')) {
+      panel.classList.remove('open');
+      panel.style.top = ''; panel.style.bottom = ''; panel.style.height = '';
+      const bd = document.getElementById('hm-detail-backdrop');
+      if (bd) bd.style.display = 'none';
+    }
+  });
+})();
+
+// Không cần _hmPanelInitDrag nữa – giữ stub để không lỗi các lần gọi cũ
+function _hmPanelInitDrag(panel) {
+  if (!panel) return;
+  panel.style.display       = 'flex';
+  panel.style.flexDirection = 'column';
+  panel.style.overflow      = 'hidden';
+}
+
+// Mở panel + hiện backdrop + focus search
+function _hmOpenPanel(p, showBackdrop) {
+  // Panel dùng overflow-y:auto trực tiếp - không cần flex tricks
+  p.style.top    = '0';
+  p.style.bottom = '0';
+  p.style.height = '';
+
+  // Backdrop
+  if (showBackdrop !== false) {
+    let bd = document.getElementById('hm-detail-backdrop');
+    if (!bd) {
+      bd = document.createElement('div');
+      bd.id = 'hm-detail-backdrop';
+      bd.style.cssText = 'position:fixed;inset:0;z-index:9190;background:rgba(0,0,0,.35);display:none';
+      bd.onclick = () => {
+        p.classList.remove('open');
+        bd.style.display = 'none';
+      };
+      document.body.appendChild(bd);
+    }
+    bd.style.display = 'block';
+  }
+  // Focus search box
+  setTimeout(() => {
+    const si = p.querySelector('input[type=text]');
+    if (si) si.focus();
+  }, 220);
+}
+
+function _lytDetailSearchFn(val) {
+  const q = (val||'').toLowerCase().trim();
+  const body = document.getElementById('hm-detail-body');
+  if (!body) return;
+  body.querySelectorAll('.hm-detail-row').forEach(row => {
+    const show = !q || (row.dataset.search||'').includes(q);
+    row.style.display = show ? '' : 'none';
+    const next = row.nextElementSibling;
+    if (next?.classList.contains('hm-detail-sub-list')) next.style.display = show ? '' : 'none';
+  });
+  body.querySelectorAll('.hm-detail-group').forEach(g => {
+    let sib=g.nextElementSibling, any=false;
+    while(sib&&!sib.classList.contains('hm-detail-group')){ if(sib.classList.contains('hm-detail-row')&&sib.style.display!=='none')any=true; sib=sib.nextElementSibling; }
+    g.style.display = any||!q ? '' : 'none';
+  });
+}
+
+// ── LIVE CHIPS RENDERER ──────────────────────────────────────
+// Render device chips vào canvas section có id='deviceByType'
+// Đồng bộ logic với app.js renderTypeChips()
+
+let _chipAllData   = [];    // toàn bộ rows từ Supabase
+let _chipFiltered  = [];    // filtered rows (= _chipAllData khi không filter)
+let _selectedChips = new Set(); // chip filter state
+
+function isExcludedChip(pl) {
+  if (!pl) return true;
+  const n = pl.trim().toUpperCase().replace(/\s+/g, '').normalize('NFC');
+  if (n.startsWith('TICHAN') || n.startsWith('TI-CHAN') ||
+      n === 'TICHANSỨ' || n === 'TICHÂNSỨ' ||
+      n.includes('TICHÂN') || n.includes('TICHAN')) return true;
+  if (n === 'HTTĐ' || n === 'HTTD' ||
+      n.startsWith('HTTĐ') || n.startsWith('HTTD')) return true;
+  return false;
+}
+
+function buildChipData(rows) {
+  const typeMap = {};
+  rows.forEach(d => {
+    const pl = (d.Phan_loai_thiet_bi || '').trim();
+    if (!pl || isExcludedChip(pl)) return;
+    if (!typeMap[pl]) typeMap[pl] = { totalCount: 0, soLuong: 0, hangs: new Set() };
+    typeMap[pl].totalCount++;
+    typeMap[pl].soLuong += Number(d.So_luong) || 0;
+    const h = (d.Hang_san_xuat || '').trim();
+    if (h) typeMap[pl].hangs.add(h);
+  });
+  return typeMap;
+}
+
+function renderChipsSection() {
+  const chipsItem = layout.find(l => l.type === 'chips');
+  if (!chipsItem) return;
+  const wrapper = document.querySelector(`.section-wrapper[data-uid="${chipsItem.uid}"]`);
+  if (!wrapper) return;
+  const preview = wrapper.querySelector('.card-preview');
+  if (!preview) return;
+  if (!_chipAllData.length) return;
+
+  const fmt = n => Number(n).toLocaleString('vi-VN');
+
+  // Exclude list
+  const isExcl = pl => {
+    if (!pl) return true;
+    const n = pl.trim().toUpperCase().replace(/\s+/g,'').normalize('NFC');
+    return n.startsWith('TICHAN') || n.includes('TICHÂN') ||
+           n === 'HTTD' || n.startsWith('HTTD') ||
+           n === 'DAU' || n.startsWith('DẦU') || n.startsWith('DAU');
   };
 
-  document.querySelectorAll('.nav-item').forEach(el => {
-    const text = el.querySelector('span')?.textContent?.trim();
-    const pageId = navMap[text];
-    if (pageId) {
-      el.dataset.page = pageId;
-      el.addEventListener('click', e => {
-        e.preventDefault();
-        navigateTo(pageId);
+  // Base rows = filtered or all
+  const baseRows = _chipFiltered.length ? _chipFiltered : _chipAllData;
+
+  // Tram linkage: if tram selected via filter → determine cap group
+  const selTram = _lf?.tram || '';
+  const selCap  = _lf?.cap  || '';
+  const capPrio = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
+
+  // Build tramMaxCap to determine which group a tram belongs to
+  const tramMaxCap = {};
+  _chipAllData.forEach(d => {
+    const t=(d.Tram||'').trim(); if(!t)return;
+    const cv=String(d.Cap_dien_ap??''); if(!cv||cv==='null')return;
+    if(!tramMaxCap[t]||(capPrio[cv]??9)<(capPrio[tramMaxCap[t]]??9)) tramMaxCap[t]=cv;
+  });
+
+  // Determine which groups to show based on tram/cap filter linkage
+  const HV_CAPS = new Set(['2','1']);       // 220kV, 110kV
+  const LV_CAPS = new Set(['3','4','9','6','0']); // 35kV, 22kV, 10kV, 6kV, TT
+
+  // Always show both groups — hide only if group has 0 devices after filtering
+  // (Cap filter via dropdown still applies via baseRows, but don't hide whole group by tram cap)
+  let showHV = true, showLV = true;
+  // Only restrict when user explicitly selects a cap via dropdown
+  if (selCap) {
+    showHV = HV_CAPS.has(selCap);
+    showLV = LV_CAPS.has(selCap);
+  }
+
+  // Build chip data per group
+  function buildGroupChips(capFilter) {
+    const typeMap = {};
+    baseRows.forEach(d => {
+      const cap = String(d.Cap_dien_ap??'');
+      if (!capFilter.has(cap)) return;
+      const pl = (d.Phan_loai_thiet_bi||'').trim();
+      if (!pl || isExcl(pl)) return;
+      if (!typeMap[pl]) typeMap[pl] = { soLuong:0, totalCount:0 };
+      typeMap[pl].soLuong    += Number(d.So_luong)||0;
+      typeMap[pl].totalCount += 1;
+    });
+    return typeMap;
+  }
+
+  // Total from ALL data (for /total display)
+  function buildGroupTotal(capFilter) {
+    const typeMap = {};
+    _chipAllData.forEach(d => {
+      const cap = String(d.Cap_dien_ap??'');
+      if (!capFilter.has(cap)) return;
+      const pl = (d.Phan_loai_thiet_bi||'').trim();
+      if (!pl || isExcl(pl)) return;
+      if (!typeMap[pl]) typeMap[pl] = { soLuong:0 };
+      typeMap[pl].soLuong += Number(d.So_luong)||0;
+    });
+    return typeMap;
+  }
+
+  const hvMap  = buildGroupChips(HV_CAPS);
+  const lvMap  = buildGroupChips(LV_CAPS);
+  const hvAll  = buildGroupTotal(HV_CAPS);
+  const lvAll  = buildGroupTotal(LV_CAPS);
+
+  // Sort by soLuong desc, active chips first
+  function sortTypes(map) {
+    return Object.entries(map).sort((a,b) => {
+      const aA = _selectedChips.has(a[0]) ? 1:0, bA = _selectedChips.has(b[0]) ? 1:0;
+      if (bA!==aA) return bA-aA;
+      return (b[1].soLuong||0) - (a[1].soLuong||0);
+    });
+  }
+
+  function chipHtml(type, info, allInfo) {
+    const isActive = _selectedChips.has(type);
+    const cur = info.soLuong||0;
+    const tot = allInfo?.[type]?.soLuong||cur;
+    const isFiltered = cur !== tot;
+    const safeType = type.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    return `<div class="device-chip${isActive?' active':''}"
+      title="${type} — ${fmt(cur)}${isFiltered?'/'+fmt(tot):''}TB"
+      data-chip-type="${safeType}"
+      onmousedown="this._md=true" onmousemove="this._md=false"
+      onmouseup="if(this._md){event.stopPropagation();lytChipClick(this)}">
+      <div class="device-chip-header">
+        <span class="device-chip-name">${type}</span>
+        <span class="device-chip-count">${isActive?'<i class="fas fa-check" style="font-size:8px;margin-right:2px"></i>':''}${fmt(cur)}${isFiltered?'<span class="device-chip-total">/'+fmt(tot)+'</span>':''}</span>
+      </div>
+    </div>`;
+  }
+
+  const numTypes = Object.keys(hvMap).length + Object.keys(lvMap).length;
+  const totalSL  = [...Object.values(hvMap),...Object.values(lvMap)].reduce((s,v)=>s+(v.soLuong||0),0);
+
+  let html = `<div class="chips-header-row">
+    <span class="chips-active-info${_selectedChips.size>0?' visible':''}" id="lyt_chipsInfo">
+      ${_selectedChips.size>0?`<i class="fas fa-filter"></i> Đang lọc: ${[..._selectedChips].join(', ')}`:''}
+    </span>
+    <span style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono)">${numTypes} loại · ${fmt(totalSL)} thiết bị</span>
+    <button class="chips-reset-btn" id="lyt_chipsReset"
+      style="display:${_selectedChips.size>0?'inline-flex':'none'}"
+      onclick="lytChipReset()">
+      <i class="fas fa-times-circle"></i> Bỏ lựa chọn
+    </button>
+  </div>`;
+
+  // Group HV
+  if (showHV && Object.keys(hvMap).length) {
+    const hvTotal = Object.values(hvMap).reduce((s,v)=>s+(v.soLuong||0),0);
+    html += `<div style="font-size:9px;font-weight:800;color:#ff9100;letter-spacing:.08em;margin:10px 0 6px;display:flex;align-items:center;gap:8px">
+      <span style="width:8px;height:8px;border-radius:50%;background:#ff9100;flex-shrink:0"></span>
+      220kV – 110kV
+      <span style="font-weight:400;color:var(--text-muted)">${Object.keys(hvMap).length} loại · ${fmt(hvTotal)} thiết bị</span>
+    </div><div class="device-chips-grid">`;
+    sortTypes(hvMap).forEach(([t,info]) => { html += chipHtml(t, info, hvAll); });
+    html += `</div>`;
+  }
+
+  // Group LV
+  if (showLV && Object.keys(lvMap).length) {
+    const lvTotal = Object.values(lvMap).reduce((s,v)=>s+(v.soLuong||0),0);
+    html += `<div style="font-size:9px;font-weight:800;color:#00c8ff;letter-spacing:.08em;margin:14px 0 6px;display:flex;align-items:center;gap:8px">
+      <span style="width:8px;height:8px;border-radius:50%;background:#00c8ff;flex-shrink:0"></span>
+      35kV – 22kV – 10kV – 6kV
+      <span style="font-weight:400;color:var(--text-muted)">${Object.keys(lvMap).length} loại · ${fmt(lvTotal)} thiết bị</span>
+    </div><div class="device-chips-grid">`;
+    sortTypes(lvMap).forEach(([t,info]) => { html += chipHtml(t, info, lvAll); });
+    html += `</div>`;
+  }
+
+  // No data for selected filter
+  if (!showHV && !showLV) {
+    html += `<div style="color:var(--text-muted);font-size:11px;padding:20px;text-align:center">Không có thiết bị cho bộ lọc hiện tại</div>`;
+  }
+
+  preview.innerHTML = html;
+}
+
+
+function lytChipClick(el) {
+  const type = el.dataset.chipType;
+  if (!type) return;
+  lytChipToggle(type);
+}
+
+function lytChipToggle(type) {
+  // Toggle selection
+  if (_selectedChips.has(type)) _selectedChips.delete(type);
+  else _selectedChips.add(type);
+
+  // Re-filter
+  if (_selectedChips.size === 0) {
+    _chipFiltered = [..._chipAllData];
+  } else {
+    _chipFiltered = _chipAllData.filter(d => {
+      const pl = (d.Phan_loai_thiet_bi || '').trim();
+      return _selectedChips.has(pl);
+    });
+  }
+  renderChipsSection();
+  renderChartsSection();
+  if (_chipAllData.length > 0) _recomputeStatsWithFilter();
+
+  // Show detail panel — same style as stats card panel
+  lytChipShowDetail(type);
+}
+
+function lytChipShowDetail(type) {
+  const baseRows = _chipAllData;
+  const capPrio  = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
+  const capColor = {'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
+  const capLbl   = {'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+  const tramMaxCap = {};
+  baseRows.forEach(d => {
+    const t=(d.Tram||'').trim(); if(!t)return;
+    const cv=String(d.Cap_dien_ap??''); if(!cv||cv==='null')return;
+    if(!tramMaxCap[t]||(capPrio[cv]??9)<(capPrio[tramMaxCap[t]]??9)) tramMaxCap[t]=cv;
+  });
+  const typeRows = baseRows.filter(d => (d.Phan_loai_thiet_bi||'').trim() === type);
+  if (!typeRows.length) return;
+  const byTram = {};
+  typeRows.forEach(d => {
+    const t=(d.Tram||'').trim(); if(!t)return;
+    if(!byTram[t]) byTram[t]={ qty:0, ngans:new Set() };
+    byTram[t].qty += Number(d.So_luong)||1;
+    if(d.Ngan_thiet_bi) byTram[t].ngans.add(d.Ngan_thiet_bi);
+  });
+  const tramList = Object.keys(byTram).sort((a,b) => {
+    const pa=capPrio[tramMaxCap[a]]??9, pb=capPrio[tramMaxCap[b]]??9;
+    return pa!==pb?pa-pb:a.localeCompare(b,'vi');
+  });
+  const items = [];
+  const byC = {};
+  tramList.forEach(t=>{ const cv=tramMaxCap[t]||'?'; if(!byC[cv])byC[cv]=[]; byC[cv].push(t); });
+  ['2','1','3','4','9','6','0'].forEach(cap => {
+    const arr=byC[cap]; if(!arr?.length)return;
+    items.push({ isGroup:true, text:`── ${capLbl[cap]||cap} (${arr.length} trạm) ──`, color:capColor[cap]||'#888' });
+    arr.forEach(t => {
+      const info = byTram[t];
+      const ngans = [...info.ngans].sort();
+      items.push({ text:t, badge:`${info.qty.toLocaleString('vi-VN')} TB`, color:capColor[tramMaxCap[t]]||'#888',
+        detail: ngans.length ? ngans : null });
+    });
+  });
+  const totalQty = typeRows.reduce((s,d)=>s+(Number(d.So_luong)||1),0);
+
+  // Build MBA/Trạm breakdown sub-section for MBA, MBATD, MBATN types
+  const mbaTypes = new Set(['MBA','MBATD','MBATN','MBA_TU','MBATN']);
+  let mbaSection = null;
+  if (mbaTypes.has(type.trim().toUpperCase()) || type.toUpperCase().includes('MBA')) {
+    const mbaRows = typeRows;
+    const tramMbaMap = {};
+    mbaRows.forEach(d => {
+      const t=(d.Tram||'').trim(); if(!t)return;
+      if(!tramMbaMap[t]) tramMbaMap[t]=[];
+      tramMbaMap[t].push(d);
+    });
+    // Build summary: Tram + each MBA name + qty
+    mbaSection = { type, tramMbaMap, capColor, capLbl, capPrio, tramMaxCap };
+  }
+
+  _lytShowDetailPanel(`🔌 ${type}`, 'var(--accent)',
+    `${totalQty.toLocaleString('vi-VN')} thiết bị · ${tramList.length} trạm`, items, mbaSection);
+}
+
+
+function _chipDetailSearch(val) {
+  const q = (val||'').toLowerCase().trim();
+  const body = document.getElementById('hm-detail-body');
+  if (!body) return;
+  body.querySelectorAll('.hm-detail-row').forEach(row => {
+    const show = !q || (row.dataset.search||'').includes(q);
+    row.style.display = show ? '' : 'none';
+    const next = row.nextElementSibling;
+    if (next?.classList.contains('hm-detail-sub-list')) next.style.display = show ? '' : 'none';
+  });
+  body.querySelectorAll('.hm-detail-group').forEach(g => {
+    let sib=g.nextElementSibling, any=false;
+    while(sib&&!sib.classList.contains('hm-detail-group')){ if(sib.classList.contains('hm-detail-row')&&sib.style.display!=='none')any=true; sib=sib.nextElementSibling; }
+    g.style.display = any||!q ? '' : 'none';
+  });
+}
+
+function lytChipReset() {
+  _selectedChips.clear();
+  _chipFiltered = [..._chipAllData];
+  renderChipsSection();
+  renderChartsSection();
+  _recomputeStatsWithFilter();
+}
+
+// ── Stats card click — hiện detail panel bên phải ──────────────
+function lytStatsCardClick(label, color) {
+  const rows    = (_chipFiltered.length ? _chipFiltered : _chipAllData);
+  const capLbl  = {'0':'TT','1':'110kV','2':'220kV','3':'35kV','4':'22kV','6':'6kV','9':'10kV'};
+  const capPrio = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
+
+  // Build maxCap map từ toàn bộ data
+  const tramMaxCap = {};
+  _chipAllData.forEach(d => {
+    const t = (d.Tram||'').trim(); if (!t) return;
+    const c = String(d.Cap_dien_ap??'');
+    if (!c || c==='null') return;
+    if (!tramMaxCap[t] || (capPrio[c]??99) < (capPrio[tramMaxCap[t]]??99)) tramMaxCap[t] = c;
+  });
+
+  // Danh sách trạm xuất hiện trong rows
+  const filteredTrams = [...new Set(rows.map(d=>(d.Tram||'').trim()).filter(Boolean))];
+  filteredTrams.sort((a,b) => {
+    const pa = capPrio[tramMaxCap[a]]??9, pb = capPrio[tramMaxCap[b]]??9;
+    return pa!==pb ? pa-pb : a.localeCompare(b);
+  });
+
+  let title = label;
+  let items = [];      // [{text, sub, color}]
+  let totalLine = '';
+
+  switch (label) {
+    case 'Tổng số TBA': {
+      title = '🏢 Tổng số TBA';
+      const byMaxCap = {};
+      filteredTrams.forEach(t => {
+        const mc = tramMaxCap[t] || '?';
+        if (!byMaxCap[mc]) byMaxCap[mc] = [];
+        byMaxCap[mc].push(t);
+      });
+      ['2','1','3','4','9','6','0'].forEach(cap => {
+        const arr = byMaxCap[cap]; if (!arr||!arr.length) return;
+        items.push({ text: `── ${capLbl[cap]||cap} (${arr.length} trạm) ──`, isGroup: true, color: LYT_CAP_COLORS[cap]||'#888' });
+        arr.forEach(t => items.push({ text: t, sub: capLbl[cap]||cap, color: LYT_CAP_COLORS[cap]||'#888' }));
+      });
+      totalLine = `${filteredTrams.length} trạm`;
+      break;
+    }
+    case 'TBA 220kV': {
+      title = '⚡ TBA 220kV';
+      const list = filteredTrams.filter(t => tramMaxCap[t] === '2');
+      list.forEach(t => items.push({ text: t, sub: '220kV', color: LYT_CAP_COLORS['2'] }));
+      totalLine = `${list.length} trạm`;
+      break;
+    }
+    case 'TBA 110kV': {
+      title = '⚡ TBA 110kV';
+      const list = filteredTrams.filter(t => tramMaxCap[t] === '1');
+      list.forEach(t => items.push({ text: t, sub: '110kV', color: LYT_CAP_COLORS['1'] }));
+      totalLine = `${list.length} trạm`;
+      break;
+    }
+    case 'Tổng số ngăn': {
+      title = '▦ Tổng số ngăn';
+      const nganScope = lytBuildScopedNganSets(rows, _chipAllData);
+      const byTram = {};
+      nganScope.total.forEach(key => {
+        const [tram, ngan] = key.split('|||');
+        if (!tram || !ngan) return;
+        if (!byTram[tram]) byTram[tram] = new Set();
+        byTram[tram].add(ngan);
+      });
+      let total = 0;
+      filteredTrams.filter(t => byTram[t]).forEach(t => {
+        const cnt = byTram[t].size;
+        total += cnt;
+        items.push({ text: t, sub: `${cnt} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888' });
+      });
+      totalLine = `${total} ngăn / ${items.length} trạm`;
+      break;
+    }
+    case 'Ngăn đường dây': {
+      title = '↔ Ngăn Đường Dây';
+      const nganScope = lytBuildScopedNganSets(rows, _chipAllData);
+      const byTram = {};
+      nganScope.dz.forEach(key => {
+        const [tram, ngan] = key.split('|||');
+        if (!tram || !ngan) return;
+        if (!byTram[tram]) byTram[tram] = new Set();
+        byTram[tram].add(ngan);
+      });
+      let total = 0;
+      filteredTrams.filter(t => byTram[t]).forEach(t => {
+        const ngans = [...byTram[t]].sort();
+        total += ngans.length;
+        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
+      });
+      totalLine = `${total} ngăn ĐZ / ${Object.keys(byTram).length} trạm`;
+      break;
+    }
+    case 'MBA': case 'Ngăn MBA': {
+      title = '🔧 MBA';
+      const nganScope = lytBuildScopedNganSets(rows, _chipAllData);
+      const byTram = {};
+      nganScope.mba.forEach(key => {
+        const [tram, ngan] = key.split('|||');
+        if (!tram || !ngan) return;
+        if (!byTram[tram]) byTram[tram] = new Set();
+        byTram[tram].add(ngan);
+      });
+      let total = 0;
+      filteredTrams.filter(t => byTram[t]).forEach(t => {
+        const ngans = [...byTram[t]].sort();
+        total += ngans.length;
+        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
+      });
+      totalLine = `${total} ngăn MBA / ${Object.keys(byTram).length} trạm`;
+      break;
+    }
+    case 'Ngăn XT': case 'Ngăn xuất tuyến': case 'Ngăn xuất tuyến (XT)': {
+      title = '↗ Ngăn Xuất Tuyến (XT)';
+      const nganScope = lytBuildScopedNganSets(rows, _chipAllData);
+      const byTram = {};
+      nganScope.xt.forEach(key => {
+        const [tram, ngan] = key.split('|||');
+        if (!tram || !ngan) return;
+        if (!byTram[tram]) byTram[tram] = new Set();
+        byTram[tram].add(ngan);
+      });
+      let total = 0;
+      filteredTrams.filter(t => byTram[t]).forEach(t => {
+        const ngans = [...byTram[t]].sort();
+        total += ngans.length;
+        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
+      });
+      totalLine = `${total} ngăn XT / ${Object.keys(byTram).length} trạm`;
+      break;
+    }
+    case 'Ngăn liên lạc (LL)': {
+      title = '⇄ Ngăn Liên Lạc (LL)';
+      const nganScope = lytBuildScopedNganSets(rows, _chipAllData);
+      const byTram = {};
+      nganScope.ll.forEach(key => {
+        const [tram, ngan] = key.split('|||');
+        if (!tram || !ngan) return;
+        if (!byTram[tram]) byTram[tram] = new Set();
+        byTram[tram].add(ngan);
+      });
+      let total = 0;
+      filteredTrams.filter(t => byTram[t]).forEach(t => {
+        const ngans = [...byTram[t]].sort();
+        total += ngans.length;
+        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
+      });
+      totalLine = `${total} ngăn LL / ${Object.keys(byTram).length} trạm`;
+      break;
+    }
+    case 'Ngăn tụ bù (TBN)': {
+      title = '🔋 Ngăn Tụ Bù (TBN)';
+      const nganScope = lytBuildScopedNganSets(rows, _chipAllData);
+      const byTram = {};
+      nganScope.tbn.forEach(key => {
+        const [tram, ngan] = key.split('|||');
+        if (!tram || !ngan) return;
+        if (!byTram[tram]) byTram[tram] = new Set();
+        byTram[tram].add(ngan);
+      });
+      let total = 0;
+      filteredTrams.filter(t => byTram[t]).forEach(t => {
+        const ngans = [...byTram[t]].sort();
+        total += ngans.length;
+        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
+      });
+      totalLine = `${total} ngăn TBN / ${Object.keys(byTram).length} trạm`;
+      break;
+    }
+    case 'Ngăn tự dùng (TD)': {
+      title = '🔌 Ngăn Tự Dùng (TD)';
+      const nganScope = lytBuildScopedNganSets(rows, _chipAllData);
+      const byTram = {};
+      nganScope.td.forEach(key => {
+        const [tram, ngan] = key.split('|||');
+        if (!tram || !ngan) return;
+        if (!byTram[tram]) byTram[tram] = new Set();
+        byTram[tram].add(ngan);
+      });
+      let total = 0;
+      filteredTrams.filter(t => byTram[t]).forEach(t => {
+        const ngans = [...byTram[t]].sort();
+        total += ngans.length;
+        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
+      });
+      totalLine = `${total} ngăn TD / ${Object.keys(byTram).length} trạm`;
+      break;
+    }
+    case 'Ngăn kháng': {
+      title = '🧲 Ngăn Kháng';
+      const nganScope = lytBuildScopedNganSets(rows, _chipAllData);
+      const byTram = {};
+      nganScope.khang.forEach(key => {
+        const [tram, ngan] = key.split('|||');
+        if (!tram || !ngan) return;
+        if (!byTram[tram]) byTram[tram] = new Set();
+        byTram[tram].add(ngan);
+      });
+      let total = 0;
+      filteredTrams.filter(t => byTram[t]).forEach(t => {
+        const ngans = [...byTram[t]].sort();
+        total += ngans.length;
+        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
+      });
+      totalLine = `${total} ngăn Kháng / ${Object.keys(byTram).length} trạm`;
+      break;
+    }
+    case 'Tổng số thiết bị': {
+      title = '📦 Tổng số thiết bị';
+      // Nhóm theo loại thiết bị
+      const byType = {};
+      rows.forEach(r => {
+        const pl = (r.Phan_loai_thiet_bi||'Khác').trim();
+        if (!byType[pl]) byType[pl] = { qty: 0, trams: new Set() };
+        byType[pl].qty += Number(r.So_luong)||1;
+        if (r.Tram) byType[pl].trams.add((r.Tram||'').trim());
+      });
+      const sorted = Object.entries(byType).sort((a,b) => b[1].qty - a[1].qty);
+      const total = sorted.reduce((s,[,v]) => s + v.qty, 0);
+      sorted.forEach(([pl, v]) => {
+        items.push({ text: pl, sub: `${v.qty.toLocaleString('vi-VN')} TB / ${v.trams.size} trạm`, color: LYT_CAP_COLORS['1']||'#18ffff' });
+      });
+      totalLine = `${total.toLocaleString('vi-VN')} thiết bị · ${sorted.length} loại`;
+      break;
+    }
+    case 'Tổng công suất': {
+      title = '⚡ Tổng công suất MBA';
+      const byTram2 = {};
+      rows.forEach(r => {
+        const t = (r.Tram||'').trim(); if (!t) return;
+        const cs = Number(r.Cong_suat)||0;
+        if (!byTram2[t]) byTram2[t] = { cs: 0, cap: String(r.Cap_dien_ap??'') };
+        byTram2[t].cs += cs;
+      });
+      let total2 = 0;
+      filteredTrams.filter(t => byTram2[t]).forEach(t => {
+        const { cs, cap } = byTram2[t];
+        total2 += cs;
+        if (cs > 0) items.push({ text: t, sub: `${cs.toLocaleString('vi-VN')} MVA`, color: LYT_CAP_COLORS[cap]||'#888' });
+      });
+      totalLine = `${total2.toLocaleString('vi-VN')} MVA tổng / ${items.length} trạm`;
+      break;
+    }
+    case 'Công nghệ thiết bị TBA': {
+      title = '🏗️ Công nghệ thiết bị TBA';
+      const techMap = {};
+      rows.forEach(r => {
+        const tech = (r.Cong_nghe||r.Loai_cong_nghe||'').trim() || 'AIS';
+        if (!techMap[tech]) techMap[tech] = { qty: 0, trams: new Set() };
+        techMap[tech].qty += 1;
+        if (r.Tram) techMap[tech].trams.add((r.Tram||'').trim());
+      });
+      const techColors = { AIS:'#00c8ff', GIS:'#b388ff', HGIS:'#18ffff', KCK:'#00e676' };
+      Object.entries(techMap).sort((a,b)=>b[1].qty-a[1].qty).forEach(([tech, v]) => {
+        items.push({ text: tech, sub: `${v.trams.size} trạm`, color: techColors[tech]||'#ff9100' });
+      });
+      totalLine = `${filteredTrams.length} trạm · ${Object.keys(techMap).length} loại công nghệ`;
+      break;
+    }
+    default:
+      return; // Card không hỗ trợ drill-down — không mở panel
+  }
+
+  if (!items.length) return;
+
+  // Build panel HTML
+  let bodyHtml = items.map((item, i) => {
+    if (item.isGroup) {
+      return `<div style="padding:6px 16px 3px;font-size:8px;font-weight:700;letter-spacing:.1em;
+        color:${item.color};background:var(--bg-elevated);position:sticky;top:0;
+        border-bottom:1px solid rgba(255,255,255,0.05)">${item.text}</div>`;
+    }
+    const detailHtml = item.detail
+      ? `<div style="padding:2px 16px 6px 24px">` +
+        item.detail.map(n => `<div style="font-size:9.5px;color:var(--text-muted);padding:2px 0;
+          border-bottom:1px solid rgba(255,255,255,0.04);font-family:var(--font-mono)">• ${n}</div>`).join('') +
+        `</div>`
+      : '';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;
+        padding:7px 16px;border-bottom:1px solid rgba(255,255,255,0.05);
+        font-family:var(--font-mono)">
+        <span style="font-size:10px;color:var(--text-secondary)">${item.text}</span>
+        <span style="font-size:9px;font-weight:700;color:${item.color};
+          background:${item.color}18;padding:2px 8px;border-radius:10px">${item.sub}</span>
+      </div>${detailHtml}`;
+  }).join('');
+
+  // MBA/Tram breakdown section
+  let mbaSectionHtml = '';
+  if (mbaSection) {
+    const { tramMbaMap, capColor, capLbl, capPrio, tramMaxCap } = mbaSection;
+    const tramsSorted = Object.keys(tramMbaMap).sort((a,b)=>{
+      const pa=capPrio[tramMaxCap[a]]??9,pb=capPrio[tramMaxCap[b]]??9;
+      return pa!==pb?pa-pb:a.localeCompare(b,'vi');
+    });
+    let mbaRows = '';
+    tramsSorted.forEach(t => {
+      const rows = tramMbaMap[t];
+      const cv = tramMaxCap[t]||'';
+      const col = capColor[cv]||'#888';
+      const lbl = capLbl[cv]||cv;
+      const totalTram = rows.reduce((s,d)=>s+(Number(d.So_luong)||1),0);
+      mbaRows += `<div style="border-bottom:1px solid rgba(255,255,255,.04)">
+        <div style="padding:6px 16px 3px;display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.02)">
+          <span style="font-size:10px;font-weight:700;color:var(--text-primary);font-family:var(--font-mono)">${t}</span>
+          <div style="display:flex;gap:5px;align-items:center">
+            ${cv?`<span style="font-size:8px;font-weight:700;color:${col};background:${col}18;padding:1px 5px;border-radius:4px">${lbl}</span>`:''}
+            <span style="font-size:9px;color:var(--text-muted);background:rgba(255,255,255,.06);padding:1px 6px;border-radius:5px">${totalTram} TB</span>
+          </div>
+        </div>
+        ${rows.map(d=>`<div style="padding:3px 24px;font-size:9px;color:var(--text-secondary);display:flex;justify-content:space-between;font-family:var(--font-mono)">
+          <span style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.Ten_thiet_bi||''}">${d.Ten_thiet_bi||'—'}</span>
+          <span style="color:var(--accent);flex-shrink:0">${Number(d.So_luong)||1} TB</span>
+        </div>`).join('')}
+      </div>`;
+    });
+    mbaSectionHtml = `<div style="border-top:2px solid rgba(0,200,255,.2);margin-top:6px">
+      <div style="padding:8px 16px 4px;font-size:9px;font-weight:800;color:var(--accent);letter-spacing:.1em;background:rgba(0,200,255,.05)">
+        <i class="fas fa-list-ul" style="margin-right:5px"></i>CHI TIẾT THEO TRẠM
+      </div>
+      ${mbaRows}
+    </div>`;
+  }
+
+  // Lấy hoặc tạo panel
+  let p = document.getElementById('hm-detail-panel');
+  if (!p) {
+    p = document.createElement('div');
+    p.id        = 'hm-detail-panel';
+    p.className = 'hm-detail-panel';
+    document.body.appendChild(p);
+  }
+
+  p.innerHTML = `
+    <div class="hm-resize-grip"></div>
+    <div class="hm-detail-hd" style="border-left:3px solid ${color||'var(--accent)'}">
+      <span style="color:${color||'var(--accent)'}">${title}</span>
+      <span class="hm-detail-close"
+        onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span>
+    </div>
+    <div style="padding:8px 16px;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0">
+      ${totalLine}
+    </div>
+    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">${bodyHtml}</div>`;
+
+  p.classList.add('open');
+  _hmOpenPanel(p);
+}
+
+function lytNormalizeNganLoai(v) {
+  const raw = normalizeSearchText(v);
+  // 'raw' đã bỏ dấu + lowercase + trim, nhưng CÒN khoảng trắng
+  // nên cần kiểm tra cả variant có space và không space
+  if (raw === 'ngan dz'    || raw === 'ngandz'    || raw === 'ngan duong day') return 'Ngăn ĐZ';
+  if (raw === 'ngan xt'    || raw === 'nganxt'    || raw === 'ngan xuat tuyen' || raw === 'xuat tuyen') return 'Ngăn XT';
+  if (raw === 'ngan mba'   || raw === 'nganmba')   return 'Ngăn MBA';
+  if (raw === 'ngan ll'    || raw === 'nganll'    || raw === 'ngan lien lac')  return 'Ngăn LL';
+  if (raw === 'ngan tbn'   || raw === 'ngantbn'   || raw === 'ngan tu bu')     return 'Ngăn TBN';
+  if (raw === 'ngantd'     || raw === 'ngan td'   || raw === 'ngan tu dung')   return 'NgănTD';
+  if (raw === 'ngan khang' || raw === 'ngankhang')                             return 'Ngăn Kháng';
+  return String(v || '').trim();
+}
+
+function lytIsMBARow(d) {
+  // Đếm theo Phan_loai_thiet_bi = 'MBA' exact (bỏ MBATD, MBA,...)
+  const pl = (d?.Phan_loai_thiet_bi || '').trim();
+  return pl === 'MBA';
+}
+
+function lytBuildScopedNganSets(activeRows, sourceRows = _chipAllData) {
+  const rows = Array.isArray(activeRows) ? activeRows : [];
+  const fallbackRows = Array.isArray(sourceRows) && sourceRows.length ? sourceRows : rows;
+  const filteredTrams = new Set(rows.map(d => (d.Tram || '').trim()).filter(Boolean));
+  const scopedRows = filteredTrams.size
+    ? fallbackRows.filter(d => filteredTrams.has((d.Tram || '').trim()))
+    : fallbackRows;
+
+  const buildSet = predicate => {
+    const out = new Set();
+    scopedRows.filter(predicate).forEach(d => {
+      const tram = (d.Tram || '').trim();
+      const ngan = (d.Ngan_thiet_bi || '').trim();
+      if (tram && ngan) out.add(tram + '|||' + ngan);
+    });
+    return out;
+  };
+
+  // Tổng ngăn: loại HTTĐ
+  const isHTTD = d => {
+    const n = (d.Phan_loai_thiet_bi||'').trim().toUpperCase().replace(/\s+/g,'').normalize('NFC');
+    return n === 'HTTĐ' || n === 'HTTD' || n.startsWith('HTTD');
+  };
+
+  return {
+    filteredTrams,
+    scopedRows,
+    total:  buildSet(d => !isHTTD(d)),
+    dz:     buildSet(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn ĐZ'),
+    mba:    buildSet(d => lytIsMBARow(d)),
+    xt:     buildSet(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn XT'),
+    ll:     buildSet(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn LL'),
+    tbn:    buildSet(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn TBN'),
+    td:     buildSet(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'NgănTD'),
+    khang:  buildSet(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn Kháng'),
+  };
+}
+
+function _recomputeStatsWithFilter() {
+  // Recompute stats from _chipFiltered and update stat cards
+  // KEY 1: TBA count uses maxCap from ALL rows (_chipAllData), not filtered rows
+  // Ví dụ: thiết bị 110kV ở trạm 220kV vẫn tính là trạm 220kV
+  // KEY 2: Count "ngăn" on the full station scope, not only filtered device rows,
+  // để tránh hụt số ngăn khi chip chỉ lọc theo một loại thiết bị con trong cùng trạm.
+  const rows = _chipFiltered.length ? _chipFiltered : _chipAllData;
+  const statsItem = layout.find(l => l.type === 'stats');
+  if (!statsItem) return;
+  const fmt = n => Number(n).toLocaleString('vi-VN');
+  const pct = (a, b) => b > 0 ? ((a / b) * 100).toFixed(1) + '%' : '—';
+
+  const tf = d => d.Tram || '';
+
+  function isExclDev(pl) {
+    if (!pl) return true;
+    const n = (pl||'').trim().toUpperCase().replace(/\s+/g,'').normalize('NFC');
+    if (n === 'THM') return true;
+    if (n === 'RL')  return true;
+    if (n.startsWith('TICHAN') || n.includes('TICHÂN')) return true;
+    if (n === 'HTTĐ' || n === 'HTTD' || n.startsWith('HTTD')) return true;
+    if (n === 'DẦU' || n === 'DAU' || n.startsWith('DẦU') || n.startsWith('DAU')) return true;
+    return false;
+  }
+
+  // Build maxCap map from ALL rows (not filtered) — trạm 220kV stays 220kV
+  // regardless of which device type is selected in chips
+  const tramMaxCap = {};
+  const capPrio = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
+  _chipAllData.forEach(d => {
+    const tram = tf(d); if (!tram) return;
+    const cap  = String(d.Cap_dien_ap);
+    if (cap === 'null' || cap === 'undefined') return;
+    const cur = tramMaxCap[tram];
+    if (!cur || (capPrio[cap]??99) < (capPrio[cur]??99)) tramMaxCap[tram] = cap;
+  });
+
+  // Stations that appear in filtered rows
+  const nganScope = lytBuildScopedNganSets(rows, _chipAllData);
+  const filteredTrams = nganScope.filteredTrams;
+  const totalTBA = filteredTrams.size;
+  // 220kV: trạm trong filtered có maxCap=2
+  const n220 = [...filteredTrams].filter(t => tramMaxCap[t] === '2').length;
+  // 110kV: trạm trong filtered có maxCap=1 (không có maxCap=2)
+  const n110 = [...filteredTrams].filter(t => tramMaxCap[t] === '1').length;
+  const totalDevices = rows.filter(d=>!isExclDev(d.Phan_loai_thiet_bi)).reduce((s,d)=>s+(Number(d.So_luong)||0),0);
+  // Tổng công suất: deduplicate MBA theo Tram+Ngan → tránh đếm 2 lần
+  const _mbaCSMap = new Map();
+  rows.forEach(d => {
+    const pl  = (d.Phan_loai_thiet_bi || '').trim();
+    const cap = String(d.Cap_dien_ap ?? '');
+    if (pl !== 'MBA' || !d.Tram || !d.Ngan_thiet_bi || (cap !== '1' && cap !== '2')) return;
+    const key = d.Tram + '|||' + d.Ngan_thiet_bi;
+    const cs = Number(d.Cong_suat) || 0;
+    if (cs > (_mbaCSMap.get(key) || 0)) _mbaCSMap.set(key, cs);
+  });
+  const tongCS = [..._mbaCSMap.values()].reduce((s, cs) => s + cs, 0);
+
+  // Update cards values and push to DOM immediately (bypasses RAF delay)
+  statsItem.props.cards.forEach(card => {
+    switch (card.label) {
+      case 'Tổng số TBA':       card.value = fmt(totalTBA); break;
+      case 'TBA 220kV':         card.value = fmt(n220); card.ratioValue = pct(n220,totalTBA); break;
+      case 'TBA 110kV':         card.value = fmt(n110); card.ratioValue = pct(n110,totalTBA); break;
+      case 'Tổng số thiết bị':  card.value = fmt(totalDevices); break;
+      case 'Tổng số ngăn':      card.value = fmt(nganScope.total.size); break;
+      case 'Ngăn đường dây':    card.value = fmt(nganScope.dz.size); break;
+      case 'MBA': case 'Ngăn MBA': card.value = fmt(nganScope.mba.size); break;
+      case 'Ngăn XT': case 'Ngăn xuất tuyến': case 'Ngăn xuất tuyến (XT)':
+                                card.value = fmt(nganScope.xt.size); break;
+      case 'Ngăn liên lạc (LL)':  card.value = fmt(nganScope.ll.size); break;
+      case 'Ngăn tụ bù (TBN)':    card.value = fmt(nganScope.tbn.size); break;
+      case 'Ngăn tự dùng (TD)':   card.value = fmt(nganScope.td.size); break;
+      case 'Ngăn kháng':           card.value = fmt(nganScope.khang.size); break;
+      case 'Tổng công suất (MVA)': case 'Tổng công suất':
+                                card.value = fmt(Math.round(tongCS)); break;
+    }
+  });
+
+  // Cập nhật DOM trực tiếp — KHÔNG chờ RAF để tránh flash giá trị cũ
+  const statsWrapper = document.querySelector(`.section-wrapper[data-uid="${statsItem.uid}"]`);
+  if (statsWrapper) {
+    statsItem.props.cards.forEach((card, ci) => {
+      const valEl = statsWrapper.querySelector(`[data-uid="${statsItem.uid}"][data-ci="${ci}"][data-field="value"]`);
+      if (valEl && card.value !== undefined) valEl.textContent = card.value;
+      if (card.ratioValue !== undefined) {
+        const ratioEl = statsWrapper.querySelector(`#icc_${statsItem.uid}_${ci} .ic-ratio`);
+        if (ratioEl) ratioEl.textContent = card.ratioValue;
+      }
+    });
+  }
+
+  scheduleCanvasRender(statsItem.uid);
+}
+
+const LYT_CAP_LABEL  = {'0':'TT','1':'110kV','2':'220kV','3':'35kV','4':'22kV','6':'6kV','9':'10kV'};
+const LYT_CAP_ORDER  = ['2','1','3','4','9','6','0'];
+const LYT_CAP_COLORS = {'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
+const LYT_TECH_COLORS = {AIS:'#00c8ff', GIS:'#b388ff', HGIS:'#18ffff', HGIS_AIS:'#ff9100'};
+const LYT_DATA_CACHE_KEY = 'evn_supabase_rows_cache_v6';
+const LYT_DATA_CACHE_META_KEY = 'evn_supabase_rows_cache_meta_v6';
+const LYT_CACHE_FRESH_MS = 30 * 60 * 1000; // 30 phút — data điện lực ít thay đổi
+const LYT_FETCH_BATCH_SIZE = 1000;
+const LYT_FETCH_CONCURRENCY = 4;
+
+function lytReadRowsCache() {
+  try {
+    const raw = localStorage.getItem(LYT_DATA_CACHE_KEY);
+    if (!raw) return null;
+    const rows = JSON.parse(raw);
+    const meta = JSON.parse(localStorage.getItem(LYT_DATA_CACHE_META_KEY) || '{}');
+    if (!Array.isArray(rows) || !rows.length) return null;
+    return { rows, meta };
+  } catch (err) {
+    console.warn('lytReadRowsCache failed', err);
+    return null;
+  }
+}
+
+function lytWriteRowsCache(rows) {
+  try {
+    const payload = JSON.stringify(rows);
+    if (payload.length <= 4500000) {
+      localStorage.setItem(LYT_DATA_CACHE_KEY, payload);
+      localStorage.setItem(LYT_DATA_CACHE_META_KEY, JSON.stringify({ ts: Date.now(), count: rows.length, partial: false }));
+      return { ok: true, partial: false, count: rows.length };
+    }
+
+    const capPrio = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
+    const compactRows = [...rows].sort((a, b) => {
+      const pa = capPrio[String(a.Cap_dien_ap)] ?? 99;
+      const pb = capPrio[String(b.Cap_dien_ap)] ?? 99;
+      if (pa !== pb) return pa - pb;
+      return (Number(b.So_luong) || 0) - (Number(a.So_luong) || 0);
+    }).slice(0, 2000);
+    const compactPayload = JSON.stringify(compactRows);
+    if (compactPayload.length > 4500000) {
+      localStorage.removeItem(LYT_DATA_CACHE_KEY);
+      localStorage.setItem(LYT_DATA_CACHE_META_KEY, JSON.stringify({ ts: Date.now(), count: 0, partial: true, cacheDisabled: true }));
+      showToast('⚠ Cache đầy — dữ liệu không được lưu cục bộ');
+      return { ok: false, partial: true, count: 0 };
+    }
+    localStorage.setItem(LYT_DATA_CACHE_KEY, compactPayload);
+    localStorage.setItem(LYT_DATA_CACHE_META_KEY, JSON.stringify({ ts: Date.now(), count: compactRows.length, partial: true, originalCount: rows.length }));
+    showToast('⚠ Cache đầy — chỉ lưu cục bộ bản rút gọn để mở nhanh lần sau');
+    return { ok: true, partial: true, count: compactRows.length };
+  } catch (err) {
+    console.warn('lytWriteRowsCache failed', err);
+    showToast('⚠ Không lưu được cache cục bộ');
+    return { ok: false, partial: false, count: 0 };
+  }
+}
+
+function renderLiveSectionSkeletons() {
+  const chipsItem  = layout.find(l => l.type === 'chips');
+  const chartsItem = layout.find(l => l.type === 'charts');
+
+  // Chips: ok thay thế card-preview (renderChipsSection sẽ rebuild hoàn toàn)
+  if (chipsItem) {
+    const chipsPrev = document.querySelector(`.section-wrapper[data-uid="${chipsItem.uid}"] .card-preview`);
+    if (chipsPrev) chipsPrev.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap">${Array.from({length:6}).map(()=>'<div class="live-skeleton live-skeleton-chip"></div>').join('')}</div>`;
+  }
+
+  // Charts: KHÔNG xoá card-preview (sẽ mất lytChartMain_uid)
+  // Chỉ cập nhật nội dung bên trong lytChartMain nếu tồn tại
+  // Nếu không tồn tại: tạo lại structure đúng cấu trúc để renderChartsSection dùng được
+  if (chartsItem) {
+    const uid = chartsItem.uid;
+    const skeletonRows = `<div class="live-skeleton" style="height:34px;margin-bottom:10px"></div>
+      ${Array.from({length:4}).map((_,i)=>`<div class="live-skeleton live-skeleton-bar" style="width:${[96,88,79,67][i]}%"></div>`).join('')}
+      <div class="live-skeleton" style="height:180px;margin-top:10px"></div>`;
+
+    let mainEl = document.getElementById('lytChartMain_' + uid);
+    if (mainEl) {
+      // Element tồn tại → chỉ thay nội dung, giữ nguyên DOM container
+      mainEl.innerHTML = `<div style="padding:8px"><div class="hm-sub-bar" style="margin-bottom:12px"><i class="fas fa-spinner fa-spin" style="color:var(--accent)"></i> Đang tải dữ liệu…</div>${skeletonRows}</div>`;
+    } else {
+      // Element không tồn tại → cần rebuild toàn bộ card-preview với đúng structure
+      const chartsPrev = document.querySelector(`.section-wrapper[data-uid="${uid}"] .card-preview`);
+      if (chartsPrev) {
+        chartsPrev.innerHTML = `<div class="lyt-charts-wrap" id="lytChartsWrap_${uid}">
+          <div id="lytChartMain_${uid}" style="min-height:60px;padding:8px">
+            <div class="hm-sub-bar" style="margin-bottom:12px"><i class="fas fa-spinner fa-spin" style="color:var(--accent)"></i> Đang tải dữ liệu…</div>
+            ${skeletonRows}
+          </div>
+        </div>`;
+      }
+    }
+  }
+}
+
+// ── Tính công nghệ TBA từ bất kỳ tập rows nào ─────────────────
+// Tách thành hàm riêng để dùng được ở cả cache path và full-fetch path
+function lytComputeTech(rows) {
+  function classifyHV(typeSet) {
+    const arr = [...typeSet];
+    const hasGIS  = arr.some(t => t === 'GIS');
+    const hasHGIS = arr.some(t => t === 'HGIS');
+    const hasMC   = arr.some(t => t === 'MC');
+    if (hasHGIS && hasMC) return 'HGIS_AIS';
+    if (hasGIS  && hasMC) return 'HGIS_AIS';
+    if (hasHGIS) return 'HGIS';
+    if (hasGIS)  return 'GIS';
+    return 'AIS';
+  }
+  function classifyLV(typeSet) {
+    const arr = [...typeSet];
+    const hasGIS  = arr.some(t => t === 'GIS');
+    const hasHGIS = arr.some(t => t === 'HGIS');
+    const hasMC   = arr.some(t => t === 'MC');
+    if ((hasHGIS || hasGIS) && hasMC) return 'GIS_KCK';
+    if (hasHGIS || hasGIS) return 'GIS';
+    return 'KCK';
+  }
+
+  const tramCapTypes = {};
+  rows.forEach(d => {
+    const tram = (d.Tram || '').trim();
+    const cap  = String(d.Cap_dien_ap ?? '');
+    const pl   = (d.Phan_loai_thiet_bi || '').trim().toUpperCase();
+    if (!tram || !pl || cap === 'null' || cap === 'undefined' || cap === '') return;
+    if (!tramCapTypes[tram]) tramCapTypes[tram] = {};
+    if (!tramCapTypes[tram][cap]) tramCapTypes[tram][cap] = new Set();
+    tramCapTypes[tram][cap].add(pl);
+  });
+
+  const tech220 = { AIS:0, GIS:0, HGIS:0, HGIS_AIS:0 };
+  const tech110 = { AIS:0, GIS:0, HGIS:0, HGIS_AIS:0 };
+  const tech22  = { GIS:0, KCK:0, GIS_KCK:0 };
+  const counted = new Set();
+
+  Object.entries(tramCapTypes).forEach(([tram, capMap]) => {
+    const effCap = capMap['2'] ? '2' : capMap['1'] ? '1' : null;
+    if (effCap && !counted.has(tram)) {
+      counted.add(tram);
+      const cls = classifyHV(capMap[effCap]);
+      if (effCap === '2') tech220[cls] = (tech220[cls]||0) + 1;
+      else                tech110[cls] = (tech110[cls]||0) + 1;
+    }
+    const lvCaps = ['4','3'].filter(c => capMap[c]);
+    if (lvCaps.length > 0) {
+      const lvTypes = new Set();
+      lvCaps.forEach(cap => capMap[cap].forEach(t => lvTypes.add(t)));
+      const cls = classifyLV(lvTypes);
+      tech22[cls] = (tech22[cls]||0) + 1;
+    }
+  });
+
+  return { tech220, tech110, tech22 };
+}
+
+// Cập nhật card Công nghệ TBA trong layout với kết quả từ lytComputeTech
+function lytApplyTechToCard(tech220, tech110, tech22) {
+  const statsItem = layout.find(l => l.type === 'stats');
+  if (!statsItem) return;
+  const techCard = statsItem.props.cards.find(c => {
+    const k = (c.label || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[đĐ]/g,'d').trim();
+    return k.includes('cong nghe') || c.chartType === 'tech';
+  });
+  if (!techCard) return;
+  techCard.chartType = 'tech';
+  techCard.tech220 = { ...tech220 };
+  techCard.tech110 = { ...tech110 };
+  techCard.tech22  = { ...tech22  };
+  // Trigger re-render chỉ stats section
+  scheduleCanvasRender(statsItem.uid);
+}
+
+async function loadStatsFromSupabase() {
+  renderLiveSectionSkeletons();
+  const cached = lytReadRowsCache();
+  const cacheAge = cached?.meta?.ts ? (Date.now() - cached.meta.ts) : Number.POSITIVE_INFINITY;
+  const isFreshCache = cacheAge < LYT_CACHE_FRESH_MS;
+  if (cached?.rows?.length) {
+    _chipAllData = cached.rows;
+    _chipFiltered = [...cached.rows];
+    _selectedChips.clear();
+    _recomputeStatsWithFilter();
+    // Tính Công nghệ TBA từ cache (không được tính trong _recomputeStatsWithFilter)
+    const { tech220, tech110, tech22 } = lytComputeTech(cached.rows);
+    lytApplyTechToCard(tech220, tech110, tech22);
+    setTimeout(() => { renderChipsSection(); renderChartsSection(); renderTimelineSection(); renderLiveFilterSection(); }, 50);
+    showToast(`⚡ Dùng cache cục bộ (${cached.rows.length.toLocaleString('vi-VN')} dòng)`);
+    if (isFreshCache) return;
+  } else {
+    showToast('⏳ Đang tải dữ liệu từ Supabase...');
+  }
+  try {
+    // Dùng cách tải của app.js: supabaseClient tạo 1 lần, vòng while đơn giản
+    const supabaseClient = window.supabase.createClient(_SB_URL, _SB_KEY);
+    const TABLE_NAME = 'TongHopThietBi';
+    const batchSize  = 1000;
+
+    // Các cột cần cho stats, chips, filter, timeline
+    const NEEDED_COLS = 'Tram,Cap_dien_ap,Phan_loai_thiet_bi,Ten_thiet_bi,So_luong,Ngan_thiet_bi,Loai_ngan_lo,Cong_suat,Nam_san_xuat,Nam_van_hanh,Hang_san_xuat,Ly_lich,Thong_so,Doi,Kieu';
+
+    // Fetch tuần tự — y hệt app.js fetchData()
+    let allRows = [];
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabaseClient
+        .from(TABLE_NAME)
+        .select(NEEDED_COLS)
+        .range(from, from + batchSize - 1);
+      if (error) { console.error('[Supabase Error]', error); break; }
+      if (!data || data.length === 0) break;
+      allRows = allRows.concat(data);
+      if (data.length < batchSize) break;
+      from += batchSize;
+    }
+    if (!allRows.length) { showToast('⚠ Không tải được dữ liệu'); return; }
+
+    const tf = d => d.Tram || '';
+    const CAP_LABEL_H = { 0: 'TT', 1: '110kV', 2: '220kV', 3: '35kV', 4: '22kV', 6: '6kV', 9: '10kV' };
+
+    // ── 1. Đếm TBA (req 2, 3, 4) ──
+    const allTrams = new Set(allRows.map(tf).filter(Boolean));
+    const trams220 = new Set(allRows.filter(d => String(d.Cap_dien_ap) === '2').map(tf).filter(Boolean));
+    const trams110only = new Set(allRows.filter(d => String(d.Cap_dien_ap) === '1').map(tf).filter(Boolean));
+    const n110 = [...trams110only].filter(t => !trams220.has(t)).length;
+    const totalTBA = allTrams.size;
+    const n220 = trams220.size;
+
+    // ── 2. Tổng số thiết bị: loại THM, RL, TIchânsứ, HTTĐ, Dầu ──
+    function isExclDevH(pl) {
+      if (!pl) return true;
+      const n = (pl||'').trim().toUpperCase().replace(/\s+/g,'').normalize('NFC');
+      if (n === 'THM') return true;
+      if (n === 'RL')  return true;
+      if (n.startsWith('TICHAN') || n.includes('TICHÂN')) return true;
+      if (n === 'HTTĐ' || n === 'HTTD' || n.startsWith('HTTD')) return true;
+      if (n === 'DẦU' || n === 'DAU' || n.startsWith('DẦU') || n.startsWith('DAU')) return true;
+      return false;
+    }
+    const totalDevices = allRows
+      .filter(d => !isExclDevH(d.Phan_loai_thiet_bi))
+      .reduce((s, d) => s + (Number(d.So_luong) || 0), 0);
+
+    // ── 3. Tổng công suất: deduplicate MBA theo Tram+Ngan → tránh đếm 2 lần ──
+    const _mbaCSMapH = new Map();
+    allRows.forEach(d => {
+      const pl  = (d.Phan_loai_thiet_bi || '').trim();
+      const cap = String(d.Cap_dien_ap ?? '');
+      if (pl !== 'MBA' || !d.Tram || !d.Ngan_thiet_bi || (cap !== '1' && cap !== '2')) return;
+      const key = d.Tram + '|||' + d.Ngan_thiet_bi;
+      const cs = Number(d.Cong_suat) || 0;
+      if (cs > (_mbaCSMapH.get(key) || 0)) _mbaCSMapH.set(key, cs);
+    });
+    const tongCongSuat = [..._mbaCSMapH.values()].reduce((s, cs) => s + cs, 0);
+
+    // ── 4. Ngăn ──
+    // Tổng số ngăn: loại HTTĐ
+    const nganSet = new Set();
+    allRows.forEach(d => {
+      if (d.Ngan_thiet_bi && d.Tram) {
+        const pl = (d.Phan_loai_thiet_bi||'').trim().toUpperCase().replace(/\s+/g,'').normalize('NFC');
+        if (pl==='HTTĐ'||pl==='HTTD'||pl.startsWith('HTTD')) return;
+        nganSet.add(d.Tram + '|||' + d.Ngan_thiet_bi);
+      }
+    });
+    const totalNgan = nganSet.size;
+
+    // Ngăn đường dây: Loai_ngan_lo === 'Ngăn ĐZ'
+    const nganDLSet = new Set();
+    allRows.filter(d => (d.Loai_ngan_lo || '').trim() === 'Ngăn ĐZ')
+      .forEach(d => { if (d.Tram && d.Ngan_thiet_bi) nganDLSet.add(d.Tram + '|||' + d.Ngan_thiet_bi); });
+
+    // Ngăn MBA: đếm unique Ngan_thiet_bi có Phan_loai_thiet_bi = 'MBA' exact
+    const nganMBASet = new Set();
+    allRows.filter(d => (d.Phan_loai_thiet_bi || '').trim() === 'MBA')
+      .forEach(d => { if (d.Tram && d.Ngan_thiet_bi) nganMBASet.add(d.Tram + '|||' + d.Ngan_thiet_bi); });
+
+    // Ngăn XT
+    const nganXTSet = new Set();
+    allRows.filter(d => (d.Loai_ngan_lo || '').trim() === 'Ngăn XT')
+      .forEach(d => { if (d.Tram && d.Ngan_thiet_bi) nganXTSet.add(d.Tram + '|||' + d.Ngan_thiet_bi); });
+
+    // Ngăn liên lạc
+    const nganLLSet = new Set();
+    allRows.filter(d => (d.Loai_ngan_lo || '').trim() === 'Ngăn LL')
+      .forEach(d => { if (d.Tram && d.Ngan_thiet_bi) nganLLSet.add(d.Tram + '|||' + d.Ngan_thiet_bi); });
+
+    // Ngăn tụ bù
+    const nganTBNSet = new Set();
+    allRows.filter(d => (d.Loai_ngan_lo || '').trim() === 'Ngăn TBN')
+      .forEach(d => { if (d.Tram && d.Ngan_thiet_bi) nganTBNSet.add(d.Tram + '|||' + d.Ngan_thiet_bi); });
+
+    // Ngăn tự dùng — dùng lytNormalizeNganLoai để xử lý encoding
+    const nganTDSet = new Set();
+    allRows.filter(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'NgănTD')
+      .forEach(d => { if (d.Tram && d.Ngan_thiet_bi) nganTDSet.add(d.Tram + '|||' + d.Ngan_thiet_bi); });
+
+    // Ngăn kháng: Loai_ngan_lo = 'Ngăn Kháng' HOẶC Phan_loai_thiet_bi = 'K'
+    const nganKhangSet = new Set();
+    allRows.filter(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn Kháng' ||
+                        (d.Phan_loai_thiet_bi || '').trim() === 'K')
+      .forEach(d => { if (d.Tram && d.Ngan_thiet_bi) nganKhangSet.add(d.Tram + '|||' + d.Ngan_thiet_bi); });
+
+    // ── 5. Công nghệ TBA — dùng lytComputeTech ──
+    const { tech220, tech110, tech22 } = lytComputeTech(allRows);
+
+        const statsItem = layout.find(l => l.type === 'stats');
+    if (!statsItem) return;
+
+    const fmt = n => Number(n).toLocaleString('vi-VN');
+    const pct = (a, b) => b > 0 ? ((a / b) * 100).toFixed(1) + '%' : '—';
+
+    statsItem.props.cards.forEach(card => {
+      switch (card.label) {
+        case 'Tổng số TBA':
+          card.value = fmt(totalTBA); break;
+        case 'TBA 220kV':
+          card.value = fmt(n220); card.ratioValue = pct(n220, totalTBA); break;
+        case 'TBA 110kV':
+          card.value = fmt(n110); card.ratioValue = pct(n110, totalTBA); break;
+        case 'Tổng số thiết bị':
+          card.value = fmt(totalDevices); break;
+        case 'Công nghệ thiết bị TBA':
+          card.tech220 = { ...tech220 };
+          card.tech110 = { ...tech110 };
+          card.tech22  = { ...tech22  };
+          card.value = '';
+          break;
+        case 'Tổng số ngăn':
+          card.value = fmt(totalNgan); break;
+        case 'Ngăn đường dây':
+          card.value = fmt(nganDLSet.size); break;
+        case 'MBA': case 'Ngăn MBA':
+          card.value = fmt(nganMBASet.size); break;
+        case 'Ngăn XT': case 'Ngăn xuất tuyến': case 'Ngăn xuất tuyến (XT)':
+          card.value = fmt(nganXTSet.size); break;
+        case 'Ngăn liên lạc (LL)':
+          card.value = fmt(nganLLSet.size); break;
+        case 'Ngăn tụ bù (TBN)':
+          card.value = fmt(nganTBNSet.size); break;
+        case 'Ngăn tự dùng (TD)':
+          card.value = fmt(nganTDSet.size); break;
+        case 'Ngăn kháng':
+          card.value = fmt(nganKhangSet.size); break;
+        case 'Tổng công suất (MVA)': case 'Tổng công suất':
+          card.value = fmt(Math.round(tongCongSuat)); break;
+      }
+    });
+
+    // Lưu allRows cho chips renderer
+    _chipAllData  = allRows;
+    _chipFiltered = [...allRows];
+    _selectedChips.clear();
+    lytWriteRowsCache(allRows);
+
+    renderCanvas();
+    renderQuickNav();
+    // Sau khi canvas render xong, render chips + charts với dữ liệu thực
+    setTimeout(() => { renderChipsSection(); renderChartsSection(); renderTimelineSection(); renderLiveFilterSection(); }, 80);
+    showToast('✓ Đã cập nhật dữ liệu từ Supabase (' + allRows.length.toLocaleString('vi-VN') + ' dòng)');
+  } catch (err) {
+    console.error('[Supabase Stats Error]', err);
+    showToast('⚠ Lỗi khi tải dữ liệu Supabase');
+  }
+}
+
+// Xoá toàn bộ draft cũ, luôn dùng freshLayout
+try { ['v1','v2','v3','v4','v5','v6','v7','v8'].forEach(v => localStorage.removeItem('evn_layout_editor_draft_v'+v)); } catch(_){}
+layout = freshLayout();
+normalizeLayoutState();
+
+// Restore light mode preference
+try {
+  if (localStorage.getItem('evn_light_mode') === '1') {
+    document.body.classList.add('light-mode');
+    const btn = document.getElementById('btnLightMode');
+    if (btn) btn.innerHTML = '<i class="fas fa-moon"></i> Chế độ tối';
+  }
+} catch(_) {}
+
+// ── Dummy block để không phá cấu trúc ──
+{
+  const validCount = Array.isArray(layout)
+    ? layout.filter(i => i && i.type && i.uid && i.props).length
+    : 0;
+  if (validCount === 0) {
+    layout = freshLayout();
+    // (should never happen since we just set it above)
+    showToast('⚠ Layout trống — đã khôi phục cấu trúc mặc định. Nhấn "Áp dụng" sau khi dữ liệu tải xong.');
+  } else if (validCount < layout.length) {
+    // Lọc bỏ item null/undefined còn sót
+    layout = layout.filter(i => i && i.type && i.uid && i.props);
+  }
+}
+
+if (!selectedUid && layout[0]) selectedUid = layout[0].uid;
+render();
+loadStatsFromSupabase();
+updateHistoryUI();
+setViewMode('edit');
+
+// Connection status simulation
+(function() {
+  const dot  = document.getElementById('statusDot');
+  const txt  = document.getElementById('statusText');
+  if (!dot || !txt) return;
+  setTimeout(() => {
+    dot.className = 'status-dot connected';
+    txt.textContent = 'Đã kết nối';
+  }, 2200);
+})();
+
+/* ═══════════════════════════════════════════════
+   SIDEBAR ACCORDION NAV
+═══════════════════════════════════════════════ */
+function navToggle(parentEl, subId) {
+  const sub = document.getElementById(subId);
+  if (!sub) return;
+  const isOpen = sub.classList.contains('open');
+
+  // Close all other submenus
+  document.querySelectorAll('.nav-sub.open').forEach(el => {
+    if (el.id !== subId) {
+      el.classList.remove('open');
+      // reset chevron of parent
+      const pid = el.id;
+      document.querySelectorAll('.nav-parent').forEach(p => {
+        const onclick = p.getAttribute('onclick') || '';
+        if (onclick.includes(pid)) p.classList.remove('open');
       });
     }
   });
 
-  // Load dashboard ban đầu (không auto-refresh)
-  loadDashboard();
-});
+  if (isOpen) {
+    sub.classList.remove('open');
+    parentEl.classList.remove('open');
+  } else {
+    sub.classList.add('open');
+    parentEl.classList.add('open');
+  }
+}
 
-// ══════════════════════════════════════════════════════════════
-// ── MODULE THIẾT BỊ (đồng bộ với layout-editor-evn_c.html) ───
-// ══════════════════════════════════════════════════════════════
-const APP_TB_CONF = {
-  MBA:  { matchFn: r=>{ const pl=(r.Phan_loai_thiet_bi||'').trim().toUpperCase().replace(/\s+/g,''); return pl.startsWith('MBA'); },
-          label:'Máy biến áp (MBA)', icon:'fa-exchange-alt', color:'#10b981',
-          dropdowns:['tram','cap','type','hang','kieu','cong_suat','year','opyr'] },
-  MC:   { matchFn: r=>{ const pl=(r.Phan_loai_thiet_bi||'').trim().toUpperCase().replace(/\s+/g,''); return pl==='MC'||pl.startsWith('MC')||pl==='GIS'||pl==='HGIS'||pl.startsWith('GIS')||pl.startsWith('HGIS'); },
-          label:'Máy cắt (MC)', icon:'fa-bolt', color:'#f59e0b',
-          dropdowns:['tram','cap','type','hang','kieu','cong_suat','year','opyr'] },
-  DCL:  { matchFn: r=>{ const pl=(r.Phan_loai_thiet_bi||'').trim().toUpperCase().replace(/\s+/g,''); return pl.startsWith('DCL')||pl.startsWith('DAOCACHLY')||pl==='FCO'||pl.startsWith('FCO'); },
-          label:'DCL & FCO', icon:'fa-power-off', color:'#00c8ff',
-          dropdowns:['tram','cap','type','hang','kieu','year','opyr'] },
-  TUTI: { matchFn: r=>{ const pl=(r.Phan_loai_thiet_bi||'').trim().toUpperCase().replace(/\s+/g,''); return pl.startsWith('TU')||pl.startsWith('TI'); },
-          label:'TU, TI đo lường', icon:'fa-tachometer-alt', color:'#8b5cf6',
-          dropdowns:['tram','cap','type','hang','kieu','year','opyr'] },
-  CSV:  { matchFn: r=>{ const pl=(r.Phan_loai_thiet_bi||'').trim().toUpperCase().replace(/\s+/g,''); return pl==='CSV'||pl.startsWith('CSV'); },
-          label:'Chống sét van (CSV)', icon:'fa-shield-alt', color:'#ec4899',
-          dropdowns:['tram','cap','hang','kieu','year','opyr'] },
-  CAP:  { matchFn: r=>{ const pl=(r.Phan_loai_thiet_bi||'').trim().normalize('NFC'); return /^[Cc][aáà]/u.test(pl)||pl.toUpperCase().startsWith('CAP'); },
-          label:'Cáp điện lực', icon:'fa-project-diagram', color:'#06b6d4',
-          dropdowns:['tram','cap','type','hang','kieu','year','opyr'] },
+// Thiết bị sub-page routing map
+const _tbNavMap = {
+  // MBA - Máy biến áp
+  'MBA': {
+    matchFn: r => { const pl=(r.Phan_loai_thiet_bi||'').trim().toUpperCase().replace(/\s+/g,''); return pl.startsWith('MBA'); },
+    label:'Máy biến áp (MBA)', icon:'fa-exchange-alt', color:'#10b981',
+    dropdowns: ['tram','cap','type','hang','kieu','cong_suat','year','opyr']
+  },
+  // MC - Máy cắt (MC, GIS, HGIS)
+  'MC': {
+    matchFn: r => { const pl=(r.Phan_loai_thiet_bi||'').trim().toUpperCase().replace(/\s+/g,''); return pl==='MC'||pl.startsWith('MC')||pl==='GIS'||pl==='HGIS'||pl.startsWith('GIS')||pl.startsWith('HGIS'); },
+    label:'Máy cắt (MC)', icon:'fa-bolt', color:'#f59e0b',
+    dropdowns: ['tram','cap','type','hang','kieu','cong_suat','year','opyr']
+  },
+  // DCL + FCO - Dao cách ly & Cầu chì tự rơi
+  'DCL': {
+    matchFn: r => { const pl=(r.Phan_loai_thiet_bi||'').trim().toUpperCase().replace(/\s+/g,''); return pl.startsWith('DCL')||pl.startsWith('DAOCACHLY')||pl==='FCO'||pl.startsWith('FCO'); },
+    label:'DCL & FCO', icon:'fa-power-off', color:'#00c8ff',
+    dropdowns: ['tram','cap','type','hang','kieu','year','opyr']
+  },
+  // TU, TI - Máy biến điện áp & dòng điện đo lường
+  'TU, TI': {
+    matchFn: r => { const pl=(r.Phan_loai_thiet_bi||'').trim().toUpperCase().replace(/\s+/g,''); return pl.startsWith('TU')||pl.startsWith('TI'); },
+    label:'TU, TI đo lường', icon:'fa-tachometer-alt', color:'#8b5cf6',
+    dropdowns: ['tram','cap','type','hang','kieu','year','opyr']
+  },
+  // CSV - Chống sét van
+  'CSV': {
+    matchFn: r => { const pl=(r.Phan_loai_thiet_bi||'').trim().toUpperCase().replace(/\s+/g,''); return pl==='CSV'||pl.startsWith('CSV')||pl.startsWith('CHONGSET'); },
+    label:'Chống sét van (CSV)', icon:'fa-shield-alt', color:'#ec4899',
+    dropdowns: ['tram','cap','hang','kieu','year','opyr']
+  },
+  // Cáp - Cáp điện lực
+  'Cáp': {
+    matchFn: r => { const pl=(r.Phan_loai_thiet_bi||'').trim().normalize('NFC'); return /^[Cc][aáà]/u.test(pl)||pl.toUpperCase().startsWith('CAP'); },
+    label:'Cáp điện lực', icon:'fa-project-diagram', color:'#06b6d4',
+    dropdowns: ['tram','cap','type','hang','kieu','year','opyr']
+  },
 };
 
-const APP_CAP_LBL = {'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
-const APP_CAP_COL = {'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
-const APP_CAP_PRIO= {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
+function navActivate(el) {
+  // Remove active from all nav items and sub items
+  document.querySelectorAll('.nav-item.active, .nav-sub-item.active').forEach(e => {
+    e.classList.remove('active');
+  });
+  el.classList.add('active');
 
-function _appAge(r){const y=Number(r.Nam_van_hanh)>1970?Number(r.Nam_van_hanh):(Number(r.Nam_san_xuat)>1970?Number(r.Nam_san_xuat):0);return y>1970?new Date().getFullYear()-y:-1;}
-function _appCapBadge(cap){const c=String(cap??'');return `<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:9px;font-weight:700;background:${(APP_CAP_COL[c]||'#888')}22;color:${APP_CAP_COL[c]||'#888'}">${APP_CAP_LBL[c]||c||'—'}</span>`;}
+  // If it's a sub item, mark its parent open too
+  const sub = el.closest('.nav-sub');
+  if (sub) {
+    let prev = sub.previousElementSibling;
+    while (prev && !prev.classList.contains('nav-parent')) prev = prev.previousElementSibling;
+    if (prev) prev.classList.add('active');
+  }
 
-// App-level TB state
-let _appTbData=[], _appTbFiltered=[], _appTbPage=1, _appTbSort='Tram', _appTbAsc=true;
-let _appTbQ='', _appTbFCap='', _appTbFType='', _appTbFTram='', _appTbFHang='', _appTbFKieu='', _appTbFYear='', _appTbFOpyr='';
-const APP_TB_PS=50;
+  // Route to Thiết bị / Thí nghiệm / Báo cáo pages
+  const text = el.querySelector('span')?.textContent?.trim();
+  const tbConf = _tbNavMap[text];
+  const tnConf = _tnNavMap[text];
+  const bcConf = typeof _bcNavMap !== 'undefined' ? _bcNavMap[text] : null;
+  const overlay = document.getElementById('tbPageOverlay');
+  const canvas  = document.getElementById('canvasArea');
+  const rPanel  = document.querySelector('.props-panel');
 
-function _appTbApply(data){
-  const q=_appTbQ.toLowerCase().trim();
-  _appTbFiltered=data.filter(r=>{
-    if(_appTbFCap  && String(r.Cap_dien_ap??'')!==_appTbFCap)return false;
-    if(_appTbFType && (r.Phan_loai_thiet_bi||'').trim()!==_appTbFType)return false;
-    if(_appTbFTram && (r.Tram||'').trim()!==_appTbFTram)return false;
-    if(_appTbFHang && (r.Hang_san_xuat||'').trim()!==_appTbFHang)return false;
-    if(_appTbFKieu && (r.Kieu||'').trim()!==_appTbFKieu)return false;
-    if(_appTbFYear && String(r.Nam_san_xuat||'')!==_appTbFYear)return false;
-    if(_appTbFOpyr && String(r.Nam_van_hanh||'')!==_appTbFOpyr)return false;
-    if(q){const h=[r.Tram,r.Phan_loai_thiet_bi,r.Ten_thiet_bi,r.Ngan_thiet_bi,r.Hang_san_xuat].map(v=>v||'').join(' ').toLowerCase();if(!h.includes(q))return false;}
+  if ((tbConf || tnConf || bcConf) && overlay) {
+    if (canvas)  canvas.style.display  = 'none';
+    if (rPanel)  rPanel.style.display  = 'none';
+    overlay.style.display = 'block';
+    if (tbConf)      tbRenderPage(tbConf, text);
+    else if (tnConf) tnRenderPage(tnConf, text);
+    else             bcRenderPage(bcConf, text);
+  } else if (overlay) {
+    overlay.style.display = 'none';
+    if (canvas)  canvas.style.display  = '';
+    if (rPanel)  rPanel.style.display  = '';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── MODULE THIẾT BỊ ──────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+let _tbData      = [];   // full data from Supabase (shared with _chipAllData)
+let _tbFiltered  = [];
+let _tbPage      = 1;
+let _tbPageSize  = 50;
+let _tbSortCol   = 'Tram';
+let _tbSortAsc   = true;
+let _tbSearchQ   = '';
+let _tbFCap      = '';
+let _tbFType     = '';
+let _tbFTram     = '';
+let _tbFHang     = '';
+let _tbFYear     = '';
+let _tbFKieu     = '';
+let _tbFOpyr     = '';   // Năm vận hành
+let _tbFConf     = null; // current page conf
+let _tbConf      = null;
+
+const _tbCapLbl = {'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+const _tbCapCol = {'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
+
+function _tbAge(r) {
+  const y = Number(r.Nam_van_hanh)>1970 ? Number(r.Nam_van_hanh) : (Number(r.Nam_san_xuat)>1970 ? Number(r.Nam_san_xuat) : 0);
+  return y > 1970 ? new Date().getFullYear() - y : -1;
+}
+
+function _tbIsExcl(pl) {
+  if (!pl) return false;
+  const n = pl.trim().toUpperCase().replace(/\s+/g,'').normalize('NFC');
+  return n.startsWith('TICHAN') || n === 'HTTD' || n.startsWith('HTTD') ||
+         n === 'DAU' || n.startsWith('DẦU') || n === 'THM' || n === 'RL';
+}
+
+// Inject CSS once
+function _tbInjectCSS() {
+  if (document.getElementById('tb-module-css')) return;
+  const style = document.createElement('style');
+  style.id = 'tb-module-css';
+  style.textContent = `
+    .tb-wrap{padding:0 0 32px}
+    .tb-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 0 14px;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:14px}
+    .tb-sw{position:relative;flex:1;min-width:180px;max-width:320px}
+    .tb-sw i{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:10px;pointer-events:none}
+    .tb-si{width:100%;box-sizing:border-box;padding:7px 12px 7px 32px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text-primary);font-size:11px;outline:none}
+    .tb-dd{padding:6px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text-primary);font-size:11px;cursor:pointer;outline:none}
+    .tb-dd:focus{border-color:var(--accent)}
+    .tb-btn{padding:6px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:var(--text-primary);font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .15s}
+    .tb-btn:hover{background:rgba(255,255,255,.12)}
+    .tb-btn-csv{background:rgba(0,230,118,.1);border-color:rgba(0,230,118,.3);color:#00e676}
+    .tb-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+    .tb-sc{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px 14px}
+    .tb-sc .sl{font-size:9px;color:var(--text-muted);margin-bottom:4px}
+    .tb-sc .sv{font-size:20px;font-weight:800;font-family:var(--font-mono)}
+    .tb-sum{font-size:10px;color:var(--text-muted);font-family:var(--font-mono);padding:0 0 10px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+    .tb-sum b{color:var(--accent)}
+    .tb-tw{overflow-x:auto;border-radius:8px;border:1px solid rgba(255,255,255,.07)}
+    .tb-tbl{width:100%;border-collapse:collapse;font-size:11px}
+    .tb-tbl th{padding:7px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);cursor:pointer;white-space:nowrap;background:rgba(255,255,255,.03);user-select:none;position:sticky;top:0;z-index:2}
+    .tb-tbl th:hover{color:var(--text-primary)}
+    .tb-tbl th.srt{color:var(--accent)}
+    .tb-tbl td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text-primary);vertical-align:middle;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .tb-tbl tr:hover td{background:rgba(255,255,255,.03)}
+    .tb-num{text-align:right;font-family:var(--font-mono)}
+    .tb-a0{color:#00e676;font-weight:700;font-family:var(--font-mono)}
+    .tb-a1{color:#ffd740;font-weight:700;font-family:var(--font-mono)}
+    .tb-a2{color:#ff5252;font-weight:700;font-family:var(--font-mono)}
+    .tb-a3{color:var(--text-muted);font-family:var(--font-mono)}
+    .tb-pg{display:flex;align-items:center;gap:6px;justify-content:flex-end;padding:10px 0 0;font-size:11px;color:var(--text-muted)}
+    .tb-pb{padding:7px 20px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:var(--text-primary);cursor:pointer;font-size:11px;font-weight:500;transition:all .15s;min-width:42px;text-align:center;line-height:1}
+    .tb-pb:hover:not(:disabled){background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3)}
+    .tb-pb:disabled{opacity:.3;cursor:default}
+    .tb-pb.cur{background:var(--accent);border-color:var(--accent);color:#000;font-weight:700}
+    .tb-lbl-btn{display:inline-flex;align-items:center;gap:4px;font-size:9px;padding:2px 7px;border-radius:6px;background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.25);cursor:pointer}
+    .tb-cap-badge{display:inline-block;padding:1px 6px;border-radius:10px;font-size:9px;font-weight:700}
+  `;
+  document.head.appendChild(style);
+}
+
+// ── FILTER & SORT ─────────────────────────────────────────────
+function _tbApply() {
+  const q = _tbSearchQ.toLowerCase().trim();
+  _tbFiltered = _tbData.filter(r => {
+    if (_tbFCap  && String(r.Cap_dien_ap??'') !== _tbFCap)   return false;
+    if (_tbFType && (r.Phan_loai_thiet_bi||'').trim() !== _tbFType) return false;
+    if (_tbFTram && (r.Tram||'').trim() !== _tbFTram)        return false;
+    if (_tbFHang && (r.Hang_san_xuat||'').trim() !== _tbFHang) return false;
+    if (_tbFYear && String(r.Nam_san_xuat||'') !== _tbFYear) return false;
+    if (_tbFKieu && (r.Kieu||'').trim() !== _tbFKieu)        return false;
+    if (_tbFOpyr && String(r.Nam_van_hanh||'') !== _tbFOpyr) return false;
+    if (typeof _tbFCongSuat !== 'undefined' && _tbFCongSuat && String(r.Cong_suat||'') !== _tbFCongSuat) return false;
+    if (q) {
+      const hay = [r.Tram,r.Phan_loai_thiet_bi,r.Ten_thiet_bi,r.Ngan_thiet_bi,r.Hang_san_xuat,r.Thong_so,r.Ly_lich]
+        .map(v=>v||'').join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
     return true;
   });
-  _appTbFiltered.sort((a,b)=>{
-    let va=_appTbSort==='_age'?_appAge(a):(a[_appTbSort]??''),vb=_appTbSort==='_age'?_appAge(b):(b[_appTbSort]??'');
-    if(typeof va==='number'&&typeof vb==='number')return _appTbAsc?va-vb:vb-va;
-    va=String(va).toLowerCase();vb=String(vb).toLowerCase();return _appTbAsc?va.localeCompare(vb,'vi'):vb.localeCompare(va,'vi');
+  _tbFiltered.sort((a,b) => {
+    let va = _tbSortCol === '_age' ? _tbAge(a) : (a[_tbSortCol]??'');
+    let vb = _tbSortCol === '_age' ? _tbAge(b) : (b[_tbSortCol]??'');
+    if (typeof va === 'number' && typeof vb === 'number') return _tbSortAsc ? va-vb : vb-va;
+    va=String(va).toLowerCase(); vb=String(vb).toLowerCase();
+    return _tbSortAsc ? va.localeCompare(vb,'vi') : vb.localeCompare(va,'vi');
   });
-  _appTbPage=1;
+  _tbPage = 1;
 }
 
-function _appTbExportCSV(rows){
-  const hdr='Trạm,Cấp ĐA,Loại TB,Tên/Ký hiệu,Kiểu,Ngăn TB,SL,Hãng SX,Năm SX,Năm VH,Thâm niên,CS(MVA),Lý lịch,Thông số,Đội';
-  const body=rows.map(r=>{const age=_appAge(r);return[r.Tram,APP_CAP_LBL[String(r.Cap_dien_ap??'')]||r.Cap_dien_ap,r.Phan_loai_thiet_bi,r.Ten_thiet_bi,r.Kieu,r.Ngan_thiet_bi,r.So_luong,r.Hang_san_xuat,r.Nam_san_xuat,r.Nam_van_hanh,age>=0?age:'',r.Cong_suat,r.Ly_lich,r.Thong_so,r.Doi].map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',');}).join('\n');
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+hdr+'\n'+body],{type:'text/csv;charset=utf-8'}));a.download=`EVN_ThietBi_${new Date().toISOString().slice(0,10)}.csv`;a.click();
-}
+// ── STATS ─────────────────────────────────────────────────────
+function _tbStats(rows) {
+  const total = rows.length;
+  const gt15  = rows.filter(r => _tbAge(r) >= 15).length;
+  const hangs = new Set(rows.map(r=>(r.Hang_san_xuat||'').trim()).filter(Boolean));
+  const trams = new Set(rows.map(r=>(r.Tram||'').trim()).filter(Boolean));
+  const pct   = total > 0 ? ((gt15/total)*100).toFixed(1) : '0.0';
+  const gt15pct = total > 0 ? Math.round((gt15/total)*100) : 0;
+  const oldY  = Math.min(...rows.map(r=>{const y=Number(r.Nam_san_xuat);return y>1970?y:9999;}).filter(y=>y<9999));
+  const fmt   = n => Number(n).toLocaleString('vi-VN');
 
-function _appTbTable(data,conf){
-  const fmt=n=>Number(n).toLocaleString('vi-VN');
-  const start=(_appTbPage-1)*APP_TB_PS,rows=_appTbFiltered.slice(start,start+APP_TB_PS),tot=_appTbFiltered.length,totPg=Math.max(1,Math.ceil(tot/APP_TB_PS));
-  const COLS=[{k:'Tram',l:'Trạm',w:'110px'},{k:'Cap_dien_ap',l:'Cấp ĐA',w:'68px'},{k:'Phan_loai_thiet_bi',l:'Loại TB',w:'90px'},{k:'Ten_thiet_bi',l:'Tên/KH',w:'140px'},{k:'Kieu',l:'Kiểu',w:'80px'},{k:'Ngan_thiet_bi',l:'Ngăn TB',w:'120px'},{k:'So_luong',l:'SL',w:'46px',num:1},{k:'Hang_san_xuat',l:'Hãng SX',w:'90px'},{k:'Nam_san_xuat',l:'Năm SX',w:'58px',num:1},{k:'Nam_van_hanh',l:'Năm VH',w:'58px',num:1},{k:'_age',l:'Thâm niên',w:'72px',num:1},{k:'Cong_suat',l:'CS(MVA)',w:'68px',num:1},{k:'Ly_lich',l:'Lý lịch',w:'80px'},{k:'Thong_so',l:'Thông số',w:'100px'},{k:'Doi',l:'Đội',w:'48px',num:1}];
-  const thead=COLS.map(c=>{const s=_appTbSort===c.k;return `<th style="padding:7px 10px;font-size:9px;font-weight:700;color:${s?'var(--accent)':'var(--text-muted)'};letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);cursor:pointer;white-space:nowrap;background:rgba(255,255,255,.03);user-select:none;min-width:${c.w};text-align:${c.num?'right':'left'}" onclick="_appTbSort2('${c.k}')">${c.l}${s?`<span style="color:var(--accent)"> ${_appTbAsc?'↑':'↓'}</span>`:''}</th>`;}).join('');
-  const tbody=rows.map(r=>{const age=_appAge(r);const ac=age<0?'#888':age<10?'#00e676':age<15?'#ffd740':'#ff5252';const ll=r.Ly_lich?`<span onclick="_appTbLyLich(this)" data-idx="${_appTbFiltered.indexOf(r)}" style="display:inline-flex;align-items:center;gap:4px;font-size:9px;padding:2px 7px;border-radius:6px;background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.25);cursor:pointer"><i class="fas fa-file-alt"></i>Xem</span>`:'<span style="color:var(--text-muted);font-size:9px">—</span>';return `<tr style="border-bottom:1px solid rgba(255,255,255,.04)"><td style="padding:6px 10px;font-weight:600">${r.Tram||'—'}</td><td style="padding:6px 10px">${_appCapBadge(r.Cap_dien_ap)}</td><td style="padding:6px 10px">${r.Phan_loai_thiet_bi||'—'}</td><td style="padding:6px 10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.Ten_thiet_bi||''}">${r.Ten_thiet_bi||'—'}</td><td style="padding:6px 10px">${r.Kieu||'—'}</td><td style="padding:6px 10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.Ngan_thiet_bi||''}">${r.Ngan_thiet_bi||'—'}</td><td style="padding:6px 10px;text-align:right;font-family:var(--font-mono)">${r.So_luong??'—'}</td><td style="padding:6px 10px">${r.Hang_san_xuat||'—'}</td><td style="padding:6px 10px;text-align:right;font-family:var(--font-mono)">${r.Nam_san_xuat||'—'}</td><td style="padding:6px 10px;text-align:right;font-family:var(--font-mono)">${r.Nam_van_hanh||'—'}</td><td style="padding:6px 10px;text-align:right;font-weight:700;font-family:var(--font-mono);color:${ac}">${age>=0?age+'n':'—'}</td><td style="padding:6px 10px;text-align:right;font-family:var(--font-mono)">${r.Cong_suat||'—'}</td><td style="padding:6px 10px">${ll}</td><td style="padding:6px 10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.Thong_so||''}">${r.Thong_so?r.Thong_so.slice(0,30)+(r.Thong_so.length>30?'…':''):'—'}</td><td style="padding:6px 10px;text-align:right;font-family:var(--font-mono)">${r.Doi||'—'}</td></tr>`;}).join('');
-  // Pagination
-  const half=3;let lo=Math.max(1,_appTbPage-half),hi=Math.min(totPg,lo+6);if(hi-lo<6)lo=Math.max(1,hi-6);
-  let pg='';if(lo>1)pg+=`<button class="app-pg-btn" onclick="_appTbGo(1)">1</button>${lo>2?'…':''}`;for(let p=lo;p<=hi;p++)pg+=`<button class="app-pg-btn${p===_appTbPage?' cur':''}" onclick="_appTbGo(${p})">${p}</button>`;if(hi<totPg)pg+=`${hi<totPg-1?'…':''}<button class="app-pg-btn" onclick="_appTbGo(${totPg})">${totPg}</button>`;
-  return `<div style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);padding:0 0 10px">Hiển thị <b style="color:var(--accent)">${start+1}–${Math.min(start+APP_TB_PS,tot)}</b>/<b style="color:var(--accent)">${fmt(tot)}</b> bản ghi</div><div style="overflow-x:auto;border-radius:8px;border:1px solid rgba(255,255,255,.07)"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>${thead}</tr></thead><tbody>${tbody||'<tr><td colspan="15" style="padding:30px;text-align:center;color:var(--text-muted)">Không có dữ liệu</td></tr>'}</tbody></table></div><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;padding:10px 0 0"><button class="app-pg-btn" ${_appTbPage<=1?'disabled':''} onclick="_appTbGo(${_appTbPage-1})">‹</button>${pg}<button class="app-pg-btn" ${_appTbPage>=totPg?'disabled':''} onclick="_appTbGo(${_appTbPage+1})">›</button></div>`;
-}
-
-function _appTbSort2(c){if(_appTbSort===c)_appTbAsc=!_appTbAsc;else{_appTbSort=c;_appTbAsc=true;}_appTbApply(window._appTbAllData||[]);_appTbDraw();}
-function _appTbGo(p){const t=Math.max(1,Math.ceil(_appTbFiltered.length/APP_TB_PS));_appTbPage=Math.max(1,Math.min(p,t));_appTbDraw();}
-function _appTbDraw(){const el=document.getElementById('_appTbArea');if(el)el.innerHTML=_appTbTable();}
-
-function _appTbLyLich(btn){
-  const idx=parseInt(btn.dataset.idx);
-  const r=_appTbFiltered[idx];if(!r)return;
-  const age=_appAge(r);const cap=String(r.Cap_dien_ap??'');
-  let p=document.getElementById('_appLyLichPanel');
-  if(!p){p=document.createElement('div');p.id='_appLyLichPanel';p.style.cssText='position:fixed;top:0;right:-420px;width:400px;height:100vh;z-index:9999;background:var(--bg-surface,#161b22);border-left:1px solid rgba(255,255,255,.12);display:flex;flex-direction:column;transition:right .25s;overflow-y:auto;box-sizing:border-box';document.body.appendChild(p);const bd=document.createElement('div');bd.id='_appLyLichBd';bd.style.cssText='position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.4);display:none';bd.onclick=()=>{p.style.right='-420px';bd.style.display='none'};document.body.appendChild(bd);}
-  p.innerHTML=`<div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:13px;font-weight:800;color:var(--text-primary)">${r.Ten_thiet_bi||r.Phan_loai_thiet_bi||'—'}</div><div style="font-size:10px;color:var(--accent);margin-top:3px">${r.Tram||''} · <span style="color:${APP_CAP_COL[cap]||'#888'}">${APP_CAP_LBL[cap]||cap||'—'}</span></div></div><button onclick="document.getElementById('_appLyLichPanel').style.right='-420px';document.getElementById('_appLyLichBd').style.display='none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:4px">✕</button></div><div style="padding:14px 20px;flex:1;overflow-y:auto"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">${[['Loại thiết bị',r.Phan_loai_thiet_bi,'#00c8ff'],['Kiểu',r.Kieu,'#06b6d4'],['Số lượng',r.So_luong??'—','#00e676'],['Hãng sản xuất',r.Hang_san_xuat,'#ffd740'],['Năm sản xuất',r.Nam_san_xuat,'#ffd740'],['Năm vận hành',r.Nam_van_hanh,'#00c8ff'],['Thâm niên',age>=0?age+' năm':'—',age>=15?'#ff5252':age>=10?'#ffd740':'#00e676'],['CS (MVA)',r.Cong_suat,'#b388ff'],['Ngăn TB',r.Ngan_thiet_bi,'#888'],['Đội',r.Doi,'#888']].map(([l,v,col])=>`<div style="background:rgba(255,255,255,.04);border-radius:7px;padding:8px 10px;border:1px solid rgba(255,255,255,.07)"><div style="font-size:8.5px;color:var(--text-muted);margin-bottom:3px">${l}</div><div style="font-size:12px;font-weight:700;color:${col}">${v||'—'}</div></div>`).join('')}</div>${r.Thong_so?`<div style="margin-bottom:12px"><div style="font-size:9px;color:var(--text-muted);margin-bottom:5px;font-weight:700">THÔNG SỐ KỸ THUẬT</div><div style="font-size:10px;padding:8px 10px;background:rgba(255,255,255,.04);border-radius:6px;white-space:pre-wrap;line-height:1.6">${r.Thong_so}</div></div>`:''}${r.Ly_lich?`<div style="margin-bottom:12px"><div style="font-size:9px;color:var(--text-muted);margin-bottom:5px;font-weight:700">LÝ LỊCH THIẾT BỊ</div><div style="font-size:10px;padding:8px 10px;background:rgba(255,255,255,.04);border-radius:6px;white-space:pre-wrap;line-height:1.6">${r.Ly_lich}</div></div>`:`<div style="font-size:10px;color:var(--text-muted);padding:16px 0;text-align:center">Chưa có lý lịch thiết bị</div>`}</div>`;
-  p.style.right='0';document.getElementById('_appLyLichBd').style.display='block';
-}
-
-function appRenderThietBi(confKey){
-  const conf=APP_TB_CONF[confKey];if(!conf)return;
-  window._appTbAllData=[];
-  _appTbQ=_appTbFCap=_appTbFType=_appTbFTram=_appTbFHang=_appTbFKieu=_appTbFYear=_appTbFOpyr='';
-  _appTbSort='Tram';_appTbAsc=true;
-  const mainEl=document.getElementById('mainSections');if(!mainEl)return;
-
-  // Inject pagination CSS once
-  if(!document.getElementById('app-tb-css')){const s=document.createElement('style');s.id='app-tb-css';s.textContent='.app-pg-btn{padding:4px 9px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:var(--text-primary);cursor:pointer;font-size:10px;transition:background .15s}.app-pg-btn:hover:not(:disabled){background:rgba(255,255,255,.1)}.app-pg-btn:disabled{opacity:.35;cursor:default}.app-pg-btn.cur{background:rgba(0,200,255,.15);border-color:var(--accent);color:var(--accent)}.app-dd-trigger{display:inline-flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 10px;border-radius:6px;border:1px solid rgba(0,200,255,.4);background:var(--bg-elevated,#161b22);color:var(--text-primary);font-family:var(--font-mono);font-size:11px;cursor:pointer;outline:none;min-width:120px;white-space:nowrap;transition:border-color .15s}';document.head.appendChild(s);}
-
-  mainEl.innerHTML=`<div style="padding:0 0 32px">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-      <div style="width:34px;height:34px;border-radius:8px;background:${conf.color}22;color:${conf.color};display:flex;align-items:center;justify-content:center"><i class="fas ${conf.icon}" style="font-size:15px"></i></div>
-      <div><div style="font-size:16px;font-weight:800;color:var(--text-primary)">${conf.label}</div><div style="font-size:10px;color:var(--text-muted)">Dữ liệu trực tiếp từ Supabase · ${new Date().toLocaleDateString('vi-VN')}</div></div>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 0 12px;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:12px">
-      <div style="position:relative;flex:1;min-width:180px;max-width:300px">
-        <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:10px;pointer-events:none"></i>
-        <input id="_appTbSearch" type="text" placeholder="🔍 Tìm trạm, tên TB, ngăn, hãng..."
-          style="width:100%;box-sizing:border-box;padding:6px 10px 6px 30px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:var(--text-primary);font-size:11px;outline:none;font-family:var(--font-mono)"
-          oninput="_appTbSearch2(this.value,${JSON.stringify(confKey)})">
+  function sc(icon, iconCol, label, valHtml, barPct, barCol, clickKey) {
+    return `<div class="tb-sc" style="cursor:pointer;transition:all .15s;position:relative"
+      onclick="_tbStatCardClick('${clickKey}')"
+      onmouseenter="this.style.borderColor='${barCol}55';this.style.background='rgba(255,255,255,.06)'"
+      onmouseleave="this.style.borderColor='';this.style.background=''">
+      <div class="sl"><i class="fas ${icon}" style="color:${iconCol};margin-right:4px"></i>${label}</div>
+      <div class="sv" style="margin-bottom:6px">${valHtml}</div>
+      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)">
+        <div style="height:100%;width:${barPct}%;background:${barCol};border-radius:2px;transition:width .4s;box-shadow:0 0 6px ${barCol}55"></div>
       </div>
-      <div id="_appTbDdBtns" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"></div>
-      <button onclick="_appTbResetFilters(${JSON.stringify(confKey)})" style="padding:5px 11px;border-radius:6px;border:1px solid rgba(255,82,82,.3);background:rgba(255,82,82,.1);color:#ff5252;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-times"></i> Xóa lọc</button>
-      <button onclick="_appTbExportCSV(_appTbFiltered)" style="padding:5px 11px;border-radius:6px;border:1px solid rgba(0,230,118,.3);background:rgba(0,230,118,.1);color:#00e676;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-download"></i> CSV</button>
-    </div>
-    <div id="_appTbArea"><div style="padding:50px;text-align:center;color:var(--text-muted)"><i class="fas fa-spinner fa-spin" style="color:var(--accent);margin-right:8px"></i>Đang tải...</div></div>
-  </div>`;
+    </div>`;
+  }
 
-  const doLoad=src=>{
-    window._appTbAllData=src.filter(r=>conf.matchFn(r));
-    _appTbApply(window._appTbAllData);
-    const sVi=(a,b)=>a.localeCompare(b,'vi');
-    const sNum=(a,b)=>Number(b)-Number(a);
-    const cpPrio={'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
-    const trA=[...new Set(window._appTbAllData.map(r=>(r.Tram||'').trim()).filter(Boolean))].sort(sVi);
-    const tyA=[...new Set(window._appTbAllData.map(r=>(r.Phan_loai_thiet_bi||'').trim()).filter(Boolean))].sort(sVi);
-    const hA=[...new Set(window._appTbAllData.map(r=>(r.Hang_san_xuat||'').trim()).filter(Boolean))].sort(sVi);
-    const kA=[...new Set(window._appTbAllData.map(r=>(r.Kieu||'').trim()).filter(Boolean))].sort(sVi);
-    const yA=[...new Set(window._appTbAllData.map(r=>String(r.Nam_san_xuat||'')).filter(y=>y&&y!=='null'&&y!=='0'))].sort(sNum);
-    const oA=[...new Set(window._appTbAllData.map(r=>String(r.Nam_van_hanh||'')).filter(y=>y&&y!=='null'&&y!=='0'))].sort(sNum);
-    const cA=[...new Set(window._appTbAllData.map(r=>String(r.Cap_dien_ap??'')).filter(c=>c&&c!=='null'))].sort((a,b)=>(cpPrio[a]??9)-(cpPrio[b]??9));
-    const fc=document.getElementById('_appTbDdBtns');
-    if(fc){fc.innerHTML='';
-      const mkDD=(key,dflt,items)=>{const btn=document.createElement('button');btn.className='app-dd-trigger';const lbl=document.createElement('span');lbl.textContent=dflt;lbl.dataset.default=dflt;const ico=document.createElement('i');ico.className='fas fa-chevron-down';ico.style.cssText='font-size:8px;color:var(--text-muted)';btn.appendChild(lbl);btn.appendChild(ico);let oc;btn.onclick=e=>{e.stopPropagation();const ex=document.getElementById('_appTbDdList');if(ex){if(ex.dataset.key===key){ex.remove();return;}ex.remove();}const list=document.createElement('div');list.id='_appTbDdList';list.dataset.key=key;list.style.cssText='position:fixed;z-index:9999;background:var(--bg-surface,#161b22);border:1px solid rgba(255,255,255,.12);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.5);min-width:180px;max-height:320px;overflow-y:auto;flex-direction:column;padding:4px 0;display:flex';if(['tram','type'].includes(key)){const si=document.createElement('input');si.type='text';si.placeholder='🔍 Tìm...';si.style.cssText='margin:6px 8px;padding:4px 8px;border-radius:5px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text-primary);font-size:10px;outline:none';si.oninput=ev=>{const q=ev.target.value.toLowerCase();list.querySelectorAll('.app-dd-item').forEach(el=>{el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';});};si.onclick=ev=>ev.stopPropagation();list.appendChild(si);}const mkI=(v,l)=>{const d=document.createElement('div');d.className='app-dd-item';d.style.cssText='padding:6px 14px;cursor:pointer;font-size:11px;color:var(--text-primary);white-space:nowrap;transition:background .1s';d.textContent=l;d.onmouseenter=()=>{d.style.background='rgba(255,255,255,.06)';};d.onmouseleave=()=>{d.style.background='';};d.onclick=()=>{if(key==='tram')_appTbFTram=v;else if(key==='cap')_appTbFCap=v;else if(key==='type')_appTbFType=v;else if(key==='hang')_appTbFHang=v;else if(key==='kieu')_appTbFKieu=v;else if(key==='year')_appTbFYear=v;else if(key==='opyr')_appTbFOpyr=v;lbl.textContent=v?l:dflt;btn.style.borderColor=v?'var(--accent)':'rgba(0,200,255,.4)';btn.style.background=v?'rgba(0,200,255,.08)':'';btn.style.color=v?'var(--accent)':'';ico.style.color=v?'var(--accent)':'var(--text-muted)';_appTbApply(window._appTbAllData);_appTbDraw();list.remove();document.removeEventListener('click',oc);};list.appendChild(d);};mkI('',dflt);items.forEach(it=>typeof it==='object'?mkI(it.v,it.l):mkI(it,it));document.body.appendChild(list);const r=btn.getBoundingClientRect();list.style.top=(r.bottom+4)+'px';list.style.left=r.left+'px';const si=list.querySelector('input');if(si)setTimeout(()=>si.focus(),30);oc=ev=>{if(!list.contains(ev.target)&&ev.target!==btn){list.remove();document.removeEventListener('click',oc);}};setTimeout(()=>document.addEventListener('click',oc),0);};return btn;};
-      const dd=conf.dropdowns||[];
-      if(dd.includes('tram')) fc.appendChild(mkDD('tram',`— Tất cả trạm (${trA.length}) —`,trA));
-      if(dd.includes('cap'))  fc.appendChild(mkDD('cap','Cấp điện áp',cA.map(c=>({v:c,l:APP_CAP_LBL[c]||c}))));
-      if(dd.includes('type')&&tyA.length>1) fc.appendChild(mkDD('type','Loại thiết bị',tyA));
-      if(dd.includes('hang')&&hA.length>0) fc.appendChild(mkDD('hang','Hãng sản xuất',hA));
-      if(dd.includes('kieu')&&kA.length>0) fc.appendChild(mkDD('kieu','Kiểu',kA));
-      if(dd.includes('year')&&yA.length>0) fc.appendChild(mkDD('year','Năm SX',yA));
-      if(dd.includes('opyr')&&oA.length>0) fc.appendChild(mkDD('opyr','Năm vận hành',oA));
-    }
-    _appTbDraw();
-  };
-  if(allData&&allData.length>0) doLoad(allData);
-  else fetchData().then(d=>{if(d){allData=d;doLoad(d);}});
+  return `<div class="tb-stats">
+    ${sc('fa-list','#00c8ff','Tổng bản ghi',`<span style="color:var(--accent)">${fmt(total)}</span>`,100,'#00c8ff','total')}
+    ${sc('fa-building','#00e676','Số trạm',`<span style="color:#00e676">${trams.size}</span>`,Math.min(100,trams.size),'#00e676','trams')}
+    ${sc('fa-exclamation-triangle','#ff5252','Trên 15 năm VH',`<span style="color:#ff5252">${fmt(gt15)}</span><span style="font-size:10px;font-weight:400;color:var(--text-muted)"> (${pct}%)</span>`,gt15pct,'#ff5252','gt15')}
+    ${sc('fa-industry','#ffd740','Hãng SX / Năm cũ nhất',`<span style="color:#ffd740;font-size:15px">${hangs.size} hãng${oldY<9999?' · '+oldY:''}</span>`,Math.min(100,hangs.size*5),'#ffd740','hangs')}
+  </div>`;
 }
 
-function _appTbSearch2(v,key){_appTbQ=v||'';_appTbApply(window._appTbAllData||[]);_appTbDraw();}
-function _appTbResetFilters(key){_appTbQ=_appTbFCap=_appTbFType=_appTbFTram=_appTbFHang=_appTbFKieu=_appTbFYear=_appTbFOpyr='';const si=document.getElementById('_appTbSearch');if(si)si.value='';document.querySelectorAll('.app-dd-trigger span').forEach(el=>{el.textContent=el.dataset.default||el.textContent;});document.querySelectorAll('.app-dd-trigger').forEach(el=>{el.style.borderColor='rgba(0,200,255,.4)';el.style.background='';el.style.color='';el.querySelector('i').style.color='var(--text-muted)';});_appTbApply(window._appTbAllData||[]);_appTbDraw();}
+// ── TB STAT CARD CLICK — mở panel chi tiết ───────────────────
+function _tbStatCardClick(key) {
+  const rows = _tbFiltered.length ? _tbFiltered : _tbData;
+  const capPrio = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
+  const tramMaxCap = {};
+  rows.forEach(d => {
+    const t=(d.Tram||'').trim(); if(!t) return;
+    const c=String(d.Cap_dien_ap??''); if(!c||c==='null') return;
+    if(!tramMaxCap[t]||(capPrio[c]??99)<(capPrio[tramMaxCap[t]]??99)) tramMaxCap[t]=c;
+  });
+  const fmt = n => Number(n).toLocaleString('vi-VN');
 
+  let title='', totalLine='', bodyHtml='';
 
+  if (key === 'total') {
+    title = '📋 Danh sách thiết bị';
+    const byType = {};
+    rows.forEach(r => {
+      const pl=(r.Phan_loai_thiet_bi||'Khác').trim();
+      byType[pl]=(byType[pl]||0)+(Number(r.So_luong)||1);
+    });
+    const sorted=Object.entries(byType).sort((a,b)=>b[1]-a[1]);
+    totalLine=`${fmt(rows.length)} bản ghi · ${sorted.length} loại`;
+    bodyHtml=sorted.map(([pl,sl])=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 16px;border-bottom:1px solid rgba(255,255,255,.05)">
+        <span style="font-size:10px;color:var(--text-secondary)">${pl}</span>
+        <span style="font-size:9px;font-weight:700;color:var(--accent);background:rgba(0,200,255,.1);padding:2px 8px;border-radius:10px">${fmt(sl)}</span>
+      </div>`).join('');
 
-// ── MODULE THÍ NGHIỆM (đồng bộ HTML) ──────────────────────────
+  } else if (key === 'trams') {
+    title = '🏢 Danh sách trạm';
+    const byTram = {};
+    rows.forEach(r => {
+      const t=(r.Tram||'').trim(); if(!t) return;
+      if(!byTram[t]) byTram[t]={count:0,sl:0,cap:tramMaxCap[t]||''};
+      byTram[t].count++; byTram[t].sl+=(Number(r.So_luong)||0);
+    });
+    const sorted=Object.entries(byTram).sort((a,b)=>{
+      const pa=capPrio[a[1].cap]??9,pb=capPrio[b[1].cap]??9;
+      return pa!==pb?pa-pb:a[0].localeCompare(b[0]);
+    });
+    totalLine=`${sorted.length} trạm`;
+    const capLbl={'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+    const capCol={'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
+    bodyHtml=sorted.map(([t,info])=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 16px;border-bottom:1px solid rgba(255,255,255,.05)">
+        <span style="font-size:10px;color:var(--text-secondary)">${t}</span>
+        <div style="display:flex;gap:6px;align-items:center">
+          ${info.cap?`<span style="font-size:9px;font-weight:700;color:${capCol[info.cap]};background:${capCol[info.cap]}18;padding:1px 6px;border-radius:8px">${capLbl[info.cap]||info.cap}</span>`:''}
+          <span style="font-size:9px;color:var(--text-muted)">${fmt(info.sl||info.count)} TB</span>
+        </div>
+      </div>`).join('');
+
+  } else if (key === 'gt15') {
+    title = '⚠️ Thiết bị trên 15 năm vận hành';
+    const old15=rows.filter(r=>_tbAge(r)>=15).sort((a,b)=>_tbAge(b)-_tbAge(a));
+    totalLine=`${fmt(old15.length)} thiết bị · ${old15.length>0?Math.max(...old15.map(r=>_tbAge(r)))+' năm VH lâu nhất':''}`;
+    const capLbl={'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+    const capCol={'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
+    bodyHtml=old15.slice(0,200).map(r=>{
+      const age=_tbAge(r); const cap=String(r.Cap_dien_ap??'');
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 16px;border-bottom:1px solid rgba(255,255,255,.05)">
+        <div>
+          <div style="font-size:10px;color:var(--text-secondary)">${r.Ten_thiet_bi||r.Phan_loai_thiet_bi||'—'}</div>
+          <div style="font-size:9px;color:var(--text-muted);margin-top:1px">${r.Tram||'—'} ${cap?'· <span style="color:'+capCol[cap]+'">'+capLbl[cap]+'</span>':''}</div>
+        </div>
+        <span style="font-size:11px;font-weight:700;color:${age>=25?'#ff5252':'#ffd740'};font-family:var(--font-mono)">${age}n</span>
+      </div>`;
+    }).join('')+(old15.length>200?`<div style="padding:10px 16px;text-align:center;font-size:9px;color:var(--text-muted)">...và ${old15.length-200} thiết bị khác</div>`:'');
+
+  } else if (key === 'hangs') {
+    title = '🏭 Danh sách hãng sản xuất';
+    const byHang = {};
+    rows.forEach(r => {
+      const h=(r.Hang_san_xuat||'').trim(); if(!h) return;
+      if(!byHang[h]) byHang[h]={count:0,years:new Set()};
+      byHang[h].count+=(Number(r.So_luong)||1);
+      const y=Number(r.Nam_san_xuat); if(y>1970) byHang[h].years.add(y);
+    });
+    const sorted=Object.entries(byHang).sort((a,b)=>b[1].count-a[1].count);
+    totalLine=`${sorted.length} hãng`;
+    bodyHtml=sorted.map(([h,info])=>{
+      const ys=[...info.years].sort((a,b)=>a-b);
+      const yrStr=ys.length?`${ys[0]}${ys.length>1?'–'+ys[ys.length-1]:''}`:'-';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 16px;border-bottom:1px solid rgba(255,255,255,.05)">
+        <span style="font-size:10px;color:var(--text-secondary)">${h} <span style="color:var(--text-muted);font-size:9px">(${yrStr})</span></span>
+        <span style="font-size:9px;font-weight:700;color:#ffd740;background:rgba(255,215,64,.1);padding:2px 8px;border-radius:10px">${fmt(info.count)}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // Show detail panel (reuse hm-detail-panel)
+  const colorMap={'total':'#00c8ff','trams':'#00e676','gt15':'#ff5252','hangs':'#ffd740'};
+  const col=colorMap[key]||'var(--accent)';
+  let p=document.getElementById('hm-detail-panel');
+  if(!p){p=document.createElement('div');p.id='hm-detail-panel';p.className='hm-detail-panel';document.body.appendChild(p);}
+  p.innerHTML=`
+    <div class="hm-resize-grip"></div>
+    <div class="hm-detail-hd" style="border-left:3px solid ${col}">
+      <span style="color:${col}">${title}</span>
+      <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span>
+    </div>
+    <div style="padding:8px 16px;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">${totalLine}</div>
+    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">${bodyHtml||'<div style=\'padding:24px;text-align:center;color:var(--text-muted)\'>Không có dữ liệu</div>'}</div>`;
+  p.classList.add('open');
+  _hmOpenPanel(p);
+}
+
+// ── TABLE ─────────────────────────────────────────────────────
+function _tbTable() {
+  const start = (_tbPage-1)*_tbPageSize;
+  const rows  = _tbFiltered.slice(start, start+_tbPageSize);
+  const total = _tbFiltered.length;
+  const totalPg = Math.max(1, Math.ceil(total/_tbPageSize));
+  const fmt = n => Number(n).toLocaleString('vi-VN');
+
+  // Danh sách loại thiết bị không hiển thị cột Ngăn TB
+  const _tbHideNgan = new Set(['MBA','MC','DCL','MBATD','MBATN']);
+  const _showNganCol = !(_tbFType && _tbHideNgan.has(_tbFType.trim().toUpperCase())) &&
+    !(_tbData && _tbData.length > 0 && _tbData.every(r => _tbHideNgan.has((r.Phan_loai_thiet_bi||'').trim().toUpperCase())));
+  const COLS = [
+    {k:'Tram',               l:'Trạm',        w:'110px'},
+    {k:'Cap_dien_ap',        l:'Cấp ĐA',      w:'68px' },
+    {k:'Phan_loai_thiet_bi', l:'Loại TB',     w:'90px' },
+    {k:'Ten_thiet_bi',       l:'Tên / KH',    w:'150px'},
+    {k:'Kieu',               l:'Kiểu',        w:'80px' },
+    ...(_showNganCol ? [{k:'Ngan_thiet_bi', l:'Ngăn TB', w:'120px'}] : []),
+    {k:'So_luong',           l:'SL',          w:'46px', cls:'tb-num'},
+    {k:'Hang_san_xuat',      l:'Hãng SX',     w:'90px' },
+    {k:'Nam_san_xuat',       l:'Năm SX',      w:'58px', cls:'tb-num'},
+    {k:'Nam_van_hanh',       l:'Năm VH',      w:'58px', cls:'tb-num'},
+    {k:'_age',               l:'Thâm niên',   w:'70px', cls:'tb-num'},
+    {k:'Cong_suat',          l:'CS (MVA)',    w:'68px', cls:'tb-num'},
+    {k:'Ly_lich',            l:'Lý lịch',     w:'80px' },
+    {k:'Thong_so',           l:'Thông số',    w:'100px'},
+  ];
+
+  const thead = COLS.map(col => {
+    const srt = _tbSortCol === col.k;
+    return `<th style="min-width:${col.w}" class="${srt?'srt':''}" onclick="_tbSort('${col.k}')">
+      ${col.l}${srt?`<span style="color:var(--accent)"> ${_tbSortAsc?'↑':'↓'}</span>`:''}
+    </th>`;
+  }).join('');
+
+  const tbody = rows.map(r => {
+    const age = _tbAge(r);
+    const ageCls = age<0?'tb-a3':age<10?'tb-a0':age<15?'tb-a1':'tb-a2';
+    const cap = String(r.Cap_dien_ap??'');
+    const capHtml = `<span class="tb-cap-badge" style="background:${(_tbCapCol[cap]||'#888')}22;color:${_tbCapCol[cap]||'#888'}">${_tbCapLbl[cap]||cap||'—'}</span>`;
+    const lyLich = r.Ly_lich
+      ? `<span class="tb-lbl-btn" onclick="_tbShowLyLich(${_tbFiltered.indexOf(r)})"><i class="fas fa-file-alt"></i> Xem</span>`
+      : '<span style="color:var(--text-muted);font-size:9px">—</span>';
+
+    return `<tr>
+      <td style="font-weight:600">${r.Tram||'—'}</td>
+      <td>${capHtml}</td>
+      <td>${r.Phan_loai_thiet_bi||'—'}</td>
+      <td title="${r.Ten_thiet_bi||''}">${r.Ten_thiet_bi||'—'}</td>
+      <td title="${r.Kieu||''}">${r.Kieu||'—'}</td>
+      ${_showNganCol ? `<td title="${r.Ngan_thiet_bi||''}">${r.Ngan_thiet_bi||'—'}</td>` : ''}
+      <td class="tb-num">${r.So_luong??'—'}</td>
+      <td title="${r.Hang_san_xuat||''}">${r.Hang_san_xuat||'—'}</td>
+      <td class="tb-num">${r.Nam_san_xuat||'—'}</td>
+      <td class="tb-num">${r.Nam_van_hanh||'—'}</td>
+      <td class="${ageCls}">${age>=0?age+'n':'—'}</td>
+      <td class="tb-num">${r.Cong_suat||'—'}</td>
+      <td>${lyLich}</td>
+      <td title="${r.Thong_so||''}">${r.Thong_so?r.Thong_so.slice(0,30)+(r.Thong_so.length>30?'…':''):'—'}</td>
+    </tr>`;
+  }).join('');
+
+  // Pagination
+  const half=3; let lo=Math.max(1,_tbPage-half), hi=Math.min(totalPg,lo+6); if(hi-lo<6)lo=Math.max(1,hi-6);
+  let pgBtns = '';
+  if(lo>1) pgBtns+=`<button class="tb-pb" onclick="_tbGoPage(1)">1</button>${lo>2?'…':''}`;
+  for(let p=lo;p<=hi;p++) pgBtns+=`<button class="tb-pb${p===_tbPage?' cur':''}" onclick="_tbGoPage(${p})">${p}</button>`;
+  if(hi<totalPg) pgBtns+=`${hi<totalPg-1?'…':''}<button class="tb-pb" onclick="_tbGoPage(${totalPg})">${totalPg}</button>`;
+
+  return `${_tbStats(_tbFiltered)}
+  <div class="tb-sum"><span>Hiển thị <b>${start+1}–${Math.min(start+_tbPageSize,total)}</b> / <b>${fmt(total)}</b> bản ghi</span></div>
+  <div class="tb-tw"><table class="tb-tbl">
+    <thead><tr>${thead}</tr></thead>
+    <tbody>${tbody||'<tr><td colspan="15" style="padding:30px;text-align:center;color:var(--text-muted)">Không có dữ liệu</td></tr>'}</tbody>
+  </table></div>
+  <div class="tb-pg">
+    <button class="tb-pb" ${_tbPage<=1?'disabled':''} onclick="_tbGoPage(${_tbPage-1})">‹</button>
+    ${pgBtns}
+    <button class="tb-pb" ${_tbPage>=totalPg?'disabled':''} onclick="_tbGoPage(${_tbPage+1})">›</button>
+  </div>`;
+}
+
+// ── LÝ LỊCH PANEL ─────────────────────────────────────────────
+function _tbShowLyLich(idx) {
+  const r = _tbFiltered[idx];
+  if (!r) return;
+  let p = document.getElementById('_tbLyLichPanel');
+  if (!p) {
+    p = document.createElement('div');
+    p.id = '_tbLyLichPanel';
+    p.style.cssText = `position:fixed;top:0;right:-420px;width:400px;height:100vh;z-index:9999;
+      background:var(--bg-surface,#161b22);border-left:1px solid rgba(255,255,255,.12);
+      display:flex;flex-direction:column;transition:right .25s;overflow-y:auto;padding:0;box-sizing:border-box`;
+    document.body.appendChild(p);
+    const bd=document.createElement('div');
+    bd.id='_tbLyLichBd';
+    bd.style.cssText='position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.4);display:none';
+    bd.onclick=()=>{p.style.right='-420px';bd.style.display='none'};
+    document.body.appendChild(bd);
+  }
+  const age=_tbAge(r);const cap=String(r.Cap_dien_ap??'');
+  const capCol=_tbCapCol[cap]||'#888'; const capLbl=_tbCapLbl[cap]||cap||'—';
+  p.innerHTML=`
+    <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:flex-start">
+      <div>
+        <div style="font-size:13px;font-weight:800;color:var(--text-primary)">${r.Ten_thiet_bi||r.Phan_loai_thiet_bi||'—'}</div>
+        <div style="font-size:10px;color:var(--accent);margin-top:3px">${r.Tram||''} · <span style="color:${capCol}">${capLbl}</span></div>
+      </div>
+      <button onclick="document.getElementById('_tbLyLichPanel').style.right='-420px';document.getElementById('_tbLyLichBd').style.display='none'"
+        style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:4px">✕</button>
+    </div>
+    <div style="padding:14px 20px;flex:1;overflow-y:auto">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+        ${[['Loại thiết bị',r.Phan_loai_thiet_bi,'#00c8ff'],['Số lượng',r.So_luong??'—','#00e676'],
+           ['Hãng sản xuất',r.Hang_san_xuat,'#ffd740'],['Năm sản xuất',r.Nam_san_xuat,'#ffd740'],
+           ['Năm vận hành',r.Nam_van_hanh,'#00c8ff'],['Thâm niên',age>=0?age+' năm':'—',age>=15?'#ff5252':age>=10?'#ffd740':'#00e676'],
+           ['Công suất (MVA)',r.Cong_suat,'#b388ff'],['Đội quản lý',r.Doi,'#888']
+        ].map(([l,v,col])=>`<div style="background:rgba(255,255,255,.04);border-radius:7px;padding:8px 10px;border:1px solid rgba(255,255,255,.07)">
+          <div style="font-size:8.5px;color:var(--text-muted);margin-bottom:3px">${l}</div>
+          <div style="font-size:12px;font-weight:700;color:${col}">${v||'—'}</div>
+        </div>`).join('')}
+      </div>
+      ${r.Ngan_thiet_bi?`<div style="margin-bottom:12px"><div style="font-size:9px;color:var(--text-muted);margin-bottom:5px;font-weight:700">NGĂN THIẾT BỊ</div><div style="font-size:11px;color:var(--text-primary);background:rgba(255,255,255,.04);padding:8px 10px;border-radius:6px">${r.Ngan_thiet_bi}</div></div>`:''}
+      ${r.Thong_so?`<div style="margin-bottom:12px"><div style="font-size:9px;color:var(--text-muted);margin-bottom:5px;font-weight:700">THÔNG SỐ KỸ THUẬT</div><div style="font-size:10px;color:var(--text-primary);background:rgba(255,255,255,.04);padding:8px 10px;border-radius:6px;white-space:pre-wrap;line-height:1.6">${r.Thong_so}</div></div>`:''}
+      ${r.Ly_lich?`<div style="margin-bottom:12px"><div style="font-size:9px;color:var(--text-muted);margin-bottom:5px;font-weight:700">LÝ LỊCH THIẾT BỊ</div><div style="font-size:10px;color:var(--text-primary);background:rgba(255,255,255,.04);padding:8px 10px;border-radius:6px;white-space:pre-wrap;line-height:1.6">${r.Ly_lich}</div></div>`:`<div style="font-size:10px;color:var(--text-muted);padding:16px 0;text-align:center"><i class="fas fa-file-excel" style="margin-right:6px"></i>Chưa có lý lịch thiết bị</div>`}
+      <button onclick="_tbExportOne(${idx})"
+        style="width:100%;margin-top:8px;padding:9px;border-radius:7px;border:1px solid rgba(0,230,118,.3);background:rgba(0,230,118,.1);color:#00e676;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;gap:6px">
+        <i class="fas fa-file-export"></i> Xuất lý lịch CSV
+      </button>
+    </div>`;
+  p.style.right='0';
+  document.getElementById('_tbLyLichBd').style.display='block';
+}
+
+// ── EXPORT ────────────────────────────────────────────────────
+function _tbExportCSV() {
+  const rows = _tbFiltered;
+  if (!rows.length) return;
+  const hdr = ['Trạm','Cấp ĐA','Loại TB','Tên/Ký hiệu','Ngăn TB','Số lượng','Hãng SX','Năm SX','Năm VH','Thâm niên','CS(MVA)','Lý lịch','Thông số','Đội'].join(',');
+  const body = rows.map(r=>{
+    const age=_tbAge(r);
+    return [r.Tram,_tbCapLbl[String(r.Cap_dien_ap??'')]||r.Cap_dien_ap,r.Phan_loai_thiet_bi,r.Ten_thiet_bi,r.Ngan_thiet_bi,r.So_luong,r.Hang_san_xuat,r.Nam_san_xuat,r.Nam_van_hanh,age>=0?age:'',r.Cong_suat,r.Ly_lich,r.Thong_so,r.Doi]
+    .map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',');
+  }).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\uFEFF'+hdr+'\n'+body],{type:'text/csv;charset=utf-8'}));
+  a.download=`EVN_ThietBi_${new Date().toISOString().slice(0,10)}.csv`;a.click();
+}
+
+function _tbExportOne(idx) {
+  const r=_tbFiltered[idx]; if(!r) return;
+  const fields=[['Trạm',r.Tram],['Cấp ĐA',_tbCapLbl[String(r.Cap_dien_ap??'')]||r.Cap_dien_ap],['Loại TB',r.Phan_loai_thiet_bi],['Tên/Ký hiệu',r.Ten_thiet_bi],['Ngăn TB',r.Ngan_thiet_bi],['Số lượng',r.So_luong],['Hãng SX',r.Hang_san_xuat],['Năm SX',r.Nam_san_xuat],['Năm VH',r.Nam_van_hanh],['Thâm niên',_tbAge(r)>=0?_tbAge(r):''],['CS(MVA)',r.Cong_suat],['Thông số',r.Thong_so],['Lý lịch',r.Ly_lich],['Đội',r.Doi]];
+  const csv='\uFEFF'+fields.map(([k,v])=>`"${k}","${String(v||'').replace(/"/g,'""')}"`).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`LyLich_${(r.Tram||'TB').replace(/\s/g,'_')}_${new Date().toISOString().slice(0,10)}.csv`;a.click();
+}
+
+// ── CONTROLS ─────────────────────────────────────────────────
+function _tbSort(col){if(_tbSortCol===col)_tbSortAsc=!_tbSortAsc;else{_tbSortCol=col;_tbSortAsc=true;}_tbApply();_tbRefreshContent();}
+function _tbGoPage(p){const tot=Math.max(1,Math.ceil(_tbFiltered.length/_tbPageSize));_tbPage=Math.max(1,Math.min(p,tot));_tbRefreshContent();}
+function _tbOnSearch(v){_tbSearchQ=v||'';_tbApply();_tbRefreshContent();}
+let _tbFCongSuat = '';
+function _tbOnFilter(k,v){
+  if(k==='cap')        _tbFCap=v;
+  else if(k==='type')  _tbFType=v;
+  else if(k==='tram')  _tbFTram=v;
+  else if(k==='hang')  _tbFHang=v;
+  else if(k==='year')  _tbFYear=v;
+  else if(k==='kieu')  _tbFKieu=v;
+  else if(k==='opyr')  _tbFOpyr=v;
+  else if(k==='cong_suat') _tbFCongSuat=v;
+  _tbApply();_tbRefreshContent();
+}
+function _tbReset(){
+  _tbSearchQ=_tbFCap=_tbFType=_tbFTram=_tbFHang=_tbFYear=_tbFKieu=_tbFOpyr='';
+  if(typeof _tbFCongSuat!=='undefined')_tbFCongSuat='';
+  // Reset all trigger labels in overlay
+  document.querySelectorAll('#tbPageOverlay .hm-tram-trigger-label').forEach(el=>{
+    el.textContent = el.dataset.default||el.textContent;
+  });
+  document.querySelectorAll('#tbPageOverlay .hm-tram-trigger').forEach(el=>{
+    el.classList.remove('open'); el.style.borderColor=''; el.style.background=''; el.style.color='';
+  });
+  const si=document.getElementById('_tbSi');if(si)si.value='';
+  _tbApply();_tbRefreshContent();
+}
+function _tbRefreshContent(){const el=document.getElementById('_tbTableArea');if(el)el.innerHTML=_tbTable();}
+
+// ── RENDER PAGE ───────────────────────────────────────────────
+function tbRenderPage(conf, title) {
+  _tbInjectCSS();
+  _tbConf = conf;
+  _tbSortCol='Tram'; _tbSortAsc=true;
+  _tbSearchQ=_tbFCap=_tbFType=_tbFTram=_tbFHang=_tbFYear='';
+
+  const overlay = document.getElementById('tbPageOverlay');
+  if (!overlay) return;
+
+  overlay.innerHTML = `
+    <div class="tb-wrap">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <div style="width:32px;height:32px;border-radius:8px;background:${conf.color}22;color:${conf.color};display:flex;align-items:center;justify-content:center">
+          <i class="fas ${conf.icon}" style="font-size:14px"></i>
+        </div>
+        <div>
+          <div style="font-size:16px;font-weight:800;color:var(--text-primary)">${title}</div>
+          <div style="font-size:10px;color:var(--text-muted)">Dữ liệu trực tiếp từ Supabase · ${new Date().toLocaleDateString('vi-VN')}</div>
+        </div>
+        <button onclick="navActivate(document.querySelector('.nav-item'))" 
+          style="margin-left:auto;padding:6px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:var(--text-primary);font-size:10px;cursor:pointer;display:flex;align-items:center;gap:5px">
+          <i class="fas fa-arrow-left"></i> Dashboard
+        </button>
+      </div>
+      <div class="tb-bar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 0 12px;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:12px">
+        <div style="position:relative;flex:1;min-width:160px;max-width:280px">
+          <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:10px;pointer-events:none"></i>
+          <input id="_tbSi" type="text" placeholder="🔍 Tìm trạm, tên TB, ngăn, hãng..."
+            style="width:100%;box-sizing:border-box;padding:6px 10px 6px 30px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:var(--text-primary);font-size:11px;outline:none;font-family:var(--font-mono)"
+            oninput="_tbOnSearch(this.value)">
+        </div>
+        <div id="_tbFilterBtns" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"></div>
+        <button id="_tbResetBtn" onclick="_tbReset()" style="display:none;padding:5px 11px;border-radius:6px;border:1px solid rgba(255,82,82,.3);background:rgba(255,82,82,.1);color:#ff5252;font-size:10px;cursor:pointer;display:none;align-items:center;gap:5px">
+          <i class="fas fa-times"></i> Xóa lọc
+        </button>
+        <button onclick="_tbExportCSV()" style="padding:5px 11px;border-radius:6px;border:1px solid rgba(0,230,118,.3);background:rgba(0,230,118,.1);color:#00e676;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px">
+          <i class="fas fa-download"></i> CSV
+        </button>
+      </div>
+      <div id="_tbTableArea"><div style="padding:50px;text-align:center;color:var(--text-muted)">
+        <i class="fas fa-spinner fa-spin" style="color:var(--accent);margin-right:8px"></i>Đang tải dữ liệu...
+      </div></div>
+    </div>`;
+
+  // Load data: use _chipAllData if already loaded, else wait
+  const loadAndRender = () => {
+    const source = _chipAllData.length > 0 ? _chipAllData : [];
+    if (source.length > 0) {
+      _tbLoadFromSource(source, conf);
+    } else {
+      // Poll until data loads (loadStatsFromSupabase is running)
+      const poll = setInterval(() => {
+        if (_chipAllData.length > 0) {
+          clearInterval(poll);
+          _tbLoadFromSource(_chipAllData, conf);
+        }
+      }, 300);
+      // Timeout after 30s
+      setTimeout(() => clearInterval(poll), 30000);
+    }
+  };
+  loadAndRender();
+}
+
+function _tbLoadFromSource(source, conf) {
+  // Filter to device types using matchFn or types list
+  if (conf.watchMode) {
+    _tbData = source.filter(r => _tbAge(r) >= 15 && !_tbIsExcl(r.Phan_loai_thiet_bi));
+  } else if (conf.matchFn) {
+    _tbData = source.filter(r => conf.matchFn(r));
+  } else if (conf.types && conf.types.length > 0) {
+    const typeSet = new Set(conf.types.map(t=>t.trim().toLowerCase()));
+    _tbData = source.filter(r => typeSet.has((r.Phan_loai_thiet_bi||'').trim().toLowerCase()));
+  } else {
+    _tbData = source.filter(r => !_tbIsExcl(r.Phan_loai_thiet_bi));
+  }
+
+  _tbApply();
+
+  // Build data lists for dropdowns
+  const sortVi = (a,b) => a.localeCompare(b,'vi');
+  const sortNum = (a,b) => Number(b) - Number(a);
+  const tramsAll = [...new Set(_tbData.map(r=>(r.Tram||'').trim()).filter(Boolean))].sort(sortVi);
+  const typesAll = [...new Set(_tbData.map(r=>(r.Phan_loai_thiet_bi||'').trim()).filter(Boolean))].sort(sortVi);
+  const hangsAll = [...new Set(_tbData.map(r=>(r.Hang_san_xuat||'').trim()).filter(Boolean))].sort(sortVi);
+  const yearsAll = [...new Set(_tbData.map(r=>String(r.Nam_san_xuat||'')).filter(y=>y&&y!=='null'&&y!=='0'))].sort(sortNum);
+  const opyrsAll = [...new Set(_tbData.map(r=>String(r.Nam_van_hanh||'')).filter(y=>y&&y!=='null'&&y!=='0'))].sort(sortNum);
+  const kieuAll  = [...new Set(_tbData.map(r=>(r.Kieu||'').trim()).filter(Boolean))].sort(sortVi);
+  const capAll   = [...new Set(_tbData.map(r=>String(r.Cap_dien_ap??'')).filter(c=>c&&c!=='null'))].sort((a,b)=>({'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6}[a]??9)-({'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6}[b]??9));
+
+  // Build filter buttons using hm-tram-trigger style
+  const btnContainer = document.getElementById('_tbFilterBtns');
+  if (!btnContainer) { _tbRefreshContent(); return; }
+
+  const dropdowns = conf.dropdowns || ['tram','cap','hang','kieu','year','opyr'];
+
+  // Helper: create a trigger button with lazy-populated dropdown
+  function mkDd(key, defaultLbl, items, getId) {
+    const uid = '_tbDd_' + key;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = uid + '_btn';
+    btn.style.cssText = 'display:inline-flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 10px;border-radius:6px;border:1px solid rgba(0,200,255,0.4);background:var(--bg-elevated,#161b22);color:var(--text-primary);font-family:var(--font-mono);font-size:11px;cursor:pointer;outline:none;min-width:120px;white-space:nowrap;transition:border-color .15s';
+    btn.onmouseenter = () => { btn.style.borderColor='var(--accent)'; };
+    btn.onmouseleave = () => { if(!btn.classList.contains('tb-dd-open')) btn.style.borderColor='rgba(0,200,255,0.4)'; };
+
+    const lbl = document.createElement('span');
+    lbl.id = uid + '_lbl';
+    lbl.textContent = defaultLbl;
+    lbl.dataset.default = defaultLbl;
+
+    const ico = document.createElement('i');
+    ico.className = 'fas fa-chevron-down';
+    ico.style.fontSize = '8px';
+    ico.style.color = 'var(--text-muted)';
+    btn.appendChild(lbl); btn.appendChild(ico);
+
+    // Create dropdown list
+    const list = document.createElement('div');
+    list.id = uid + '_list';
+    list.style.cssText = 'position:fixed;z-index:9999;background:var(--bg-surface,#161b22);border:1px solid rgba(255,255,255,.12);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.5);min-width:180px;max-height:300px;overflow-y:auto;display:none;flex-direction:column;padding:4px 0';
+
+    function populateList() {
+      list.innerHTML = '';
+      // Search box for tram, hang, type
+      if (['tram','hang','type','kieu'].includes(key)) {
+        const si = document.createElement('input');
+        si.type='text'; si.placeholder='🔍 Tìm...';
+        si.style.cssText='margin:6px 8px;padding:4px 8px;border-radius:5px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text-primary);font-size:10px;outline:none';
+        si.oninput = e => { const q=e.target.value.toLowerCase(); list.querySelectorAll('.tb-dd-item').forEach(el=>{el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';}); };
+        si.onclick = e => e.stopPropagation();
+        list.appendChild(si);
+      }
+      // All option
+      function mkItem(val, label) {
+        const d = document.createElement('div');
+        d.className='tb-dd-item';
+        d.style.cssText='padding:6px 14px;cursor:pointer;font-size:11px;color:var(--text-primary);white-space:nowrap;transition:background .1s';
+        d.textContent = label;
+        d.onmouseenter = ()=>{ d.style.background='rgba(255,255,255,.06)'; };
+        d.onmouseleave = ()=>{ d.style.background=''; };
+        d.onclick = () => {
+          _tbOnFilter(key, val);
+          lbl.textContent = val ? label : defaultLbl;
+          btn.style.borderColor = val ? 'var(--accent)' : 'rgba(0,200,255,0.4)';
+          btn.style.background = val ? 'rgba(0,200,255,.08)' : '';
+          btn.style.color = val ? 'var(--accent)' : '';
+          btn.classList.toggle('tb-dd-open', !!val);
+          ico.style.color = val ? 'var(--accent)' : 'var(--text-muted)';
+          list.style.display='none';
+          document.removeEventListener('click', outsideClick);
+        };
+        list.appendChild(d);
+        return d;
+      }
+      mkItem('', defaultLbl);
+      items.forEach(it => {
+        if (typeof it === 'object') mkItem(it.v, it.l);
+        else mkItem(it, it);
+      });
+    }
+
+    let outsideClick;
+    btn.onclick = e => {
+      e.stopPropagation();
+      if (list.style.display !== 'none') { list.style.display='none'; return; }
+      // Position list
+      populateList();
+      document.body.appendChild(list);
+      const r = btn.getBoundingClientRect();
+      list.style.display = 'flex';
+      list.style.top = (r.bottom + 4) + 'px';
+      list.style.left = r.left + 'px';
+      // Auto-focus search
+      const si = list.querySelector('input');
+      if (si) setTimeout(()=>si.focus(), 30);
+      outsideClick = ev => { if(!list.contains(ev.target)&&ev.target!==btn){list.style.display='none';document.removeEventListener('click',outsideClick);} };
+      setTimeout(()=>document.addEventListener('click', outsideClick), 0);
+    };
+
+    return btn;
+  }
+
+  // ── CASCADE DROPDOWN SYSTEM ─────────────────────────────────
+  // Thứ tự cascade: tram → cap → type → hang → kieu → cong_suat → year → opyr
+  // Khi thay đổi một filter, tất cả filter sau đó phải rebuild từ source
+  // đã lọc qua các filter trước.
+
+  const _tbDdRefs = {}; // key → {btn, lbl, ico, setItems, reset}
+  const _tbCapPrioCasc = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
+  const _sortViCasc = (a,b) => a.localeCompare(b,'vi');
+  const _sortNumCasc = (a,b) => Number(b)-Number(a);
+
+  // Lấy source data đã lọc đến key (không tính key hiện tại)
+  function _tbCascadeSource(upToKey) {
+    const order = ['tram','cap','type','hang','kieu','cong_suat','year','opyr'];
+    const upToIdx = order.indexOf(upToKey);
+    let src = _tbData;
+    if (_tbFTram && order.indexOf('tram') < upToIdx) src = src.filter(r=>(r.Tram||'').trim()===_tbFTram);
+    if (_tbFCap   && order.indexOf('cap')  < upToIdx) src = src.filter(r=>String(r.Cap_dien_ap??'')===_tbFCap);
+    if (_tbFType  && order.indexOf('type') < upToIdx) src = src.filter(r=>(r.Phan_loai_thiet_bi||'').trim()===_tbFType);
+    if (_tbFHang  && order.indexOf('hang') < upToIdx) src = src.filter(r=>(r.Hang_san_xuat||'').trim()===_tbFHang);
+    if (_tbFKieu  && order.indexOf('kieu') < upToIdx) src = src.filter(r=>(r.Kieu||'').trim()===_tbFKieu);
+    if (typeof _tbFCongSuat!=='undefined'&&_tbFCongSuat && order.indexOf('cong_suat')<upToIdx) src=src.filter(r=>String(r.Cong_suat||'')===_tbFCongSuat);
+    if (_tbFYear  && order.indexOf('year') < upToIdx) src = src.filter(r=>String(r.Nam_san_xuat||'')===_tbFYear);
+    if (_tbFOpyr  && order.indexOf('opyr') < upToIdx) src = src.filter(r=>String(r.Nam_van_hanh||'')===_tbFOpyr);
+    return src;
+  }
+
+  // Rebuild all dropdowns after key (cascade downstream)
+  function _tbRebuildAfter(changedKey) {
+    const order = ['tram','cap','type','hang','kieu','cong_suat','year','opyr'];
+    const changedIdx = order.indexOf(changedKey);
+    order.slice(changedIdx + 1).forEach(key => {
+      const ref = _tbDdRefs[key];
+      if (!ref) return;
+      const src = _tbCascadeSource(key);
+      let newItems = [];
+      if (key==='tram')      newItems = [...new Set(src.map(r=>(r.Tram||'').trim()).filter(Boolean))].sort(_sortViCasc);
+      else if (key==='cap')  newItems = [...new Set(src.map(r=>String(r.Cap_dien_ap??'')).filter(c=>c&&c!=='null'))].sort((a,b)=>(_tbCapPrioCasc[a]??9)-(_tbCapPrioCasc[b]??9)).map(cv=>({v:cv,l:_tbCapLbl[cv]||cv}));
+      else if (key==='type') newItems = [...new Set(src.map(r=>(r.Phan_loai_thiet_bi||'').trim()).filter(Boolean))].sort(_sortViCasc);
+      else if (key==='hang') newItems = [...new Set(src.map(r=>(r.Hang_san_xuat||'').trim()).filter(Boolean))].sort(_sortViCasc);
+      else if (key==='kieu') newItems = [...new Set(src.map(r=>(r.Kieu||'').trim()).filter(Boolean))].sort(_sortViCasc);
+      else if (key==='cong_suat') newItems = [...new Set(src.map(r=>String(r.Cong_suat||'')).filter(v=>v&&v!=='null'&&v!=='0'))].sort(_sortNumCasc);
+      else if (key==='year') newItems = [...new Set(src.map(r=>String(r.Nam_san_xuat||'')).filter(y=>y&&y!=='null'&&y!=='0'))].sort(_sortNumCasc);
+      else if (key==='opyr') newItems = [...new Set(src.map(r=>String(r.Nam_van_hanh||'')).filter(y=>y&&y!=='null'&&y!=='0'))].sort(_sortNumCasc);
+      ref.setItems(newItems);
+      // Auto-reset if current value no longer available
+      const curVal = {tram:_tbFTram,cap:_tbFCap,type:_tbFType,hang:_tbFHang,kieu:_tbFKieu,cong_suat:_tbFCongSuat,year:_tbFYear,opyr:_tbFOpyr}[key]||'';
+      const available = newItems.map(it=>typeof it==='object'?it.v:it);
+      if (curVal && !available.includes(curVal)) {
+        _tbOnFilter(key, '');
+        ref.reset();
+      }
+    });
+  }
+
+  // Create a cascade-aware dropdown button
+  function mkCascadeDd(key, defaultLbl, initItems) {
+    let currentItems = initItems;
+    const btn = document.createElement('button');
+    btn.type='button';
+    btn.style.cssText='display:inline-flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;border-radius:7px;border:1px solid rgba(0,200,255,.4);background:var(--bg-elevated,#161b22);color:var(--text-primary);font-family:var(--font-mono);font-size:11px;cursor:pointer;outline:none;min-width:130px;white-space:nowrap;transition:all .15s';
+    const lbl=document.createElement('span'); lbl.textContent=defaultLbl; lbl.dataset.default=defaultLbl;
+    const ico=document.createElement('i'); ico.className='fas fa-chevron-down'; ico.style.cssText='font-size:8px;color:var(--text-muted);flex-shrink:0';
+    btn.appendChild(lbl); btn.appendChild(ico);
+    btn.onmouseenter=()=>{if(!btn._active)btn.style.borderColor='var(--accent)';};
+    btn.onmouseleave=()=>{if(!btn._active)btn.style.borderColor='rgba(0,200,255,.4)';};
+
+    btn.setItems = items => { currentItems = items; };
+    btn.reset = () => { lbl.textContent=defaultLbl; btn._active=false; btn.style.borderColor='rgba(0,200,255,.4)'; btn.style.background=''; btn.style.color=''; ico.style.color='var(--text-muted)'; };
+    _tbDdRefs[key] = btn;
+
+    let oc;
+    btn.onclick = e => {
+      e.stopPropagation();
+      const ex=document.getElementById('_tbDdList');
+      if(ex){if(ex.dataset.key===key){ex.remove();return;}ex.remove();}
+      const list=document.createElement('div'); list.id='_tbDdList'; list.dataset.key=key;
+      list.style.cssText='position:fixed;z-index:9999;background:var(--bg-surface,#161b22);border:1px solid rgba(255,255,255,.12);border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.6);min-width:200px;max-height:320px;overflow-y:auto;flex-direction:column;padding:4px 0;display:flex';
+      // Search box
+      if(['tram','hang','type','kieu'].includes(key)){
+        const si=document.createElement('input'); si.type='text'; si.placeholder='🔍 Tìm...';
+        si.style.cssText='margin:6px 8px;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:var(--text-primary);font-size:11px;outline:none';
+        si.oninput=ev=>{const q=ev.target.value.toLowerCase();list.querySelectorAll('.tb-dd-item').forEach(el=>{el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';});};
+        si.onclick=ev=>ev.stopPropagation(); list.appendChild(si);
+      }
+      function mkI(v,l){
+        const d=document.createElement('div'); d.className='tb-dd-item';
+        d.style.cssText='padding:7px 14px;cursor:pointer;font-size:11px;color:var(--text-primary);white-space:nowrap;transition:background .1s';
+        d.textContent=l;
+        d.onmouseenter=()=>{d.style.background='rgba(255,255,255,.07)';}; d.onmouseleave=()=>{d.style.background='';};
+        d.onclick=()=>{
+          // Reset downstream filters
+          _tbOnFilter(key,v);
+          lbl.textContent=v?l:defaultLbl; btn._active=!!v;
+          btn.style.borderColor=v?'var(--accent)':'rgba(0,200,255,.4)';
+          btn.style.background=v?'rgba(0,200,255,.1)':'';
+          btn.style.color=v?'var(--accent)':'';
+          ico.style.color=v?'var(--accent)':'var(--text-muted)';
+          list.remove(); document.removeEventListener('click',oc);
+          // Cascade: rebuild all downstream dropdowns
+          _tbRebuildAfter(key);
+          // Update reset button visibility
+          const rb=document.getElementById('_tbResetBtn');
+          if(rb) rb.style.display='inline-flex';
+        };
+        list.appendChild(d);
+      }
+      mkI('',defaultLbl);
+      currentItems.forEach(it=>typeof it==='object'?mkI(it.v,it.l):mkI(it,it));
+      document.body.appendChild(list);
+      const rb=btn.getBoundingClientRect();
+      list.style.top=(rb.bottom+4)+'px'; list.style.left=rb.left+'px';
+      const si=list.querySelector('input'); if(si)setTimeout(()=>si.focus(),30);
+      oc=ev=>{if(!list.contains(ev.target)&&ev.target!==btn){list.remove();document.removeEventListener('click',oc);}};
+      setTimeout(()=>document.addEventListener('click',oc),0);
+    };
+    return btn;
+  }
+
+  btnContainer.innerHTML = '';
+
+  // Tram (always first, shows all tramsAll)
+  if (dropdowns.includes('tram')) {
+    const initTrams = tramsAll;
+    btnContainer.appendChild(mkCascadeDd('tram','— Tất cả trạm ('+tramsAll.length+') —', initTrams));
+  }
+  // Cấp ĐA
+  if (dropdowns.includes('cap')) btnContainer.appendChild(mkCascadeDd('cap','Cấp điện áp', capAll.map(cv=>({v:cv,l:_tbCapLbl[cv]||cv}))));
+  // Loại TB
+  if (dropdowns.includes('type')) btnContainer.appendChild(mkCascadeDd('type','Loại thiết bị', typesAll));
+  // Hãng SX
+  if (dropdowns.includes('hang')) btnContainer.appendChild(mkCascadeDd('hang','Hãng sản xuất', hangsAll));
+  // Kiểu
+  if (dropdowns.includes('kieu') && kieuAll.length > 0) btnContainer.appendChild(mkCascadeDd('kieu','Kiểu', kieuAll));
+  // Công suất
+  if (dropdowns.includes('cong_suat')) {
+    const csAll=[...new Set(_tbData.map(r=>String(r.Cong_suat||'')).filter(v=>v&&v!=='null'&&v!=='0'))].sort(_sortNumCasc);
+    if(csAll.length>0) btnContainer.appendChild(mkCascadeDd('cong_suat','Công suất', csAll));
+  }
+  // Năm SX
+  if (dropdowns.includes('year') && yearsAll.length > 0) btnContainer.appendChild(mkCascadeDd('year','Năm SX', yearsAll));
+  // Năm VH
+  if (dropdowns.includes('opyr') && opyrsAll.length > 0) btnContainer.appendChild(mkCascadeDd('opyr','Năm vận hành', opyrsAll));
+
+  _tbRefreshContent();
+}
+
+// ══════════════════════════════════════════════════════════════
 
 // ══════════════════════════════════════════════════════════════
 // ── MODULE THÍ NGHIỆM ĐỊNH KỲ — CongTacThiNghiem ─────────────
@@ -1966,6 +6131,14 @@ const _TN_CACHE_TTL = 15 * 60 * 1000;
 const _tnNavMap = {
   'TNĐK định kỳ':        { mode:'dinhky',  label:'Thí nghiệm định kỳ (TNĐK)',  icon:'fa-calendar-check', color:'#00c8ff' },
   'Thí nghiệm đột xuất': { mode:'dotxuat', label:'Thí nghiệm đột xuất (TNĐX)', icon:'fa-bolt',           color:'#f59e0b' },
+};
+
+// Báo cáo nav map
+const _bcNavMap = {
+  'KL theo tháng':    { rpt:'by_month',   label:'Khối lượng TN theo tháng',    icon:'fa-chart-bar',           color:'#00c8ff' },
+  'KL theo năm':      { rpt:'by_year',    label:'Khối lượng TN theo năm',       icon:'fa-chart-line',          color:'#10b981' },
+  'Thiết bị quá hạn': { rpt:'overdue',    label:'Thiết bị quá hạn thí nghiệm', icon:'fa-exclamation-triangle', color:'#ff5252' },
+  'Đặt sớm kế hoạch': { rpt:'early_plan', label:'Thiết bị đặt sớm hơn kế hoạch', icon:'fa-forward',          color:'#f59e0b' },
 };
 
 const _tnCapLbl = {'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
@@ -2001,7 +6174,7 @@ function _tnAlertStatus(row) {
   if (truocDo) truocDo.setHours(0,0,0,0);
 
   // Hạn thí nghiệm (ngày)
-  // Han_thi_nghiem tính bằng NĂM → chuyển sang ngày
+  // Han_thi_nghiem tính bằng NĂM → chuyển sang ngày để so sánh
   const hanNam = Number(row.Han_thi_nghiem) || 0;
   const hanTN  = hanNam * 365;
 
@@ -2050,7 +6223,7 @@ async function _tnFetchData() {
     }
   } catch(_) {}
 
-  const sb = supabaseClient;
+  const sb = window.supabase ? window.supabase.createClient(_TN_SB_URL, _TN_SB_KEY) : null;
   if (!sb) return [];
 
   let allRows = [], from = 0;
@@ -2069,8 +6242,9 @@ async function _tnFetchData() {
 // ── STATE ─────────────────────────────────────────────────────
 let _tnRawData=[], _tnAllData=[], _tnFiltered=[], _tnPage=1, _tnPageSize=50;
 let _tnSortCol='_alert', _tnSortAsc=true;
-let _tnSearchQ='', _tnFCap='', _tnFType='', _tnFTram='', _tnFNhom='', _tnFAlertOnly=false;
+let _tnSearchQ='', _tnFCap='', _tnFType='', _tnFTram='', _tnFNhom='', _tnFDoi='', _tnFAlertOnly=false;
 let _tnMode='', _tnConf=null;
+let _tnDdRefs = {};  // dropdown button refs for cascade update
 
 // ── FILTER & SORT ─────────────────────────────────────────────
 function _tnApply() {
@@ -2080,6 +6254,7 @@ function _tnApply() {
     if (_tnFType  && (r.Phan_loai_thiet_bi||'').trim() !== _tnFType)   return false;
     if (_tnFTram  && (r.Tram||'').trim() !== _tnFTram)                  return false;
     if (_tnFNhom  && (r.Nhom_thiet_bi||'').trim() !== _tnFNhom)        return false;
+    if (_tnFDoi   && String(r.Doi||'').trim() !== _tnFDoi)              return false;
     if (_tnFAlertOnly) {
       const lvl = _tnAlertStatus(r).level;
       if (lvl === 'ok' || lvl === 'none') return false;
@@ -2107,35 +6282,111 @@ function _tnApply() {
 }
 
 // ── STATS ROW ─────────────────────────────────────────────────
+function _tnStatClick(lvl) {
+  if (lvl) { _tnFAlertOnly=true; _tnAllData_filter(lvl); _tnRefresh(); }
+  else      { _tnFAlertOnly=false; _tnApply(); _tnRefresh(); }
+  // Mở panel chi tiết
+  _tnShowStatPanel(lvl);
+}
+
+function _tnShowStatPanel(lvl) {
+  const rows = _tnFiltered;
+  const fmt = n => Number(n).toLocaleString('vi-VN');
+  const fmtD = v => { if(!v) return '—'; const d=new Date(v); return isNaN(d)?v:d.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'}); };
+  const capLbl={'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+  const capCol={'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
+
+  const levelConf = {
+    '':       {title:'📋 Tổng thiết bị TN', color:'var(--accent)'},
+    'overdue':{title:'🚨 Quá hạn TN',       color:'#ff5252'},
+    'warning':{title:'⏰ Sắp đến hạn (≤30 ngày)', color:'#ffd740'},
+    'late':   {title:'⏪ Đặt muộn >15%',    color:'#ff9100'},
+    'early':  {title:'⏩ Đặt sớm',          color:'#00c8ff'},
+    'ok':     {title:'✅ Trong hạn',         color:'#00e676'},
+  };
+  const conf = levelConf[lvl||''] || {title:'Chi tiết', color:'var(--accent)'};
+  const srcRows = lvl ? rows.filter(r=>_tnAlertStatus(r).level===lvl) : rows;
+
+  // Group by Tram
+  const byTram = {};
+  srcRows.forEach(r => {
+    const t=(r.Tram||'—').trim();
+    if(!byTram[t]) byTram[t]=[];
+    byTram[t].push(r);
+  });
+  const tramKeys = Object.keys(byTram).sort((a,b)=>a.localeCompare(b,'vi'));
+
+  const bodyHtml = tramKeys.map(t => {
+    const arr = byTram[t];
+    const capVal = String(arr[0]?.Cap_dien_ap??'');
+    return `<div style="border-bottom:1px solid rgba(255,255,255,.06)">
+      <div style="padding:7px 16px 4px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:10px;font-weight:700;color:var(--text-primary)">${t}</span>
+        <div style="display:flex;gap:5px;align-items:center">
+          ${capVal&&capVal!=='null'?`<span style="font-size:8px;font-weight:700;color:${capCol[capVal]};background:${capCol[capVal]}18;padding:1px 5px;border-radius:6px">${capLbl[capVal]||capVal}</span>`:''}
+          <span style="font-size:9px;color:var(--text-muted);background:rgba(255,255,255,.05);padding:1px 6px;border-radius:6px">${arr.length}</span>
+        </div>
+      </div>
+      ${arr.slice(0,5).map(r=>{
+        const s=_tnAlertStatus(r);
+        return `<div style="padding:4px 24px;font-size:9px;color:var(--text-secondary);display:flex;justify-content:space-between">
+          <span>${r.Phan_loai_thiet_bi||'—'} · ${r.Ten_thiet_bi||'—'}</span>
+          <span style="color:${s.color};font-family:var(--font-mono)">${fmtD(r.Thoi_gian_thi_nghiem_tiep_theo)}</span>
+        </div>`;
+      }).join('')}
+      ${arr.length>5?`<div style="padding:2px 24px 6px;font-size:8.5px;color:var(--text-muted)">...và ${arr.length-5} thiết bị khác</div>`:''}
+    </div>`;
+  }).join('');
+
+  let p=document.getElementById('hm-detail-panel');
+  if(!p){p=document.createElement('div');p.id='hm-detail-panel';p.className='hm-detail-panel';document.body.appendChild(p);}
+  p.innerHTML=`
+    <div class="hm-resize-grip"></div>
+    <div class="hm-detail-hd" style="border-left:3px solid ${conf.color}">
+      <span style="color:${conf.color}">${conf.title}</span>
+      <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span>
+    </div>
+    <div style="padding:8px 16px;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">${fmt(srcRows.length)} bản ghi · ${tramKeys.length} trạm</div>
+    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">${bodyHtml||'<div style="padding:24px;text-align:center;color:var(--text-muted)">Không có dữ liệu</div>'}</div>`;
+  p.classList.add('open');
+  _hmOpenPanel(p);
+}
+
 function _tnStats() {
   const fmt = n => Number(n).toLocaleString('vi-VN');
   const f = _tnFiltered;
   const counts = {
-    total:    f.length,
-    overdue:  f.filter(r=>_tnAlertStatus(r).level==='overdue').length,
-    warning:  f.filter(r=>_tnAlertStatus(r).level==='warning').length,
-    late:     f.filter(r=>_tnAlertStatus(r).level==='late').length,
-    early:    f.filter(r=>_tnAlertStatus(r).level==='early').length,
-    ok:       f.filter(r=>_tnAlertStatus(r).level==='ok').length,
+    total:   f.length,
+    overdue: f.filter(r=>_tnAlertStatus(r).level==='overdue').length,
+    warning: f.filter(r=>_tnAlertStatus(r).level==='warning').length,
+    late:    f.filter(r=>_tnAlertStatus(r).level==='late').length,
+    early:   f.filter(r=>_tnAlertStatus(r).level==='early').length,
+    ok:      f.filter(r=>_tnAlertStatus(r).level==='ok').length,
   };
   const cards = [
-    ['Tổng',          counts.total,   'var(--accent)',  'rgba(0,200,255,.07)', 'rgba(0,200,255,.2)', 'fa-list',                  ''],
-    ['Quá hạn',       counts.overdue, '#ff5252',        'rgba(255,82,82,.1)',  'rgba(255,82,82,.3)', 'fa-exclamation-triangle',  'overdue'],
-    ['Sắp đến hạn',   counts.warning, '#ffd740',        'rgba(255,215,64,.08)','rgba(255,215,64,.25)','fa-clock',               'warning'],
-    ['Đặt muộn',      counts.late,    '#ff9100',        'rgba(255,145,0,.08)', 'rgba(255,145,0,.25)','fa-backward',             'late'],
-    ['Đặt sớm',       counts.early,   '#00c8ff',        'rgba(0,200,255,.07)','rgba(0,200,255,.2)', 'fa-forward',               'early'],
-    ['Trong hạn',     counts.ok,      '#00e676',        'rgba(0,230,118,.07)','rgba(0,230,118,.2)', 'fa-check-circle',          'ok'],
+    ['Tổng',        counts.total,   'var(--accent)', 'rgba(0,200,255,.07)', 'rgba(0,200,255,.2)',   'fa-list',                 '',        counts.total],
+    ['Quá hạn',     counts.overdue, '#ff5252',       'rgba(255,82,82,.1)',  'rgba(255,82,82,.3)',   'fa-exclamation-triangle', 'overdue', counts.total],
+    ['Sắp đến hạn', counts.warning, '#ffd740',       'rgba(255,215,64,.08)','rgba(255,215,64,.25)', 'fa-clock',                'warning', counts.total],
+    ['Đặt muộn',    counts.late,    '#ff9100',       'rgba(255,145,0,.08)', 'rgba(255,145,0,.25)',  'fa-backward',             'late',    counts.total],
+    ['Đặt sớm',     counts.early,   '#00c8ff',       'rgba(0,200,255,.07)', 'rgba(0,200,255,.2)',   'fa-forward',              'early',   counts.total],
+    ['Trong hạn',   counts.ok,      '#00e676',       'rgba(0,230,118,.07)', 'rgba(0,230,118,.2)',   'fa-check-circle',         'ok',      counts.total],
   ];
-  return `<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-bottom:14px">
-    ${cards.map(([l,v,col,bg,brd,ic,lvl])=>`
-    <div style="background:${bg};border:1px solid ${brd};border-radius:8px;padding:9px 12px;cursor:pointer"
-      onclick="${lvl?`_tnFAlertOnly=true;_tnAllData_filter('${lvl}');_tnRefresh()`:'_tnFAlertOnly=false;_tnApply();_tnRefresh()'}">
-      <div style="font-size:9px;color:${col};margin-bottom:3px"><i class="fas ${ic}" style="margin-right:3px"></i>${l}</div>
-      <div style="font-size:18px;font-weight:800;font-family:var(--font-mono);color:${col}">${fmt(v)}</div>
-    </div>`).join('')}
-  </div>`;
+  return '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-bottom:14px">' +
+    cards.map(([l,v,col,bg,brd,ic,lvl,tot]) => {
+      const pct = tot > 0 ? Math.round((v / tot) * 100) : (lvl===''?100:0);
+      const barPct = lvl==='' ? 100 : (tot > 0 ? Math.round((v / tot) * 100) : 0);
+      return '<div style="background:' + bg + ';border:1px solid ' + brd + ';border-radius:8px;padding:9px 12px;cursor:pointer;transition:all .15s" onclick="_tnStatClick(\'' + lvl + '\')" onmouseenter="this.style.transform=\'translateY(-1px)\'" onmouseleave="this.style.transform=\'\'">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">' +
+          '<div style="font-size:9px;color:' + col + '"><i class="fas ' + ic + '" style="margin-right:3px"></i>' + l + '</div>' +
+          (lvl!=='' ? '<div style="font-size:9px;font-family:var(--font-mono);color:' + col + ';opacity:.7">' + (tot>0?((v/tot*100).toFixed(1)):'0') + '%</div>' : '') +
+        '</div>' +
+        '<div style="font-size:18px;font-weight:800;font-family:var(--font-mono);color:' + col + ';margin-bottom:6px">' + fmt(v) + '</div>' +
+        '<div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden">' +
+          '<div style="height:100%;border-radius:2px;width:' + barPct + '%;background:' + col + ';transition:width .4s ease;box-shadow:0 0 6px ' + col + '55"></div>' +
+        '</div>' +
+      '</div>';
+    }).join('') + '</div>';
 }
-
 function _tnAllData_filter(lvl) {
   _tnFiltered = _tnAllData.filter(r => _tnAlertStatus(r).level === lvl);
   _tnPage = 1;
@@ -2159,19 +6410,17 @@ function _tnTable() {
     {k:'Nhom_thiet_bi',                   l:'Nhóm TB',             w:'90px'},
     {k:'Phan_loai_thiet_bi',              l:'Loại TB',             w:'85px'},
     {k:'Ten_thiet_bi',                    l:'Tên thiết bị',        w:'130px'},
-    {k:'Loai_ngan_lo',                    l:'Ngăn',                w:'120px'},
     {k:'So_luong',                        l:'SL',                  w:'44px', num:1},
     {k:'Han_thi_nghiem',                  l:'Hạn TN (ngày)',       w:'90px', num:1},
     {k:'Thoi_gian_thi_nghiem_truoc',      l:'TN trước đó',         w:'100px'},
     {k:'Thoi_gian_thi_nghiem_tiep_theo',  l:'TN tiếp theo',        w:'100px'},
     {k:'Ngay_thi_nghiem',                 l:'Ngày TN thực tế',     w:'105px'},
-    {k:'Dien_ban',                        l:'Điện bản',            w:'90px'},
+    {k:'Dien_ban',                        l:'SFRA',                w:'90px'},
     {k:'Bien_ban',                        l:'Biên bản',            w:'90px'},
     {k:'Ngay_thi_nghiem_dot_xuat',        l:'TN đột xuất',         w:'95px'},
     {k:'Nam_ke_hoach',                    l:'Năm KH',              w:'65px', num:1},
     {k:'Nam_thuc_hien',                   l:'Năm TH',              w:'65px', num:1},
     {k:'Muc_ke_hoach_nam',                l:'Mục KH',              w:'80px'},
-    {k:'Doi',                             l:'Đội',                 w:'46px', num:1},
     {k:'Ghi_chu',                         l:'Ghi chú',             w:'140px'},
   ];
 
@@ -2194,7 +6443,11 @@ function _tnTable() {
     const han = Number(r.Han_thi_nghiem)||0;
     const truoc = r.Thoi_gian_thi_nghiem_truoc ? new Date(r.Thoi_gian_thi_nghiem_truoc) : null;
     const tiep  = dateTT;
-    const hanDisplay = han > 0 ? `<span style="font-family:var(--font-mono)">${han} năm</span>` : '<span style="color:rgba(255,255,255,.2);font-size:9px">—</span>';
+    // Han_thi_nghiem tính bằng năm — hiển thị đơn giản
+    const hanNgay = han > 0 ? han * 365 : 0;
+    const hanDisplay = han > 0
+      ? `<span style="font-family:var(--font-mono)">${han} năm</span>`
+      : '<span style="color:rgba(255,255,255,.2);font-size:9px">—</span>';
 
     return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);${rowBg}">
       <td style="padding:6px 9px">${_tnAlertBadge(r)}</td>
@@ -2203,7 +6456,6 @@ function _tnTable() {
       <td style="padding:6px 9px;font-size:10px">${r.Nhom_thiet_bi||'—'}</td>
       <td style="padding:6px 9px;font-size:10px">${r.Phan_loai_thiet_bi||'—'}</td>
       <td style="padding:6px 9px;font-size:10px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.Ten_thiet_bi||''}">${r.Ten_thiet_bi||'—'}</td>
-      <td style="padding:6px 9px;font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.Loai_ngan_lo||''}">${r.Loai_ngan_lo||'—'}</td>
       <td style="padding:6px 9px;text-align:right;font-family:var(--font-mono)">${r.So_luong??'—'}</td>
       <td style="padding:6px 9px;text-align:right">${hanDisplay}</td>
       <td style="padding:6px 9px">${fmtD(r.Thoi_gian_thi_nghiem_truoc)}</td>
@@ -2215,15 +6467,14 @@ function _tnTable() {
       <td style="padding:6px 9px;text-align:right;font-family:var(--font-mono);font-size:10px">${r.Nam_ke_hoach||'—'}</td>
       <td style="padding:6px 9px;text-align:right;font-family:var(--font-mono);font-size:10px">${r.Nam_thuc_hien||'—'}</td>
       <td style="padding:6px 9px;font-size:10px">${r.Muc_ke_hoach_nam||'—'}</td>
-      <td style="padding:6px 9px;text-align:right;font-family:var(--font-mono);font-size:10px">${r.Doi||'—'}</td>
       <td style="padding:6px 9px;font-size:10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.Ghi_chu||''}">${r.Ghi_chu||'—'}</td>
     </tr>`;
   }).join('');
 
   const half=3; let lo=Math.max(1,_tnPage-half), hi=Math.min(totPg,lo+6); if(hi-lo<6)lo=Math.max(1,hi-6);
-  let pg=''; if(lo>1)pg+=`<button class="app-pg-btn" onclick="_tnGoPage(1)">1</button>${lo>2?'…':''}`;
+  let pg=''; if(lo>1)pg+=`<button class="tb-pb" onclick="_tnGoPage(1)">1</button>${lo>2?'…':''}`;
   for(let p=lo;p<=hi;p++) pg+=`<button class="tb-pb${p===_tnPage?' cur':''}" onclick="_tnGoPage(${p})">${p}</button>`;
-  if(hi<totPg) pg+=`${hi<totPg-1?'…':''}<button class="app-pg-btn" onclick="_tnGoPage(${totPg})">${totPg}</button>`;
+  if(hi<totPg) pg+=`${hi<totPg-1?'…':''}<button class="tb-pb" onclick="_tnGoPage(${totPg})">${totPg}</button>`;
 
   return `${_tnStats()}
   <div style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono);padding:0 0 10px">
@@ -2233,13 +6484,13 @@ function _tnTable() {
   <div style="overflow-x:auto;border-radius:8px;border:1px solid rgba(255,255,255,.07)">
     <table style="width:100%;border-collapse:collapse;font-size:11px">
       <thead><tr>${COLS.map(mkTh).join('')}</tr></thead>
-      <tbody>${tbody||'<tr><td colspan="20" style="padding:30px;text-align:center;color:var(--text-muted)">Không có dữ liệu</td></tr>'}</tbody>
+      <tbody>${tbody||'<tr><td colspan="18" style="padding:30px;text-align:center;color:var(--text-muted)">Không có dữ liệu</td></tr>'}</tbody>
     </table>
   </div>
-  <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;padding:10px 0 0">
-    <button class="app-pg-btn" ${_tnPage<=1?'disabled':''} onclick="_tnGoPage(${_tnPage-1})">‹</button>
+  <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end;padding:14px 0 0">
+    <button class="tb-pb" ${_tnPage<=1?'disabled':''} onclick="_tnGoPage(${_tnPage-1})">‹</button>
     ${pg}
-    <button class="app-pg-btn" ${_tnPage>=totPg?'disabled':''} onclick="_tnGoPage(${_tnPage+1})">›</button>
+    <button class="tb-pb" ${_tnPage>=totPg?'disabled':''} onclick="_tnGoPage(${_tnPage+1})">›</button>
   </div>`;
 }
 
@@ -2248,10 +6499,17 @@ function _tnSort(c){ if(_tnSortCol===c)_tnSortAsc=!_tnSortAsc;else{_tnSortCol=c;
 function _tnGoPage(p){ const t=Math.max(1,Math.ceil(_tnFiltered.length/_tnPageSize));_tnPage=Math.max(1,Math.min(p,t));_tnRefresh(); }
 function _tnRefresh(){ const el=document.getElementById('_tnTableArea');if(el)el.innerHTML=_tnTable(); }
 function _tnOnSearch(v){ _tnSearchQ=v||'';_tnApply();_tnRefresh(); }
-function _tnOnFilter(k,v){ if(k==='cap')_tnFCap=v;else if(k==='type')_tnFType=v;else if(k==='tram')_tnFTram=v;else if(k==='nhom')_tnFNhom=v;_tnApply();_tnRefresh(); }
+function _tnOnFilter(k,v){
+  if(k==='cap')       _tnFCap=v;
+  else if(k==='type') _tnFType=v;
+  else if(k==='tram') _tnFTram=v;
+  else if(k==='nhom') _tnFNhom=v;
+  else if(k==='doi')  _tnFDoi=v;
+  _tnApply(); _tnRefresh();
+}
 
 function _tnReset(){
-  _tnSearchQ=_tnFCap=_tnFType=_tnFTram=_tnFNhom='';_tnFAlertOnly=false;
+  _tnSearchQ=_tnFCap=_tnFType=_tnFTram=_tnFNhom=_tnFDoi='';_tnFAlertOnly=false;
   document.querySelectorAll('#tbPageOverlay .tn-trigger-lbl').forEach(el=>{ el.textContent=el.dataset.default; });
   document.querySelectorAll('#tbPageOverlay .tn-trigger').forEach(el=>{ el.style.cssText=''; });
   const si=document.getElementById('_tnSi');if(si)si.value='';
@@ -2276,10 +6534,10 @@ function _tnExportCSV() {
 // ── RENDER PAGE ───────────────────────────────────────────────
 function tnRenderPage(conf, title) {
   _tnConf=conf; _tnMode=conf.mode;
-  _tnSortCol='_alert'; _tnSortAsc=true;
+  _tnSortCol='Loai_ngan_lo'; _tnSortAsc=true;
   _tnSearchQ=_tnFCap=_tnFType=_tnFTram=_tnFNhom=''; _tnFAlertOnly=false;
 
-  const overlay=document.getElementById('mainSections');
+  const overlay=document.getElementById('tbPageOverlay');
   if(!overlay) return;
 
   overlay.innerHTML=`
@@ -2290,7 +6548,7 @@ function tnRenderPage(conf, title) {
           <div style="font-size:16px;font-weight:800;color:var(--text-primary)">${title}</div>
           <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Bảng <span style="color:var(--accent);font-family:var(--font-mono)">CongTacThiNghiem</span> · Cảnh báo: <span style="color:#ffd740">sắp hạn ≤30 ngày</span>, <span style="color:#ff5252">quá hạn</span>, <span style="color:#ff9100">đặt muộn >15%</span>, <span style="color:#00c8ff">đặt sớm</span> · CSV miễn cảnh báo</div>
         </div>
-        <button onclick="navigateTo('dashboard')" style="margin-left:auto;padding:6px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:var(--text-primary);font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-arrow-left"></i> Dashboard</button>
+        <button onclick="navActivate(document.querySelector('.nav-item'))" style="margin-left:auto;padding:6px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:var(--text-primary);font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-arrow-left"></i> Dashboard</button>
       </div>
 
       <!-- Toolbar -->
@@ -2322,9 +6580,12 @@ function tnRenderPage(conf, title) {
       return;
     }
     _tnRawData = rows;
-    _tnAllData = conf.mode === 'dinhky'
-      ? rows.filter(r => !(r.LoaiTN||'').toUpperCase().includes('ĐỘT'))
-      : rows.filter(r => (r.LoaiTN||'').toUpperCase().includes('ĐỘT')) || rows;
+    if (conf.mode === 'dinhky') {
+      _tnAllData = rows.filter(r => !(r.LoaiTN||'').toUpperCase().includes('ĐỘT'));
+    } else {
+      // TNDX: chỉ lấy thiết bị có ngày trong Ngay_thi_nghiem_dot_xuat
+      _tnAllData = rows.filter(r => r.Ngay_thi_nghiem_dot_xuat && String(r.Ngay_thi_nghiem_dot_xuat).trim() !== '');
+    }
     if (!_tnAllData.length) _tnAllData = rows;
     _tnApply();
 
@@ -2334,32 +6595,110 @@ function tnRenderPage(conf, title) {
     const trA=[...new Set(_tnAllData.map(r=>(r.Tram||'').trim()).filter(Boolean))].sort(sortVi);
     const tyA=[...new Set(_tnAllData.map(r=>(r.Phan_loai_thiet_bi||'').trim()).filter(Boolean))].sort(sortVi);
     const nhA=[...new Set(_tnAllData.map(r=>(r.Nhom_thiet_bi||'').trim()).filter(Boolean))].sort(sortVi);
-    const cA =[...new Set(_tnAllData.map(r=>String(r.Cap_dien_ap??'')).filter(c=>c&&c!=='null'))].sort((a,b)=>(cpPrio[a]??9)-(cpPrio[b]??9));
+    const cA  =[...new Set(_tnAllData.map(r=>String(r.Cap_dien_ap??'')).filter(c=>c&&c!=='null'))].sort((a,b)=>(cpPrio[a]??9)-(cpPrio[b]??9));
+    const doiA=[...new Set(_tnAllData.map(r=>String(r.Doi||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi',{numeric:true}));
     const fc=document.getElementById('_tnFilterBtns');
     if(fc){
       fc.innerHTML='';
-      function mkTnDd(key,dflt,items){
-        const btn=document.createElement('button');btn.type='button';btn.className='tn-trigger';
-        btn.style.cssText='display:inline-flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 10px;border-radius:6px;border:1px solid rgba(0,200,255,.4);background:var(--bg-elevated,#161b22);color:var(--text-primary);font-family:var(--font-mono);font-size:11px;cursor:pointer;outline:none;min-width:120px;white-space:nowrap;transition:border-color .15s';
+      // Reset dropdown refs for this render
+      _tnDdRefs = {};
+
+      // Get filtered source for dependent dropdowns (based on current doi+tram selection)
+      function _tnDdSource() {
+        let src = _tnAllData;
+        if (_tnFDoi)  src = src.filter(r => String(r.Doi||'').trim() === _tnFDoi);
+        if (_tnFTram) src = src.filter(r => (r.Tram||'').trim() === _tnFTram);
+        return src;
+      }
+
+      // Rebuild dependent dropdowns — triggered by doi OR tram change
+      function _tnRebuildDeps(changedKey) {
+        const src = _tnDdSource();
+        const newTram = [...new Set(src.map(r=>(r.Tram||'').trim()).filter(Boolean))].sort(sortVi);
+        const newCap  = [...new Set(src.map(r=>String(r.Cap_dien_ap??'')).filter(x=>x&&x!=='null'))].sort((a,b)=>(cpPrio[a]??9)-(cpPrio[b]??9));
+        const newNhom = [...new Set(src.map(r=>(r.Nhom_thiet_bi||'').trim()).filter(Boolean))].sort(sortVi);
+        const newType = [...new Set(src.map(r=>(r.Phan_loai_thiet_bi||'').trim()).filter(Boolean))].sort(sortVi);
+        // Update items
+        if (_tnDdRefs.tram) _tnDdRefs.tram.setItems(newTram);
+        if (_tnDdRefs.cap)  _tnDdRefs.cap.setItems(newCap.map(v=>({v,l:_tnCapLbl[v]||v})));
+        if (_tnDdRefs.nhom) _tnDdRefs.nhom.setItems(newNhom);
+        if (_tnDdRefs.type) _tnDdRefs.type.setItems(newType);
+        // Reset downstream selections
+        const resetKeys = changedKey==='doi' ? ['tram','cap','nhom','type'] : ['cap','nhom','type'];
+        const resetVars = changedKey==='doi' ? ()=>{ _tnFTram=''; _tnFCap=''; _tnFNhom=''; _tnFType=''; }
+                                             : ()=>{ _tnFCap=''; _tnFNhom=''; _tnFType=''; };
+        resetVars();
+        resetKeys.forEach(k=>{ if(_tnDdRefs[k]) _tnDdRefs[k].reset(); });
+      }
+
+      function mkTnDd(key, dflt, initItems) {
+        let currentItems = initItems;
+        const btn = document.createElement('button');
+        btn.type='button'; btn.className='tn-trigger';
+        btn.style.cssText='display:inline-flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;border-radius:7px;border:1px solid rgba(0,200,255,.4);background:var(--bg-elevated,#161b22);color:var(--text-primary);font-family:var(--font-mono);font-size:11px;cursor:pointer;outline:none;min-width:130px;white-space:nowrap;transition:all .15s';
         const lbl=document.createElement('span');lbl.className='tn-trigger-lbl';lbl.textContent=dflt;lbl.dataset.default=dflt;
-        const ico=document.createElement('i');ico.className='fas fa-chevron-down';ico.style.cssText='font-size:8px;color:var(--text-muted)';
+        const ico=document.createElement('i');ico.className='fas fa-chevron-down';ico.style.cssText='font-size:8px;color:var(--text-muted);flex-shrink:0';
         btn.appendChild(lbl);btn.appendChild(ico);
+        btn.onmouseenter=()=>{if(!btn._active)btn.style.borderColor='var(--accent)';};
+        btn.onmouseleave=()=>{if(!btn._active)btn.style.borderColor='rgba(0,200,255,.4)';};
+
+        // Public API: update items + reset
+        btn.setItems = items => { currentItems = items; };
+        btn.reset = () => { lbl.textContent=dflt; btn._active=false; btn.style.borderColor='rgba(0,200,255,.4)'; btn.style.background=''; btn.style.color=''; ico.style.color='var(--text-muted)'; };
+
         let oc;
-        btn.onclick=e=>{e.stopPropagation();const ex=document.getElementById('_tnDdList');if(ex){if(ex.dataset.key===key){ex.remove();return;}ex.remove();}
+        btn.onclick = e => {
+          e.stopPropagation();
+          const ex=document.getElementById('_tnDdList');
+          if(ex){if(ex.dataset.key===key){ex.remove();return;}ex.remove();}
           const list=document.createElement('div');list.id='_tnDdList';list.dataset.key=key;
-          list.style.cssText='position:fixed;z-index:9999;background:var(--bg-surface,#161b22);border:1px solid rgba(255,255,255,.12);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.5);min-width:180px;max-height:320px;overflow-y:auto;flex-direction:column;padding:4px 0;display:flex';
-          if(['tram','type','nhom'].includes(key)){const si=document.createElement('input');si.type='text';si.placeholder='🔍 Tìm...';si.style.cssText='margin:6px 8px;padding:4px 8px;border-radius:5px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text-primary);font-size:10px;outline:none';si.oninput=ev=>{const q=ev.target.value.toLowerCase();list.querySelectorAll('.tn-dd-item').forEach(el=>{el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';});};si.onclick=ev=>ev.stopPropagation();list.appendChild(si);}
-          function mkI(v,l){const d=document.createElement('div');d.className='tn-dd-item';d.style.cssText='padding:6px 14px;cursor:pointer;font-size:11px;color:var(--text-primary);white-space:nowrap;transition:background .1s';d.textContent=l;d.onmouseenter=()=>{d.style.background='rgba(255,255,255,.06)';};d.onmouseleave=()=>{d.style.background='';};d.onclick=()=>{_tnOnFilter(key,v);lbl.textContent=v?l:dflt;btn.style.borderColor=v?'var(--accent)':'rgba(0,200,255,.4)';btn.style.background=v?'rgba(0,200,255,.08)':'';btn.style.color=v?'var(--accent)':'';ico.style.color=v?'var(--accent)':'var(--text-muted)';list.remove();document.removeEventListener('click',oc);};list.appendChild(d);}
-          mkI('',dflt);items.forEach(it=>typeof it==='object'?mkI(it.v,it.l):mkI(it,it));
-          document.body.appendChild(list);const r=btn.getBoundingClientRect();list.style.top=(r.bottom+4)+'px';list.style.left=r.left+'px';
-          const si=list.querySelector('input');if(si)setTimeout(()=>si.focus(),30);
-          oc=ev=>{if(!list.contains(ev.target)&&ev.target!==btn){list.remove();document.removeEventListener('click',oc);}};setTimeout(()=>document.addEventListener('click',oc),0);};
+          list.style.cssText='position:fixed;z-index:9999;background:var(--bg-surface,#161b22);border:1px solid rgba(255,255,255,.12);border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.6);min-width:200px;max-height:320px;overflow-y:auto;flex-direction:column;padding:4px 0;display:flex';
+          // Search box
+          const si=document.createElement('input');si.type='text';si.placeholder='🔍 Tìm...';
+          si.style.cssText='margin:6px 8px;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:var(--text-primary);font-size:11px;outline:none';
+          si.oninput=ev=>{const q=ev.target.value.toLowerCase();list.querySelectorAll('.tn-dd-item').forEach(el=>{el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';});};
+          si.onclick=ev=>ev.stopPropagation();
+          list.appendChild(si);
+
+          function mkI(v,l){
+            const d=document.createElement('div');d.className='tn-dd-item';
+            d.style.cssText='padding:7px 14px;cursor:pointer;font-size:11px;color:var(--text-primary);white-space:nowrap;transition:background .1s';
+            d.textContent=l;
+            d.onmouseenter=()=>{d.style.background='rgba(255,255,255,.07)';};
+            d.onmouseleave=()=>{d.style.background='';};
+            d.onclick=()=>{
+              if(key==='doi')  { _tnFDoi=v;  _tnOnFilter('doi',v);  _tnRebuildDeps('doi'); }
+              else if(key==='tram') { _tnFTram=v; _tnOnFilter('tram',v); _tnRebuildDeps('tram'); }
+              else { _tnOnFilter(key,v); }
+              lbl.textContent=v?l:dflt; btn._active=!!v;
+              btn._active=!!v;
+              btn.style.borderColor=v?'var(--accent)':'rgba(0,200,255,.4)';
+              btn.style.background=v?'rgba(0,200,255,.1)':'';
+              btn.style.color=v?'var(--accent)':'';
+              ico.style.color=v?'var(--accent)':'var(--text-muted)';
+              list.remove();document.removeEventListener('click',oc);
+            };
+            list.appendChild(d);
+          }
+          mkI('',dflt);
+          currentItems.forEach(it=>typeof it==='object'?mkI(it.v,it.l):mkI(it,it));
+          document.body.appendChild(list);
+          const rb=btn.getBoundingClientRect();
+          list.style.top=(rb.bottom+4)+'px';
+          list.style.left=rb.left+'px';
+          setTimeout(()=>si.focus(),30);
+          oc=ev=>{if(!list.contains(ev.target)&&ev.target!==btn){list.remove();document.removeEventListener('click',oc);}};
+          setTimeout(()=>document.addEventListener('click',oc),0);
+        };
+        _tnDdRefs[key] = btn;
         return btn;
       }
-      fc.appendChild(mkTnDd('tram',`— Tất cả trạm (${trA.length}) —`,trA));
-      fc.appendChild(mkTnDd('cap','Cấp điện áp',cA.map(c=>({v:c,l:_tnCapLbl[c]||c}))));
-      fc.appendChild(mkTnDd('nhom','Nhóm thiết bị',nhA));
-      fc.appendChild(mkTnDd('type','Loại thiết bị',tyA));
+
+      fc.appendChild(mkTnDd('doi', `— Đội —`, doiA));
+      fc.appendChild(mkTnDd('tram',`— Tất cả trạm (${trA.length}) —`, trA));
+      fc.appendChild(mkTnDd('cap','Cấp điện áp', cA.map(v=>({v,l:_tnCapLbl[v]||v}))));
+      fc.appendChild(mkTnDd('nhom','Nhóm thiết bị', nhA));
+      fc.appendChild(mkTnDd('type','Loại thiết bị', tyA));
     }
     _tnRefresh();
   });
@@ -2369,3 +6708,867 @@ function _tnSetData(source) {
   _tnAllData = source; _tnApply(); _tnRefresh();
 }
 
+
+// ══════════════════════════════════════════════════════════════
+// ── MODULE BÁO CÁO + TNDX ────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+
+// ── SHARED HELPERS ────────────────────────────────────────────
+function _bcFmtD(v, short=false) {
+  if (!v) return '—';
+  const d = new Date(v);
+  if (isNaN(d)) return v;
+  return short
+    ? d.toLocaleDateString('vi-VN', {month:'2-digit', year:'numeric'})
+    : d.toLocaleDateString('vi-VN', {day:'2-digit', month:'2-digit', year:'numeric'});
+}
+
+function _bcCapBadge(cap) {
+  const col = _tnCapCol[String(cap??'')] || '#888';
+  const lbl = _tnCapLbl[String(cap??'')] || String(cap||'—');
+  return `<span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:9px;font-weight:700;background:${col}22;color:${col}">${lbl}</span>`;
+}
+
+function _bcIsCSV(row) {
+  const pl = (row.Phan_loai_thiet_bi||'').trim().toUpperCase().replace(/\s+/g,'');
+  return pl === 'CSV' || pl.startsWith('CSV');
+}
+
+// ── TABLE BUILDER — grouped by Phan_loai_thiet_bi ────────────
+function _bcGroupedTable(rows, colDefs) {
+  const fmt = n => Number(n).toLocaleString('vi-VN');
+  if (!rows.length) return '<div style="padding:30px;text-align:center;color:var(--text-muted)">Không có dữ liệu</div>';
+
+  // Group by Phan_loai_thiet_bi
+  const groups = {};
+  rows.forEach(r => {
+    const key = (r.Phan_loai_thiet_bi||'Khác').trim();
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(r);
+  });
+
+  const sortedKeys = Object.keys(groups).sort((a,b) => a.localeCompare(b,'vi'));
+
+  const thead = `<tr>${colDefs.map(c=>`<th style="padding:7px 10px;font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);white-space:nowrap;min-width:${c.w||'80px'};text-align:${c.num?'right':'left'};position:sticky;top:0;z-index:2">${c.l}</th>`).join('')}</tr>`;
+
+  let html = '';
+  sortedKeys.forEach(key => {
+    const grpRows = groups[key];
+    // Group header
+    html += `<tr style="background:rgba(0,200,255,.05);border-top:1px solid rgba(0,200,255,.12)">
+      <td colspan="${colDefs.length}" style="padding:6px 12px;font-size:10px;font-weight:800;color:var(--accent)">
+        <i class="fas fa-microchip" style="margin-right:6px;font-size:9px"></i>${key}
+        <span style="font-weight:400;color:var(--text-muted);margin-left:8px">${fmt(grpRows.length)} bản ghi</span>
+      </td>
+    </tr>`;
+    // Rows
+    grpRows.forEach(r => {
+      html += `<tr style="border-bottom:1px solid rgba(255,255,255,.04)">${colDefs.map(col => {
+        if (col.render) return `<td style="padding:5px 10px;${col.num?'text-align:right':''}font-size:10px">${col.render(r)}</td>`;
+        const v = r[col.k];
+        return `<td style="padding:5px 10px;${col.num?'text-align:right;font-family:var(--font-mono)':''}font-size:10px;max-width:${col.w||'120px'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${v||''}">${v||'—'}</td>`;
+      }).join('')}</tr>`;
+    });
+  });
+
+  return `<div style="overflow-x:auto;border-radius:8px;border:1px solid rgba(255,255,255,.07)">
+    <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead>${thead}</thead>
+      <tbody>${html}</tbody>
+    </table>
+  </div>`;
+}
+
+// ── CHART BUILDERS (SVG bar charts) ──────────────────────────
+function _bcBarChart(data, title, colorFn) {
+  if (!data.length) return '';
+  const maxVal = Math.max(...data.map(d=>d.v), 1);
+  const BAR_H = 160, BAR_W = Math.max(24, Math.min(48, Math.floor(680 / data.length)));
+  const bars = data.map((d,i) => {
+    const h = Math.max(2, Math.round((d.v / maxVal) * BAR_H));
+    const x = i * (BAR_W + 4);
+    const col = colorFn ? colorFn(d) : '#00c8ff';
+    return `<g transform="translate(${x}, 0)">
+      <rect y="${BAR_H - h}" width="${BAR_W}" height="${h}" fill="${col}" rx="2" opacity=".85"/>
+      <text x="${BAR_W/2}" y="${BAR_H + 14}" text-anchor="middle" fill="rgba(255,255,255,.5)" font-size="9">${d.label}</text>
+      <text x="${BAR_W/2}" y="${BAR_H - h - 4}" text-anchor="middle" fill="${col}" font-size="10" font-weight="700">${d.v}</text>
+    </g>`;
+  }).join('');
+  const totalW = data.length * (BAR_W + 4);
+  return `<div style="overflow-x:auto;padding:8px 0">
+    <svg width="${totalW}" height="${BAR_H + 40}" xmlns="http://www.w3.org/2000/svg">
+      <g transform="translate(0, 10)">${bars}</g>
+    </svg>
+  </div>`;
+}
+
+// ── BÁO CÁO: KL THEO THÁNG ───────────────────────────────────
+// State for by-month filters
+let _bcFDoi='', _bcFTram='', _bcFMonth='', _bcFYear='', _bcFType='';
+
+function _bcRenderByMonth(conf) {
+  const rawData = _tnRawData.length ? _tnRawData : (_tnAllData.length ? _tnAllData : []);
+  const fmt = n => Number(n).toLocaleString('vi-VN');
+  const sortVi = (a,b) => String(a).localeCompare(String(b),'vi');
+
+  // Build filter option lists from full dataset
+  const allDois  = [...new Set(rawData.map(r=>(r.Doi||'').trim()).filter(Boolean))].sort(sortVi);
+  const allTrams = [...new Set(rawData.map(r=>(r.Tram||'').trim()).filter(Boolean))].sort(sortVi);
+  const allTypes = [...new Set(rawData.map(r=>(r.Phan_loai_thiet_bi||'').trim()).filter(Boolean))].sort(sortVi);
+  // Collect all years/months from dates
+  const allYears = new Set(), allMonths = new Set();
+  rawData.forEach(r => {
+    const ds = r.Ngay_thi_nghiem || r.Thoi_gian_thi_nghiem_tiep_theo;
+    if (!ds) return;
+    const d = new Date(ds); if (isNaN(d)) return;
+    allYears.add(d.getFullYear());
+    allMonths.add(d.getMonth()+1);
+  });
+  const yearList  = [...allYears].sort((a,b)=>b-a);
+  const monthList = [...allMonths].sort((a,b)=>a-b);
+
+  // Apply active filters
+  const data = rawData.filter(r => {
+    if (_bcFDoi  && (r.Doi||'').trim() !== _bcFDoi)                            return false;
+    if (_bcFTram && (r.Tram||'').trim() !== _bcFTram)                          return false;
+    if (_bcFType && (r.Phan_loai_thiet_bi||'').trim() !== _bcFType)            return false;
+    const ds = r.Ngay_thi_nghiem || r.Thoi_gian_thi_nghiem_tiep_theo;
+    if (_bcFYear || _bcFMonth) {
+      if (!ds) return false;
+      const d = new Date(ds); if (isNaN(d)) return false;
+      if (_bcFYear  && String(d.getFullYear()) !== String(_bcFYear))  return false;
+      if (_bcFMonth && String(d.getMonth()+1) !== String(_bcFMonth))  return false;
+    }
+    return true;
+  });
+
+  // Count by month
+  const monthMap = {};
+  const monthTypeMap = {};
+  data.forEach(r => {
+    const dateStr = r.Ngay_thi_nghiem || r.Thoi_gian_thi_nghiem_tiep_theo;
+    if (!dateStr) return;
+    const d = new Date(dateStr);
+    if (isNaN(d)) return;
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const label = `T${d.getMonth()+1}/${d.getFullYear()}`;
+    if (!monthMap[key]) monthMap[key] = { label, v:0, year:d.getFullYear(), month:d.getMonth()+1 };
+    monthMap[key].v++;
+    const pl = (r.Phan_loai_thiet_bi||'Khác').trim();
+    if (!monthTypeMap[key]) monthTypeMap[key] = {};
+    monthTypeMap[key][pl] = (monthTypeMap[key][pl]||0)+1;
+  });
+
+  const months = Object.keys(monthMap).sort().map(k=>monthMap[k]);
+  const filteredTypes = [...new Set(data.map(r=>(r.Phan_loai_thiet_bi||'Khác').trim()))].sort((a,b)=>a.localeCompare(b,'vi'));
+  const COLORS = ['#00c8ff','#00e676','#ffd740','#ff9100','#e040fb','#18ffff','#ff4081','#00bcd4','#8bc34a','#ff5252'];
+
+  const totalDone = data.filter(r=>r.Ngay_thi_nghiem).length;
+
+  // Helper: build styled dropdown
+  function mkBcDd(key, dflt, val, items, labelFn) {
+    const active = !!val;
+    const ddStyle = `display:inline-flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;border-radius:7px;border:1px solid ${active?'var(--accent)':'rgba(0,200,255,.4)'};background:${active?'rgba(0,200,255,.1)':'var(--bg-elevated)'};color:${active?'var(--accent)':'var(--text-primary)'};font-family:var(--font-mono);font-size:11px;cursor:pointer;outline:none;min-width:120px;white-space:nowrap;position:relative`;
+    const lbl = val ? (labelFn ? labelFn(val) : val) : dflt;
+    return `<button style="${ddStyle}" onclick="_bcBmDropdown(this,'${key}',${JSON.stringify(items)},${JSON.stringify(dflt)})">
+      <span>${lbl}</span><i class="fas fa-chevron-down" style="font-size:8px;opacity:.6"></i>
+    </button>`;
+  }
+
+  const hasFilter = _bcFDoi||_bcFTram||_bcFYear||_bcFMonth||_bcFType;
+
+  return `
+  <!-- Filter toolbar -->
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;margin-bottom:12px">
+    <i class="fas fa-filter" style="font-size:10px;color:var(--text-muted)"></i>
+    ${mkBcDd('doi','— Đội —',_bcFDoi, allDois.map(v=>({v,l:v})), v=>v)}
+    ${mkBcDd('tram','— Trạm —',_bcFTram, allTrams.map(v=>({v,l:v})), v=>v)}
+    ${mkBcDd('year','Năm',_bcFYear, yearList.map(v=>({v:String(v),l:String(v)})), v=>v)}
+    ${mkBcDd('month','Tháng',_bcFMonth, monthList.map(v=>({v:String(v),l:`Tháng ${v}`})), v=>`T${v}`)}
+    ${mkBcDd('type','Loại thiết bị',_bcFType, allTypes.map(v=>({v,l:v})), v=>v)}
+    ${hasFilter ? `<button onclick="_bcFDoi='';_bcFTram='';_bcFYear='';_bcFMonth='';_bcFType='';bcRenderPage(window._bcLastConf||{rpt:'by_month',icon:'fa-chart-bar',color:'#00c8ff'},'Khối lượng theo tháng')" style="padding:5px 11px;border-radius:6px;border:1px solid rgba(255,82,82,.3);background:rgba(255,82,82,.1);color:#ff5252;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-times"></i> Xóa lọc</button>` : ''}
+    <span style="margin-left:auto;font-size:10px;font-family:var(--font-mono);color:var(--text-muted)">${fmt(data.length)} bản ghi</span>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+    <div style="background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
+      onclick="_bcStatClick('total',rawData)" onmouseenter="this.style.borderColor='rgba(0,200,255,.5)'" onmouseleave="this.style.borderColor='rgba(0,200,255,.2)'">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-list" style="margin-right:4px"></i>Tổng bản ghi</div>
+      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:var(--accent);margin-bottom:6px">${fmt(data.length)}</div>
+      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:100%;background:#00c8ff;border-radius:2px"></div></div>
+    </div>
+    <div style="background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
+      onclick="_bcStatClick('done',rawData)" onmouseenter="this.style.borderColor='rgba(0,230,118,.5)'" onmouseleave="this.style.borderColor='rgba(0,230,118,.2)'">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-check-circle" style="margin-right:4px"></i>Đã thí nghiệm (có ngày TN)</div>
+      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:#00e676;margin-bottom:6px">${fmt(totalDone)}</div>
+      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${data.length>0?Math.round(totalDone/data.length*100):0}%;background:#00e676;border-radius:2px;transition:width .4s"></div></div>
+    </div>
+    <div style="background:rgba(255,215,64,.07);border:1px solid rgba(255,215,64,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
+      onclick="_bcStatClick('months',rawData)" onmouseenter="this.style.borderColor='rgba(255,215,64,.5)'" onmouseleave="this.style.borderColor='rgba(255,215,64,.2)'">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-calendar" style="margin-right:4px"></i>Số tháng có TN</div>
+      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:#ffd740;margin-bottom:6px">${months.length}</div>
+      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${Math.min(100,months.length*8)}%;background:#ffd740;border-radius:2px"></div></div>
+    </div>
+  </div>
+
+  <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:14px">
+    <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:12px">BIỂU ĐỒ KHỐI LƯỢNG THEO THÁNG</div>
+    ${_bcBarChart(months.slice(-24), 'Theo tháng', d => {
+      const age = new Date().getFullYear() - d.year;
+      return age === 0 ? '#00e676' : age === 1 ? '#00c8ff' : '#607d8b';
+    })}
+  </div>
+
+  <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px">
+    <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:10px">CHI TIẾT THEO THÁNG × LOẠI THIẾT BỊ</div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:10px">
+        <thead><tr style="background:rgba(255,255,255,.03)">
+          <th style="padding:6px 10px;font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:left;position:sticky;top:0;min-width:100px">Tháng</th>
+          ${filteredTypes.slice(0,12).map((t,i)=>`<th style="padding:6px 10px;font-size:9px;font-weight:700;color:${COLORS[i%COLORS.length]};text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:right;position:sticky;top:0;white-space:nowrap">${t}</th>`).join('')}
+          <th style="padding:6px 10px;font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:right;position:sticky;top:0">Tổng</th>
+        </tr></thead>
+        <tbody>${Object.keys(monthMap).sort().reverse().map(k=>{
+          const tMap = monthTypeMap[k]||{};
+          const total = monthMap[k].v;
+          const maxVal = Math.max(...filteredTypes.map(t=>tMap[t]||0),1);
+          return `<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+            <td style="padding:5px 10px;font-weight:600;font-family:var(--font-mono)">${monthMap[k].label}</td>
+            ${filteredTypes.slice(0,12).map((t,i)=>{
+              const v = tMap[t]||0;
+              const barW = v > 0 ? Math.max(2,Math.round((v/maxVal)*60)) : 0;
+              return `<td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);color:${v?COLORS[i%COLORS.length]:'rgba(255,255,255,.15)'}">
+                ${v ? `<span style="display:inline-flex;align-items:center;gap:5px">
+                  <span style="display:inline-block;height:3px;width:${barW}px;background:${COLORS[i%COLORS.length]};border-radius:2px;opacity:.6;vertical-align:middle"></span>${v}
+                </span>` : '—'}
+              </td>`;
+            }).join('')}
+            <td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);font-weight:700;color:var(--accent)">${total}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// ── DROPDOWN HANDLER for by-month report ──────────────────────
+function _bcBmDropdown(btn, key, items, dflt) {
+  const ex = document.getElementById('_bcBmDdList');
+  if (ex) { if (ex.dataset.key===key) { ex.remove(); return; } ex.remove(); }
+  const list = document.createElement('div');
+  list.id = '_bcBmDdList'; list.dataset.key = key;
+  list.style.cssText = 'position:fixed;z-index:9999;background:var(--bg-surface,#161b22);border:1px solid rgba(255,255,255,.12);border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.6);min-width:200px;max-height:320px;overflow-y:auto;flex-direction:column;padding:4px 0;display:flex';
+  // Search
+  if (items.length > 8) {
+    const si = document.createElement('input'); si.type='text'; si.placeholder='🔍 Tìm...';
+    si.style.cssText='margin:6px 8px;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:var(--text-primary);font-size:11px;outline:none';
+    si.oninput = ev => { const q=ev.target.value.toLowerCase(); list.querySelectorAll('.bc-dd-item').forEach(el=>{el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';}); };
+    si.onclick = ev => ev.stopPropagation(); list.appendChild(si);
+  }
+  function mkI(v,l) {
+    const d = document.createElement('div'); d.className='bc-dd-item';
+    d.style.cssText='padding:7px 14px;cursor:pointer;font-size:11px;color:var(--text-primary);white-space:nowrap;transition:background .1s';
+    d.textContent=l;
+    d.onmouseenter=()=>{d.style.background='rgba(255,255,255,.07)';}; d.onmouseleave=()=>{d.style.background='';};
+    d.onclick = () => {
+      if (key==='doi')   _bcFDoi=v;
+      else if(key==='tram') _bcFTram=v;
+      else if(key==='year') _bcFYear=v;
+      else if(key==='month') _bcFMonth=v;
+      else if(key==='type') _bcFType=v;
+      list.remove(); document.removeEventListener('click',oc);
+      const conf = window._bcLastConf||{rpt:'by_month',icon:'fa-chart-bar',color:'#00c8ff'};
+      bcRenderPage(conf,'Khối lượng theo tháng');
+    };
+    list.appendChild(d);
+  }
+  mkI('',dflt);
+  items.forEach(it => typeof it==='object' ? mkI(it.v,it.l) : mkI(it,it));
+  document.body.appendChild(list);
+  const rb = btn.getBoundingClientRect();
+  list.style.top=(rb.bottom+4)+'px'; list.style.left=rb.left+'px';
+  let oc; oc=ev=>{if(!list.contains(ev.target)&&ev.target!==btn){list.remove();document.removeEventListener('click',oc);}};
+  setTimeout(()=>document.addEventListener('click',oc),0);
+}
+
+// ── BÁO CÁO: KL THEO NĂM ─────────────────────────────────────
+function _bcRenderByYear(conf) {
+  const data = _tnRawData.length ? _tnRawData : _tnAllData;
+  const fmt = n => Number(n).toLocaleString('vi-VN');
+  const nowY = new Date().getFullYear();
+
+  const yearMap = {};
+  const yearTypeMap = {};
+  data.forEach(r => {
+    const dateStr = r.Ngay_thi_nghiem || r.Thoi_gian_thi_nghiem_tiep_theo;
+    if (!dateStr) return;
+    const y = new Date(dateStr).getFullYear();
+    if (isNaN(y)) return;
+    yearMap[y] = (yearMap[y]||0) + 1;
+    const pl = (r.Phan_loai_thiet_bi||'Khác').trim();
+    if (!yearTypeMap[y]) yearTypeMap[y] = {};
+    yearTypeMap[y][pl] = (yearTypeMap[y][pl]||0)+1;
+  });
+
+  const years = Object.keys(yearMap).map(Number).sort((a,b)=>a-b);
+  const allTypes = [...new Set(data.map(r=>(r.Phan_loai_thiet_bi||'Khác').trim()))].sort((a,b)=>a.localeCompare(b,'vi'));
+  const COLORS = ['#00c8ff','#00e676','#ffd740','#ff9100','#b388ff','#18ffff','#ff4081','#00bcd4','#8bc34a','#ff5252'];
+
+  return `
+  <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:14px">
+    <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:12px">BIỂU ĐỒ KHỐI LƯỢNG THEO NĂM</div>
+    ${_bcBarChart(years.map(y=>({label:String(y), v:yearMap[y]})), 'Theo năm', d=>{
+      const y = parseInt(d.label);
+      return y === nowY ? '#00e676' : y === nowY-1 ? '#00c8ff' : y < nowY-2 ? '#607d8b' : '#ffd740';
+    })}
+  </div>
+
+  <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px">
+    <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:10px">CHI TIẾT THEO NĂM × LOẠI THIẾT BỊ</div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:10px">
+        <thead><tr style="background:rgba(255,255,255,.03)">
+          <th style="padding:6px 10px;font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:left;position:sticky;top:0;min-width:70px">Năm</th>
+          ${allTypes.slice(0,15).map((t,i)=>`<th style="padding:6px 10px;font-size:9px;font-weight:700;color:${COLORS[i%COLORS.length]};text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:right;position:sticky;top:0;white-space:nowrap">${t}</th>`).join('')}
+          <th style="padding:6px 10px;font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:right;position:sticky;top:0">Tổng</th>
+        </tr></thead>
+        <tbody>${years.slice().reverse().map(y=>{
+          const tMap = yearTypeMap[y]||{};
+          return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);${y===nowY?'background:rgba(0,230,118,.04)':''}">
+            <td style="padding:5px 10px;font-weight:700;font-family:var(--font-mono);color:${y===nowY?'#00e676':y===nowY-1?'var(--accent)':'var(--text-primary)'}">${y}</td>
+            ${allTypes.slice(0,15).map((t,i)=>`<td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);color:${tMap[t]?COLORS[i%COLORS.length]:'rgba(255,255,255,.15)'}">${tMap[t]||'—'}</td>`).join('')}
+            <td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);font-weight:700;color:var(--accent)">${yearMap[y]}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// ── BÁO CÁO: THIẾT BỊ QUÁ HẠN ───────────────────────────────
+function _bcRenderOverdue(conf) {
+  const data = _tnRawData.length ? _tnRawData : _tnAllData;
+  const overdueRows = data.filter(r => {
+    if (_bcIsCSV(r)) return false;
+    return _tnAlertStatus(r).level === 'overdue';
+  });
+
+  const fmt = n => Number(n).toLocaleString('vi-VN');
+  const colDefs = [
+    { k:'Tram', l:'Trạm', w:'90px' },
+    { k:'Cap_dien_ap', l:'Cấp ĐA', w:'65px', render: r => _bcCapBadge(r.Cap_dien_ap) },
+    { k:'Phan_loai_thiet_bi', l:'Loại TB', w:'90px' },
+    { k:'Ten_thiet_bi', l:'Tên thiết bị', w:'130px' },
+    { k:'Loai_ngan_lo', l:'Ngăn', w:'120px' },
+    { k:'So_luong', l:'SL', w:'44px', num:1 },
+    { k:'Han_thi_nghiem', l:'Hạn TN', w:'60px', render: r => r.Han_thi_nghiem ? `${r.Han_thi_nghiem} năm` : '—' },
+    { k:'Thoi_gian_thi_nghiem_tiep_theo', l:'Ngày đến hạn', w:'100px',
+      render: r => {
+        const s = _tnAlertStatus(r);
+        return `<span style="color:#ff5252;font-weight:700;font-family:var(--font-mono);font-size:10px">${_bcFmtD(r.Thoi_gian_thi_nghiem_tiep_theo)}</span><span style="color:#ff5252;font-size:9px;margin-left:4px">(${Math.abs(s.diffDays||0)} ngày)</span>`;
+      }
+    },
+    { k:'Ngay_thi_nghiem', l:'Ngày TN thực tế', w:'100px', render: r => `<span style="font-family:var(--font-mono);font-size:10px">${_bcFmtD(r.Ngay_thi_nghiem)}</span>` },
+    { k:'Thoi_gian_thi_nghiem_truoc', l:'TN trước đó', w:'95px', render: r => `<span style="font-family:var(--font-mono);font-size:10px">${_bcFmtD(r.Thoi_gian_thi_nghiem_truoc)}</span>` },
+    { k:'Ghi_chu', l:'Ghi chú', w:'130px' },
+  ];
+
+  return `
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px">
+    <div style="background:rgba(255,82,82,.1);border:1px solid rgba(255,82,82,.3);border-radius:8px;padding:10px 14px">
+      <div style="font-size:9px;color:#ff5252;margin-bottom:4px"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>Tổng thiết bị quá hạn (trừ CSV)</div>
+      <div style="font-size:24px;font-weight:800;font-family:var(--font-mono);color:#ff5252">${fmt(overdueRows.length)}</div>
+    </div>
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px 14px">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-microchip" style="margin-right:4px"></i>Số loại thiết bị quá hạn</div>
+      <div style="font-size:24px;font-weight:800;font-family:var(--font-mono);color:var(--accent)">${new Set(overdueRows.map(r=>(r.Phan_loai_thiet_bi||'').trim())).size}</div>
+    </div>
+  </div>
+  ${_bcGroupedTable(overdueRows, colDefs)}`;
+}
+
+// ── BÁO CÁO: THIẾT BỊ ĐẶT SỚM ───────────────────────────────
+function _bcRenderEarlyPlan(conf) {
+  const data = _tnRawData.length ? _tnRawData : _tnAllData;
+  const earlyRows = data.filter(r => {
+    if (_bcIsCSV(r)) return false;
+    const s = _tnAlertStatus(r);
+    return s.level === 'early';
+  });
+
+  const fmt = n => Number(n).toLocaleString('vi-VN');
+  const colDefs = [
+    { k:'Tram', l:'Trạm', w:'90px' },
+    { k:'Cap_dien_ap', l:'Cấp ĐA', w:'65px', render: r => _bcCapBadge(r.Cap_dien_ap) },
+    { k:'Phan_loai_thiet_bi', l:'Loại TB', w:'90px' },
+    { k:'Ten_thiet_bi', l:'Tên thiết bị', w:'130px' },
+    { k:'Loai_ngan_lo', l:'Ngăn', w:'120px' },
+    { k:'So_luong', l:'SL', w:'44px', num:1 },
+    { k:'Han_thi_nghiem', l:'Hạn TN', w:'60px', render: r => r.Han_thi_nghiem ? `${r.Han_thi_nghiem} năm` : '—' },
+    { k:'Thoi_gian_thi_nghiem_truoc', l:'TN gần nhất', w:'100px',
+      render: r => `<span style="font-family:var(--font-mono);font-size:10px;color:var(--accent)">${_bcFmtD(r.Thoi_gian_thi_nghiem_truoc)}</span>`
+    },
+    { k:'Thoi_gian_thi_nghiem_tiep_theo', l:'TN tiếp theo', w:'100px',
+      render: r => {
+        const s = _tnAlertStatus(r);
+        const truoc = r.Thoi_gian_thi_nghiem_truoc ? new Date(r.Thoi_gian_thi_nghiem_truoc) : null;
+        const tiep  = r.Thoi_gian_thi_nghiem_tiep_theo ? new Date(r.Thoi_gian_thi_nghiem_tiep_theo) : null;
+        const han   = (Number(r.Han_thi_nghiem)||0)*365;
+        const interval = truoc && tiep ? Math.round((tiep-truoc)/86400000) : null;
+        const ratioStr = interval && han ? `${(interval/365).toFixed(1)}n / ${r.Han_thi_nghiem}n` : '';
+        return `<span style="font-family:var(--font-mono);font-size:10px">${_bcFmtD(r.Thoi_gian_thi_nghiem_tiep_theo)}</span>
+          ${ratioStr?`<span style="font-size:8px;color:#00c8ff;margin-left:4px">↑${ratioStr}</span>`:''}`;
+      }
+    },
+    { k:'Ngay_thi_nghiem', l:'Ngày TN thực tế', w:'100px', render: r => `<span style="font-family:var(--font-mono);font-size:10px">${_bcFmtD(r.Ngay_thi_nghiem)}</span>` },
+    { k:'Nam_ke_hoach', l:'Năm KH', w:'60px', num:1 },
+    { k:'Ghi_chu', l:'Ghi chú', w:'130px' },
+  ];
+
+  return `
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px">
+    <div style="background:rgba(0,200,255,.08);border:1px solid rgba(0,200,255,.25);border-radius:8px;padding:10px 14px">
+      <div style="font-size:9px;color:#00c8ff;margin-bottom:4px"><i class="fas fa-forward" style="margin-right:4px"></i>Tổng thiết bị đặt sớm</div>
+      <div style="font-size:24px;font-weight:800;font-family:var(--font-mono);color:#00c8ff">${fmt(earlyRows.length)}</div>
+    </div>
+    <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px 14px">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-info-circle" style="margin-right:4px"></i>Khoảng cách TN ngắn hơn hạn >15%</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Tính theo (TN tiếp theo − TN trước) < Hạn × 85%</div>
+    </div>
+  </div>
+  ${_bcGroupedTable(earlyRows, colDefs)}`;
+}
+
+
+// ── BC STAT CARD CLICK ────────────────────────────────────────
+function _bcStatClick(key, data) {
+  const fmt = n => Number(n).toLocaleString('vi-VN');
+  const fmtD = v => { if(!v) return '—'; const d=new Date(v); return isNaN(d)?v:d.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'}); };
+  let title='', totalLine='', bodyHtml='', col='var(--accent)';
+
+  if (key === 'total') {
+    col='#00c8ff'; title='📋 Tổng bản ghi thí nghiệm';
+    const byType={};
+    data.forEach(r=>{const pl=(r.Phan_loai_thiet_bi||'Khác').trim(); byType[pl]=(byType[pl]||0)+1;});
+    const sorted=Object.entries(byType).sort((a,b)=>b[1]-a[1]);
+    totalLine=`${fmt(data.length)} bản ghi · ${sorted.length} loại`;
+    bodyHtml=sorted.map(([pl,cnt])=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 16px;border-bottom:1px solid rgba(255,255,255,.05)">
+        <span style="font-size:10px;color:var(--text-secondary)">${pl}</span>
+        <span style="font-size:9px;font-weight:700;color:#00c8ff;background:rgba(0,200,255,.1);padding:2px 8px;border-radius:10px">${fmt(cnt)}</span>
+      </div>`).join('');
+  } else if (key === 'done') {
+    col='#00e676'; title='✅ Đã thí nghiệm (có ngày TN)';
+    const done=data.filter(r=>r.Ngay_thi_nghiem).sort((a,b)=>new Date(b.Ngay_thi_nghiem)-new Date(a.Ngay_thi_nghiem));
+    totalLine=`${fmt(done.length)} bản ghi có ngày TN`;
+    const capCol={'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
+    const capLbl={'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+    bodyHtml=done.slice(0,150).map(r=>{
+      const cap=String(r.Cap_dien_ap??'');
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 16px;border-bottom:1px solid rgba(255,255,255,.05)">
+        <div>
+          <div style="font-size:10px;color:var(--text-secondary)">${r.Ten_thiet_bi||r.Phan_loai_thiet_bi||'—'}</div>
+          <div style="font-size:9px;color:var(--text-muted)">${r.Tram||'—'}${cap&&cap!=='null'?' · <span style=\'color:'+capCol[cap]+'\'>'+capLbl[cap]+'</span>':''}</div>
+        </div>
+        <span style="font-size:9px;color:#00e676;font-family:var(--font-mono)">${fmtD(r.Ngay_thi_nghiem)}</span>
+      </div>`;
+    }).join('')+(done.length>150?`<div style="padding:8px 16px;text-align:center;font-size:9px;color:var(--text-muted)">...và ${done.length-150} bản ghi khác</div>`:'');
+  } else if (key === 'months') {
+    col='#ffd740'; title='📅 Các tháng có thí nghiệm';
+    const monthMap={};
+    data.forEach(r=>{
+      const ds=r.Ngay_thi_nghiem||r.Thoi_gian_thi_nghiem_tiep_theo; if(!ds) return;
+      const d=new Date(ds); if(isNaN(d)) return;
+      const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      const lbl=`Tháng ${d.getMonth()+1}/${d.getFullYear()}`;
+      if(!monthMap[k]) monthMap[k]={label:lbl,count:0};
+      monthMap[k].count++;
+    });
+    const sorted=Object.keys(monthMap).sort().reverse().map(k=>({...monthMap[k],key:k}));
+    const maxC=Math.max(...sorted.map(m=>m.count),1);
+    totalLine=`${sorted.length} tháng · ${fmt(data.length)} bản ghi`;
+    bodyHtml=sorted.map(m=>`
+      <div style="padding:7px 16px;border-bottom:1px solid rgba(255,255,255,.05)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:10px;color:var(--text-secondary)">${m.label}</span>
+          <span style="font-size:9px;font-weight:700;color:#ffd740">${fmt(m.count)}</span>
+        </div>
+        <div style="height:2px;border-radius:1px;background:rgba(255,255,255,.08)">
+          <div style="height:100%;width:${Math.round(m.count/maxC*100)}%;background:#ffd740;border-radius:1px"></div>
+        </div>
+      </div>`).join('');
+  }
+
+  let p=document.getElementById('hm-detail-panel');
+  if(!p){p=document.createElement('div');p.id='hm-detail-panel';p.className='hm-detail-panel';document.body.appendChild(p);}
+  p.innerHTML=`
+    <div class="hm-resize-grip"></div>
+    <div class="hm-detail-hd" style="border-left:3px solid ${col}">
+      <span style="color:${col}">${title}</span>
+      <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span>
+    </div>
+    <div style="padding:8px 16px;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">${totalLine}</div>
+    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">${bodyHtml||'<div style=\"padding:24px;text-align:center;color:var(--text-muted)\">Không có dữ liệu</div>'}</div>`;
+  p.classList.add('open');
+  _hmOpenPanel(p);
+}
+// ── MAIN RENDER BÁOCÁO ────────────────────────────────────────
+function bcRenderPage(conf, title) {
+  window._bcLastConf = conf; // store for filter reset
+  const overlay = document.getElementById('tbPageOverlay');
+  if (!overlay) return;
+
+  overlay.innerHTML = `
+    <div style="padding:0 0 32px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+        <div style="width:34px;height:34px;border-radius:8px;background:${conf.color}22;color:${conf.color};display:flex;align-items:center;justify-content:center">
+          <i class="fas ${conf.icon}" style="font-size:15px"></i>
+        </div>
+        <div>
+          <div style="font-size:16px;font-weight:800;color:var(--text-primary)">${title}</div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Nguồn: <span style="color:var(--accent);font-family:var(--font-mono)">CongTacThiNghiem</span> · ${new Date().toLocaleDateString('vi-VN')}</div>
+        </div>
+        <button onclick="navActivate(document.querySelector('.nav-item'))" style="margin-left:auto;padding:6px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:var(--text-primary);font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px">
+          <i class="fas fa-arrow-left"></i> Dashboard
+        </button>
+      </div>
+      <div id="_bcContent"><div style="padding:40px;text-align:center;color:var(--text-muted)"><i class="fas fa-spinner fa-spin" style="color:var(--accent);margin-right:8px"></i>Đang xử lý dữ liệu...</div></div>
+    </div>`;
+
+  // Load data if not already loaded
+  const doRender = () => {
+    const el = document.getElementById('_bcContent');
+    if (!el) return;
+    let html = '';
+    if (conf.rpt === 'by_month')   html = _bcRenderByMonth(conf);
+    else if (conf.rpt === 'by_year') html = _bcRenderByYear(conf);
+    else if (conf.rpt === 'overdue') html = _bcRenderOverdue(conf);
+    else if (conf.rpt === 'early_plan') html = _bcRenderEarlyPlan(conf);
+    el.innerHTML = html || '<div style="padding:30px;text-align:center;color:var(--text-muted)">Không có dữ liệu</div>';
+  };
+
+  if (_tnRawData.length || _tnAllData.length) {
+    doRender();
+  } else {
+    _tnFetchData().then(rows => {
+      _tnRawData = rows;
+      _tnAllData = rows;
+      doRender();
+    });
+  }
+}
+
+// ── TNDX — same as TNĐK but filters by dot xuat ──────────────
+// tnRenderPage already handles mode:'dotxuat' — no changes needed
+
+/* =======================================
+   AUTH SYSTEM
+======================================= */
+
+// AUTH -- Supabase Auth (signInWithPassword)
+// Cach su dung:
+// 1. Supabase Dashboard > Authentication > Users > Add user (nhap email + password)
+// 2. Chay SQL: insert into evn_user_profiles(id,email,name,role) select id,email,'Ten','\'user\'' from auth.users where email='...';
+// 3. Hoac dung nut Them tai khoan trong Bang Admin
+const _AUTH_SB_URL='https://xqqmfmljwycpehfyknoy.supabase.co';
+const _AUTH_SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxcW1mbWxqd3ljcGVoZnlrbm95Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODM4MDQsImV4cCI6MjA4Nzg1OTgwNH0.J_z0cFqq_Yet-n2X2L_VREdkcAqbkRFpYUp-ti3Fukc';
+const _AUTH_LOG_KEY='evn_audit_log_v1';
+let _authSb=null;
+function _getAuthSb(){if(!_authSb&&window.supabase&&window.supabase.createClient)_authSb=window.supabase.createClient(_AUTH_SB_URL,_AUTH_SB_KEY);return _authSb;}
+function _authCurrentUser(){try{return JSON.parse(sessionStorage.getItem('evn_sess_v3'));}catch{return null;}}
+function _authSaveSession(u){sessionStorage.setItem('evn_sess_v3',JSON.stringify(u));}
+function _authClearSession(){sessionStorage.removeItem('evn_sess_v3');}
+function _authGetLog(){try{return JSON.parse(localStorage.getItem(_AUTH_LOG_KEY)||'[]');}catch{return[];}}
+function _authAddLog(a,d,u){const l=_authGetLog();l.unshift({ts:new Date().toISOString(),user:u||'?',action:a,detail:d});if(l.length>500)l.length=500;try{localStorage.setItem(_AUTH_LOG_KEY,JSON.stringify(l));}catch{}}
+
+async function _authLogin(){
+  const em=(document.getElementById('authUser').value||'').trim();
+  const pw=document.getElementById('authPass').value||'';
+  const errEl=document.getElementById('authErr');
+  const btn=document.querySelector('.auth-btn');
+  errEl.textContent='';
+  if(!em||!pw){errEl.textContent='Vui long nhap day du thong tin';return;}
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Dang dang nhap...';}
+  try{
+    const sb=_getAuthSb();
+    if(!sb)throw new Error('Khong ket noi duoc Supabase');
+    const{data,error}=await sb.auth.signInWithPassword({email:em,password:pw});
+    if(error){
+      const msg=error.message||'';
+      if(msg.includes('Invalid login')||msg.includes('invalid_credentials'))errEl.textContent='Email hoac mat khau khong dung';
+      else if(msg.includes('Email not confirmed'))errEl.textContent='Email chua xac nhan. Kiem tra hop thu.';
+      else errEl.textContent='Loi: '+msg;
+      return;
+    }
+    const u=data.user,meta=u.user_metadata||{};
+    const role=meta.role||'user';
+    const name=meta.name||meta.full_name||u.email.split('@')[0];
+    const sess={id:u.id,email:u.email,username:u.email,name,role,loginAt:new Date().toISOString()};
+    _authSaveSession(sess);
+    _authAddLog('LOGIN','Dang nhap thanh cong',sess.email);
+    document.getElementById('authOverlay').style.display='none';
+    _authInitUserMenu();
+    _authApplyRoleUI(role);
+    showChangeNotif('success','Dang nhap thanh cong','Xin chao '+name+'!');
+  }catch(err){
+    errEl.textContent='Loi ket noi: '+err.message;
+  }finally{
+    if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-sign-in-alt" style="margin-right:6px"></i>Dang nhap';}
+  }
+}
+
+document.addEventListener('DOMContentLoaded',async()=>{
+  ['authUser','authPass'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('keydown',e=>{if(e.key==='Enter')_authLogin();});});
+  try{
+    const sb=_getAuthSb();
+    const{data}=await sb.auth.getSession();
+    if(data&&data.session&&data.session.user){
+      const u=data.session.user,meta=u.user_metadata||{};
+      const role=meta.role||'user';
+      const name=meta.name||meta.full_name||u.email.split('@')[0];
+      const sess={id:u.id,email:u.email,username:u.email,name,role};
+      _authSaveSession(sess);
+      document.getElementById('authOverlay').style.display='none';
+      _authInitUserMenu();
+      _authApplyRoleUI(role);
+      return;
+    }
+  }catch{}
+  const sess=_authCurrentUser();
+  if(sess){document.getElementById('authOverlay').style.display='none';_authInitUserMenu();_authApplyRoleUI(sess.role);}
+});
+
+async function _authLogout(){
+  const sess=_authCurrentUser();
+  if(sess)_authAddLog('LOGOUT','Da dang xuat',sess.email||sess.username);
+  try{const sb=_getAuthSb();if(sb)await sb.auth.signOut();}catch{}
+  _authClearSession();
+  document.body.classList.remove('user-mode');
+  const ca=document.getElementById('canvasArea');
+  if(ca){ca.style.gridColumn='';ca.style.padding='';}
+  document.getElementById('authOverlay').style.display='flex';
+  document.getElementById('authUser').value='';
+  document.getElementById('authPass').value='';
+  const drop=document.getElementById('userMenuDropdown');
+  if(drop)drop.classList.remove('open');
+  const wrap=document.getElementById('_userMenuWrap');
+  if(wrap)wrap.remove();
+}
+
+function _authInitUserMenu(){
+  const sess=_authCurrentUser();if(!sess)return;
+  const tb=document.querySelector('.topbar-actions');if(!tb)return;
+  const old=document.getElementById('_userMenuWrap');if(old)old.remove();
+  const wrap=document.createElement('div');wrap.id='_userMenuWrap';wrap.style.cssText='position:relative;';
+  const adminBtn=sess.role==='admin'?'<div class="um-item" onclick="_openAdminPanel()"><i class="fas fa-shield-alt"></i> Bang Admin</div>':'';
+  wrap.innerHTML=`<button id="userMenuBtn" onclick="_toggleUserMenu()">
+    <i class="fas fa-user-circle"></i>
+    <span style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sess.name}</span>
+    <span class="auth-role-badge ${sess.role==='admin'?'auth-role-admin':'auth-role-user'}">${sess.role==='admin'?'ADMIN':'USER'}</span>
+    <i class="fas fa-chevron-down" style="font-size:8px;opacity:.6"></i>
+  </button>
+  <div id="userMenuDropdown">
+    <div class="um-header"><div class="um-name">${sess.name}</div><div class="um-email">${sess.email}</div></div>
+    <div class="um-item" onclick="_openChangePassword()"><i class="fas fa-key"></i> Doi mat khau</div>
+    ${adminBtn}
+    <div class="um-sep"></div>
+    <div class="um-item danger" onclick="_authLogout()"><i class="fas fa-sign-out-alt"></i> Dang xuat</div>
+  </div>`;
+  tb.insertBefore(wrap,tb.firstChild);
+  document.addEventListener('click',e=>{const d=document.getElementById('userMenuDropdown');if(d&&d.classList.contains('open')&&!wrap.contains(e.target))d.classList.remove('open');});
+}
+function _toggleUserMenu(){const d=document.getElementById('userMenuDropdown');if(d)d.classList.toggle('open');}
+
+function _openChangePassword(){
+  const drop=document.getElementById('userMenuDropdown');if(drop)drop.classList.remove('open');
+  const ex=document.getElementById('_changePwModal');if(ex)ex.remove();
+  const modal=document.createElement('div');modal.id='_changePwModal';
+  modal.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center';
+  modal.innerHTML=`<div style="background:var(--bg-surface);border:1px solid var(--border-accent);border-radius:14px;padding:28px 32px;width:360px;box-shadow:0 8px 48px rgba(0,0,0,.7)">
+    <div style="font-size:14px;font-weight:800;color:var(--text-primary);margin-bottom:20px"><i class="fas fa-key" style="color:var(--accent);margin-right:8px"></i>Doi mat khau</div>
+    <div style="margin-bottom:12px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Mat khau moi</label><input id="_cpNew" type="password" class="auth-input" placeholder="Toi thieu 6 ky tu"></div>
+    <div style="margin-bottom:16px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Xac nhan mat khau moi</label><input id="_cpCfm" type="password" class="auth-input" placeholder="Nhap lai"></div>
+    <div id="_cpErr" style="font-size:11px;color:var(--red);min-height:14px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px">
+      <button class="auth-btn" style="flex:1" id="_cpBtn" onclick="_doChangePassword()">Xac nhan</button>
+      <button onclick="document.getElementById('_changePwModal').remove()" style="flex:0.5;padding:10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:13px;cursor:pointer">Huy</button>
+    </div></div>`;
+  document.body.appendChild(modal);
+}
+async function _doChangePassword(){
+  const nw=document.getElementById('_cpNew').value,cf=document.getElementById('_cpCfm').value;
+  const er=document.getElementById('_cpErr'),btn=document.getElementById('_cpBtn');
+  er.textContent='';
+  if(nw.length<6){er.textContent='Mat khau it nhat 6 ky tu';return;}
+  if(nw!==cf){er.textContent='Xac nhan khong khop';return;}
+  if(btn){btn.disabled=true;btn.textContent='Dang cap nhat...';}
+  try{
+    const sb=_getAuthSb();
+    const{error}=await sb.auth.updateUser({password:nw});
+    if(error){er.textContent='Loi: '+error.message;return;}
+    _authAddLog('CHANGE_PASSWORD','Doi mat khau thanh cong',(_authCurrentUser()||{}).email||'');
+    document.getElementById('_changePwModal').remove();
+    showChangeNotif('success','Doi mat khau thanh cong','');
+  }catch(err){er.textContent='Loi: '+err.message;}
+  finally{if(btn){btn.disabled=false;btn.textContent='Xac nhan';}}
+}
+
+function _authApplyRoleUI(role){
+  if(role==='user'){document.body.classList.add('user-mode');}
+  else{document.body.classList.remove('user-mode');const ca=document.getElementById('canvasArea');if(ca){ca.style.gridColumn='';ca.style.padding='';}}
+}
+
+function _openAdminPanel(){
+  const drop=document.getElementById('userMenuDropdown');if(drop)drop.classList.remove('open');
+  const sess=_authCurrentUser();
+  if(!sess||sess.role!=='admin'){showChangeNotif('error','Khong co quyen','Chi Admin moi truy cap.');return;}
+  document.getElementById('adminPanel').classList.add('open');
+  _adminTab('users',document.querySelector('.admin-tab'));
+}
+
+async function _adminTab(tab,el){
+  document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));
+  if(el)el.classList.add('active');
+  const body=document.getElementById('adminBody');if(!body)return;
+  const sb=_getAuthSb();
+  if(tab==='users'){
+    body.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i> Dang tai...</div>';
+    const{data:profiles,error}=await sb.from('evn_user_profiles').select('*').order('created_at',{ascending:false});
+    if(error){
+      body.innerHTML=`<div style="padding:14px;background:rgba(255,82,82,.08);border:1px solid rgba(255,82,82,.2);border-radius:8px;color:#ff5252;font-size:11px;line-height:1.8">
+        Loi: ${error.message}<br><b>Chay SQL trong Supabase de tao bang:</b>
+        <pre style="margin-top:8px;font-size:9px;color:var(--text-primary);background:rgba(0,0,0,.3);padding:10px;border-radius:6px">create table public.evn_user_profiles (
+  id uuid primary key references auth.users(id),
+  email text, name text, role text default 'user',
+  active boolean default true,
+  created_at timestamptz default now()
+);
+alter table evn_user_profiles enable row level security;
+create policy allow_all on evn_user_profiles for all using (true);</pre></div>`;
+      return;
+    }
+    const capColor=r=>r==='admin'?'rgba(255,215,64,.15)':'rgba(0,200,255,.1)';
+    const iconCls=r=>r==='admin'?'fa-user-shield':'fa-user';
+    const iconCol=r=>r==='admin'?'#ffd740':'var(--accent)';
+    const badgeCls=r=>r==='admin'?'auth-role-admin':'auth-role-user';
+    body.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <span style="font-size:12px;font-weight:700;color:var(--text-primary)">${(profiles||[]).length} tai khoan</span>
+        <button onclick="_adminAddUser()" style="padding:6px 14px;border-radius:7px;border:1px solid rgba(0,200,255,.4);background:rgba(0,200,255,.08);color:var(--accent);font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+          <i class="fas fa-user-plus"></i> Them tai khoan
+        </button></div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        ${(profiles||[]).map(u=>`<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:12px">
+          <div style="width:34px;height:34px;border-radius:50%;background:${capColor(u.role)};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <i class="fas ${iconCls(u.role)}" style="color:${iconCol(u.role)}"></i></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:700;color:var(--text-primary)">${u.name||'—'}</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${u.email||'—'} - <span class="auth-role-badge ${badgeCls(u.role)}">${u.role==='admin'?'ADMIN':'USER'}</span>${!u.active?'<span style="color:#ff5252;font-size:9px;margin-left:6px">VO HIEU</span>':''}</div>
+          </div>
+          <button onclick="_adminToggleUser('${u.id}',${!u.active})" style="padding:4px 10px;border-radius:6px;border:1px solid ${u.active?'rgba(255,82,82,.3)':'rgba(0,230,118,.3)'};background:${u.active?'rgba(255,82,82,.07)':'rgba(0,230,118,.07)'};color:${u.active?'#ff5252':'#00e676'};font-size:10px;cursor:pointer">
+            <i class="fas ${u.active?'fa-ban':'fa-check'}"></i> ${u.active?'Vo hieu':'Kich hoat'}</button>
+        </div>`).join('')}
+      </div>`;
+  }
+  else if(tab==='log'){
+    const log=_authGetLog();
+    const fmtTs=ts=>{try{return new Date(ts).toLocaleString('vi-VN');}catch{return ts;}};
+    const icMap={LOGIN:'fa-sign-in-alt',LOGOUT:'fa-sign-out-alt',CHANGE_PASSWORD:'fa-key',CREATE_USER:'fa-user-plus',TOGGLE_USER:'fa-user-slash'};
+    const colMap={LOGIN:'#00e676',LOGOUT:'#ffd740',CHANGE_PASSWORD:'#00c8ff',CREATE_USER:'#b388ff',TOGGLE_USER:'#ff9100'};
+    body.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <span style="font-size:12px;font-weight:700;color:var(--text-primary)">${log.length} su kien</span>
+        <button onclick="localStorage.removeItem('${_AUTH_LOG_KEY}');_adminTab('log',document.querySelectorAll('.admin-tab')[1])" style="padding:4px 10px;border-radius:6px;border:1px solid rgba(255,82,82,.3);background:rgba(255,82,82,.08);color:#ff5252;font-size:10px;cursor:pointer">Xoa log</button>
+      </div>
+      ${log.length===0?'<div style="text-align:center;padding:30px;color:var(--text-muted)">Chua co nhat ky</div>':
+        '<div style="display:flex;flex-direction:column;gap:4px">'+log.slice(0,100).map(e=>`<div style="display:grid;grid-template-columns:130px 110px 1fr;gap:8px;align-items:center;padding:7px 12px;background:var(--bg-elevated);border-radius:6px;border:1px solid var(--border)">
+          <div style="font-size:9px;color:var(--text-muted);font-family:var(--font-mono)">${fmtTs(e.ts)}</div>
+          <div style="display:flex;align-items:center;gap:4px"><i class="fas ${icMap[e.action]||'fa-circle'}" style="font-size:9px;color:${colMap[e.action]||'var(--accent)'}"></i>
+            <span style="font-size:9px;color:${colMap[e.action]||'var(--accent)'};font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px">${e.user}</span></div>
+          <div style="font-size:10px;color:var(--text-secondary)">${e.detail||e.action}</div>
+        </div>`).join('')+'</div>'}
+    `;
+  }
+  else if(tab==='access'){
+    body.innerHTML=`<div style="margin-bottom:12px;padding:12px 14px;background:rgba(0,200,255,.05);border:1px solid rgba(0,200,255,.15);border-radius:8px;font-size:11px;color:var(--text-secondary);line-height:1.9">
+      <b style="color:var(--accent);font-size:12px">Cach tao tai khoan moi:</b><br>
+      <b>B1:</b> Supabase Dashboard &gt; Authentication &gt; Users &gt; Add user (email + password)<br>
+      <b>B2:</b> SQL Editor: <code style="color:var(--accent)">insert into evn_user_profiles(id,email,name,role) select id,email,'Ten','user' from auth.users where email='...';</code><br>
+      <b>Hoac nhanh:</b> Dung nut <b>Them tai khoan</b> tab Nguoi dung (tu dong ca 2 buoc)
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:9px;padding:12px 16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px"><span class="auth-role-badge auth-role-admin">ADMIN</span><span style="font-size:12px;font-weight:700;color:var(--text-primary)">Quan tri vien</span></div>
+        <div style="font-size:10px;color:var(--text-secondary)">Toan quyen: xem Layout Editor, chinh sua, tao tai khoan, xem log</div>
+      </div>
+      <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:9px;padding:12px 16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px"><span class="auth-role-badge auth-role-user">USER</span><span style="font-size:12px;font-weight:700;color:var(--text-primary)">Nguoi dung</span></div>
+        <div style="font-size:10px;color:var(--text-secondary)">Chi xem dashboard du lieu, khong thay editor</div>
+      </div>
+    </div>`;
+  }
+}
+
+async function _adminToggleUser(uid,newActive){
+  const sb=_getAuthSb();
+  const{error}=await sb.from('evn_user_profiles').update({active:newActive}).eq('id',uid);
+  if(error){showChangeNotif('error','Loi',error.message);return;}
+  _authAddLog('TOGGLE_USER','Doi trang thai '+uid);
+  showChangeNotif(newActive?'success':'warning',newActive?'Da kich hoat':'Da vo hieu hoa','');
+  _adminTab('users',document.querySelector('.admin-tab.active'));
+}
+
+function _adminAddUser(){
+  const ex=document.getElementById('_addUserModal');if(ex)ex.remove();
+  const modal=document.createElement('div');modal.id='_addUserModal';
+  modal.style.cssText='position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center';
+  modal.innerHTML=`<div style="background:var(--bg-surface);border:1px solid var(--border-accent);border-radius:14px;padding:28px 32px;width:420px;box-shadow:0 8px 48px rgba(0,0,0,.8)">
+    <div style="font-size:14px;font-weight:800;color:var(--text-primary);margin-bottom:6px"><i class="fas fa-user-plus" style="color:var(--accent);margin-right:8px"></i>Them tai khoan moi</div>
+    <div style="font-size:10px;color:var(--text-muted);margin-bottom:18px">Tao Supabase Auth user + ho so nguoi dung cung luc</div>
+    <div style="margin-bottom:11px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Ho ten *</label><input id="_auName" type="text" class="auth-input" placeholder="Nguyen Van A"></div>
+    <div style="margin-bottom:11px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Email *</label><input id="_auEmail" type="email" class="auth-input" placeholder="nva@evn.vn"></div>
+    <div style="margin-bottom:11px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Mat khau * (toi thieu 6 ky tu)</label><input id="_auPw" type="password" class="auth-input" placeholder="Mat khau dang nhap"></div>
+    <div style="margin-bottom:16px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Vai tro</label>
+      <select id="_auRole" class="auth-input" style="cursor:pointer"><option value="user">USER - Nguoi dung</option><option value="admin">ADMIN - Quan tri vien</option></select></div>
+    <div id="_auErr" style="font-size:11px;color:var(--red);min-height:14px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px">
+      <button id="_auBtn" class="auth-btn" style="flex:1" onclick="_doAddUser()"><i class="fas fa-save" style="margin-right:5px"></i>Tao tai khoan</button>
+      <button onclick="document.getElementById('_addUserModal').remove()" style="flex:0.5;padding:10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:13px;cursor:pointer">Huy</button>
+    </div></div>`;
+  document.body.appendChild(modal);
+}
+
+async function _doAddUser(){
+  const name=(document.getElementById('_auName').value||'').trim();
+  const email=(document.getElementById('_auEmail').value||'').trim();
+  const pw=document.getElementById('_auPw').value;
+  const role=document.getElementById('_auRole').value;
+  const er=document.getElementById('_auErr');
+  const btn=document.getElementById('_auBtn');
+  er.textContent='';
+  if(!name||!email||!pw){er.textContent='Vui long dien day du thong tin';return;}
+  if(pw.length<6){er.textContent='Mat khau it nhat 6 ky tu';return;}
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Dang tao...';}
+  try{
+    const sb=_getAuthSb();
+    const{data:sd,error:se}=await sb.auth.signUp({email,password:pw,options:{data:{name,role}}});
+    if(se){er.textContent=se.message.includes('already registered')?'Email nay da duoc dang ky':'Loi: '+se.message;return;}
+    const newId=sd?.user?.id;
+    if(newId)await sb.from('evn_user_profiles').upsert([{id:newId,email,name,role,active:true}]);
+    _authAddLog('CREATE_USER','Tao tai khoan '+email+' ('+role+')');
+    document.getElementById('_addUserModal').remove();
+    showChangeNotif('success','Tao tai khoan thanh cong',name+' ('+email+') da tao. Kiem tra email xac nhan neu can.');
+    _adminTab('users',document.querySelector('.admin-tab.active'));
+  }catch(err){er.textContent='Loi: '+err.message;}
+  finally{if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-save" style="margin-right:5px"></i>Tao tai khoan';}}
+}
+
+function showChangeNotif(type,title,msg,duration){
+  const area=document.getElementById('changeNotifArea');if(!area)return;
+  const icons={success:'fa-check-circle',warning:'fa-exclamation-triangle',error:'fa-times-circle',info:'fa-info-circle'};
+  const colors={success:'#00e676',warning:'#ffd740',error:'#ff5252',info:'#00c8ff'};
+  const col=colors[type]||colors.info;
+  const notif=document.createElement('div');notif.className='change-notif '+type;
+  notif.innerHTML=`<i class="fas ${icons[type]||'fa-info-circle'} cn-icon" style="color:${col}"></i><div class="cn-content"><div class="cn-title" style="color:${col}">${title}</div>${msg?`<div class="cn-msg">${msg}</div>`:''}<div class="cn-time">${new Date().toLocaleTimeString('vi-VN')}</div></div><span class="cn-close" onclick="this.closest('.change-notif').remove()">x</span>`;
+  area.appendChild(notif);
+  setTimeout(()=>{if(notif.parentNode)notif.remove();},duration||5000);
+}
+document.getElementById('adminPanel').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
