@@ -74,6 +74,89 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+
+/* ═══════════════════════════════════════
+   USER-MODE: ẩn toàn bộ editor UI, chỉ hiển thị dashboard
+═══════════════════════════════════════ */
+body.user-mode {
+  grid-template-rows: 48px 1fr !important;
+  grid-template-columns: 0px 1fr 0px !important;
+  grid-template-areas:
+    "topbar  topbar  topbar"
+    "sidebar canvas  props" !important;
+}
+body.user-mode .sidebar          { display: none !important; }
+body.user-mode .props-panel      { display: none !important; }
+body.user-mode .statusbar        { display: none !important; }
+body.user-mode .topbar           {
+  grid-template-columns: auto 1fr auto !important;
+  padding: 0 18px !important;
+}
+/* Ẩn tất cả nút editor trong topbar - chỉ giữ clock + user menu */
+body.user-mode #btnUndo,
+body.user-mode .btn:not(#_userModeKeep),
+body.user-mode .unsaved-dot,
+body.user-mode .unsaved-label,
+body.user-mode .topbar-sep,
+body.user-mode .topbar-page      { display: none !important; }
+/* Ẩn canvas editor chrome: header, quicknav, ux panel */
+body.user-mode .canvas-header    { display: none !important; }
+body.user-mode .canvas-quick-nav { display: none !important; }
+body.user-mode #uxAuditPanel     { display: none !important; }
+/* Canvas area chiếm toàn bộ không gian */
+body.user-mode .canvas-area {
+  grid-column: 1 / -1 !important;
+  padding: 0 !important;
+  overflow-y: auto !important;
+}
+body.user-mode .canvas-area::before { display: none !important; }
+/* Canvas & overlay full width */
+body.user-mode #canvas,
+body.user-mode #tbPageOverlay {
+  padding: 16px 24px !important;
+}
+/* Section cards: ẩn drag handle, card actions, card-act-btn */
+body.user-mode .card-drag,
+body.user-mode .card-actions,
+body.user-mode .ic-toolbar,
+body.user-mode .ic-tbtn           { display: none !important; }
+/* Section không clickable để chọn */
+body.user-mode .section-card      { cursor: default !important; }
+body.user-mode .section-card:hover { border-color: var(--border) !important; box-shadow: none !important; }
+/* Ẩn add-card button */
+body.user-mode .ic-add-card        { display: none !important; }
+/* Topbar user-mode: chỉ hiển thị logo + title + user menu */
+body.user-mode .brand-sub          { display: none !important; }
+body.user-mode .topbar {
+  background: var(--bg-surface) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+/* User mode topbar brand-sub show dashboard text */
+body.user-mode .brand::after {
+  content: 'EVNHANOI – Dashboard';
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.04em;
+  margin-left: 10px;
+}
+
+/* User-mode: show clean dashboard title in topbar */
+body.user-mode .topbar-page { display: flex !important; font-size: 14px !important; }
+body.user-mode .topbar-page strong { font-size: 14px !important; }
+body.user-mode .brand::after { display: none; }
+/* Remove grid background dots in user mode */
+body.user-mode .canvas-area::before { display: none !important; }
+/* Chip sections in user mode: pointer-events normal for data interaction */
+body.user-mode .device-chip { cursor: pointer !important; }
+body.user-mode .quick-nav-item { cursor: pointer !important; }
+/* Section cards in user mode: no hover border highlight */
+body.user-mode .section-card.is-selected {
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+}
+
+
 /* ═══════════════════════════════════════
    TOPBAR
 ═══════════════════════════════════════ */
@@ -1776,10 +1859,67 @@ body { font-size: var(--fs-base); }
 .hm-export-btn { padding:5px 10px; border-radius:6px; cursor:pointer; font-size:10px; flex-shrink:0; border:1px solid rgba(0,200,255,0.3); background:rgba(0,200,255,0.06); color:var(--accent); }
 .hm-export-btn:hover { background:rgba(0,200,255,0.14); }
 .hm-sub-bar { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-family:var(--font-mono); font-size:9px; color:var(--text-muted); margin-bottom:6px; }
-.hm-detail-panel { position:fixed; right:0; top:0; bottom:0; width:290px; z-index:800; background:var(--bg-surface); border-left:1px solid rgba(255,255,255,0.12); box-shadow:-8px 0 32px rgba(0,0,0,.5); overflow-y:auto; transform:translateX(100%); transition:transform .2s; }
-.hm-detail-panel.open { transform:translateX(0); }
-.hm-detail-hd { padding:14px 16px 10px; font-size:12px; font-weight:700; color:var(--accent); border-bottom:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center; }
-.hm-detail-close { cursor:pointer; color:var(--text-muted); padding:2px 6px; border-radius:4px; }
+.hm-detail-panel {
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: 380px;
+  min-width: 280px;
+  max-width: 70vw;
+  height: 100vh;
+  z-index: 9200;
+  background: var(--bg-surface);
+  border-left: 1px solid rgba(255,255,255,0.15);
+  box-shadow: -10px 0 40px rgba(0,0,0,.65);
+  transform: translateX(100%);
+  transition: transform .22s cubic-bezier(0.4,0,0.2,1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.hm-detail-panel.open { transform: translateX(0); }
+/* Khi panel open, đảm bảo flex layout */
+.hm-detail-panel.open {
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  height: 100vh !important;
+}
+/* Drag resize handle on left edge */
+.hm-detail-panel .hm-resize-grip {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 10;
+  background: transparent;
+  transition: background .15s;
+}
+.hm-detail-panel .hm-resize-grip:hover,
+.hm-detail-panel .hm-resize-grip.dragging {
+  background: rgba(0,200,255,0.35);
+}
+
+.hm-detail-hd { padding:12px 16px 10px; font-size:13px; font-weight:700; color:var(--accent); border-bottom:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center; flex-shrink:0; user-select:none; cursor:move; }
+/* Đảm bảo scroll div bên trong panel luôn hoạt động */
+/* Scroll div bên trong panel - target theo id */
+.hm-detail-panel #hm-detail-body {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+/* Header và toolbar không co lại */
+.hm-detail-panel .hm-detail-hd,
+.hm-detail-panel > div[style*="flex-shrink:0"],
+.hm-detail-panel > div[style*="flex-shrink: 0"],
+.hm-detail-panel .hm-resize-grip {
+  flex-shrink: 0 !important;
+}
+.hm-detail-close { cursor:pointer; color:var(--text-muted); padding:4px 8px; border-radius:4px; font-size:14px; flex-shrink:0; } .hm-detail-close:hover { color:var(--text-primary); background:rgba(255,255,255,.08); }
 .hm-detail-item { padding:5px 0; font-size:10px; border-bottom:1px solid rgba(255,255,255,0.05); color:var(--text-secondary); font-family:var(--font-mono); }
 .chart-ph {
   background: var(--bg-elevated);
@@ -2881,7 +3021,7 @@ body.preview-mode .section-card {
     </div>
   </div>
   <div class="topbar-sep"></div>
-  <span class="topbar-page">Dashboard <strong>Quản Lý Thiết Bị</strong></span>
+  <span class="topbar-page" id="topbarPageTitle">Dashboard <strong>Quản Lý Thiết Bị</strong></span>
   <div id="unsavedDot" class="unsaved-dot" title="Có thay đổi chưa lưu"></div>
   <span class="unsaved-label" id="unsavedLabel">Chưa lưu</span>
   <div class="topbar-actions">
@@ -4789,10 +4929,11 @@ function getPreview(type, props) {
 
       // Cards có giá trị tự động tính từ DB — KHÔNG contenteditable
       const COMPUTED_LABELS = new Set([
-        'Tổng số TBA','TBA 220kV','TBA 110kV',
+        'Tổng số TBA','TBA 220kV','TBA 110kV','Công nghệ thiết bị TBA',
         'Tổng số thiết bị','Tổng công suất','Tổng công suất (MVA)','Tổng số ngăn',
         'Ngăn đường dây','MBA','Ngăn MBA','Ngăn XT','Ngăn xuất tuyến',
-        'Ngăn liên lạc (LL)','Ngăn tụ bù (TBN)','Ngăn tự dùng (TD)','Ngăn kháng'
+        'Ngăn liên lạc (LL)','Ngăn tụ bù (TBN)','Ngăn tự dùng (TD)','Ngăn kháng',
+        'Danh sách thiết bị'
       ]);
       const isComputed = COMPUTED_LABELS.has(c.label);
 
@@ -4831,7 +4972,7 @@ function getPreview(type, props) {
       <div class="ic-card ${isTechChart && useTechStackLayout ? 'ic-card-tech-stack' : ''}" id="icc_${uid}_${ci}"
         style="--card-color:${c.color};border-color:${c.color}22;border-top-color:${c.color};cursor:pointer;${placementStyle}"
         draggable="true"
-        onclick="if(!event.target.closest('.ic-toolbar')&&!event.target.closest('.ic-sz-btn')&&!event.target.isContentEditable){lytStatsCardClick('${c.label}','${c.color}')}"
+        onclick="if(!event.target.closest('.ic-toolbar')&&!event.target.closest('.ic-sz-btn')&&!event.target.closest('[contenteditable=true]')){lytStatsCardClick('${c.label}','${c.color}')}"
         ondragstart="icDragStart(event,'${uid}',${ci})"
         ondragover="icDragOver(event,'${uid}',${ci})"
         ondrop="icDrop(event,'${uid}',${ci})"
@@ -5965,14 +6106,17 @@ function lytCellClick(td) {
   const list = (td.dataset.ngan||'').split('|').filter(Boolean);
   let p = document.getElementById('hm-detail-panel');
   if (!p) { p = document.createElement('div'); p.id='hm-detail-panel'; p.className='hm-detail-panel'; document.body.appendChild(p); }
-  p.innerHTML = `<div class="hm-detail-hd"><span>📍 ${tram} · ${lbl}</span>
-    <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open')">✕</span></div>
-    <div style="padding:10px 16px">
-      <div style="font-size:9px;color:var(--text-muted);margin-bottom:8px;font-family:var(--font-mono)">
+  p.innerHTML = `<div class="hm-resize-grip"></div><div class="hm-detail-hd"><span>📍 ${tram} · ${lbl}</span>
+    <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span></div>
+    <div style="padding:8px 16px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.07)">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px;font-family:var(--font-mono)">
         ${list.length} ngăn · TB: <b style="color:var(--text-primary)">${ttb.toLocaleString('vi-VN')}</b></div>
-      ${list.map((n,i)=>`<div class="hm-detail-item">${i+1}. ${n}</div>`).join('')}
+    </div>
+    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;padding:8px 0;overscroll-behavior:contain">
+      ${list.map((n,i)=>`<div class="hm-detail-item" style="padding:5px 16px">${i+1}. ${n}</div>`).join('')}
     </div>`;
   p.classList.add('open');
+  _hmOpenPanel(p);
 }
 
 // ══════════════════════════════════════════════════════
@@ -6965,7 +7109,8 @@ function _lytShowDetailPanel(title, color, totalLine, items, mbaSection) {
   }).join('');
 
   p.innerHTML = `
-    <div class="hm-detail-hd" style="border-left:3px solid ${color||'var(--accent)'}">
+    <div class="hm-resize-grip" id="hm-resize-grip"></div>
+    <div class="hm-detail-hd" style="border-left:3px solid ${color||'var(--accent)'}" id="hm-detail-hd-drag">
       <span style="color:${color||'var(--accent)'}">${title}</span>
       <span class="hm-detail-close"
         onclick="this.closest('.hm-detail-panel').classList.remove('open');let b=document.getElementById('hm-detail-backdrop');if(b)b.style.display='none'">✕</span>
@@ -6976,20 +7121,181 @@ function _lytShowDetailPanel(title, color, totalLine, items, mbaSection) {
         style="width:100%;box-sizing:border-box;padding:5px 9px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text-primary);font-size:10px;outline:none"
         oninput="_lytDetailSearchFn(this.value)"/>
     </div>
-    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;overscroll-behavior:contain">${bodyHtml}</div>`;
-
+    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;overscroll-behavior:contain;-webkit-overflow-scrolling:touch">${bodyHtml}</div>`;
   p.classList.add('open');
+  _hmOpenPanel(p);
   let bd = document.getElementById('hm-detail-backdrop');
   if (!bd) {
     bd = document.createElement('div');
     bd.id = 'hm-detail-backdrop';
-    bd.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.4);display:none';
+    bd.style.cssText = 'position:fixed;inset:0;z-index:9190;background:rgba(0,0,0,.35);display:none;backdrop-filter:blur(1px)';
     bd.onclick = () => { p.classList.remove('open'); bd.style.display='none'; };
     document.body.appendChild(bd);
   }
   bd.style.display = 'block';
   setTimeout(()=>{ const s=document.getElementById('hm-detail-search'); if(s)s.focus(); }, 80);
 }
+
+
+// ═══════════════════════════════════════════════════════════════
+//  DETAIL PANEL – EVENT DELEGATION (không dùng _dragInited flag)
+//  Bind một lần vào document khi trang load. Hoạt động đúng
+//  ngay cả khi innerHTML bị ghi đè nhiều lần.
+// ═══════════════════════════════════════════════════════════════
+(function _initPanelSystem() {
+  let _resizing = false, _resizeStartX = 0, _resizeStartW = 0;
+  let _dragging  = false, _dragStartY  = 0, _dragStartTop = 0;
+
+  // ── RESIZE (kéo cạnh trái) ──
+  document.addEventListener('mousedown', e => {
+    const grip = e.target.closest('.hm-resize-grip');
+    if (!grip) return;
+    const panel = grip.closest('.hm-detail-panel');
+    if (!panel) return;
+    e.preventDefault();
+    _resizing = true;
+    _resizeStartX = e.clientX;
+    _resizeStartW = panel.offsetWidth;
+    grip.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (_resizing) {
+      const panel = document.querySelector('.hm-detail-panel.open');
+      if (!panel) { _resizing = false; return; }
+      const newW = Math.max(280, Math.min(window.innerWidth * 0.75, _resizeStartW + (_resizeStartX - e.clientX)));
+      panel.style.width = newW + 'px';
+    }
+    if (_dragging) {
+      const panel = document.querySelector('.hm-detail-panel.open');
+      if (!panel) { _dragging = false; return; }
+      const newTop = Math.max(0, Math.min(window.innerHeight - 100, _dragStartTop + (e.clientY - _dragStartY)));
+      panel.style.top    = newTop + 'px';
+      panel.style.bottom = 'auto';
+      panel.style.height = (window.innerHeight - newTop) + 'px';
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (_resizing) {
+      document.querySelectorAll('.hm-resize-grip').forEach(g => g.classList.remove('dragging'));
+      _resizing = false;
+      document.body.style.userSelect = '';
+    }
+    if (_dragging) {
+      _dragging = false;
+      document.body.style.userSelect = '';
+    }
+  });
+
+  // ── DRAG HEADER (kéo lên/xuống) ──
+  document.addEventListener('mousedown', e => {
+    if (e.target.classList.contains('hm-detail-close')) return;
+    if (e.target.closest('.hm-resize-grip')) return;
+    const hd = e.target.closest('.hm-detail-hd');
+    if (!hd) return;
+    const panel = hd.closest('.hm-detail-panel');
+    if (!panel) return;
+    e.preventDefault();
+    _dragging = true;
+    _dragStartY   = e.clientY;
+    _dragStartTop = panel.style.top ? parseInt(panel.style.top, 10) : 0;
+    document.body.style.userSelect = 'none';
+  });
+
+  // ── TOUCH RESIZE ──
+  document.addEventListener('touchstart', e => {
+    const grip = e.target.closest('.hm-resize-grip');
+    if (!grip) return;
+    const panel = grip.closest('.hm-detail-panel');
+    if (!panel) return;
+    _resizing = true;
+    _resizeStartX = e.touches[0].clientX;
+    _resizeStartW = panel.offsetWidth;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', e => {
+    if (!_resizing) return;
+    const panel = document.querySelector('.hm-detail-panel.open');
+    if (!panel) { _resizing = false; return; }
+    const newW = Math.max(280, Math.min(window.innerWidth * 0.75, _resizeStartW + (_resizeStartX - e.touches[0].clientX)));
+    panel.style.width = newW + 'px';
+  }, { passive: true });
+
+  document.addEventListener('touchend', () => { _resizing = false; });
+
+  // ── ESCAPE để đóng ──
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const panel = document.getElementById('hm-detail-panel');
+    if (panel && panel.classList.contains('open')) {
+      panel.classList.remove('open');
+      panel.style.top = ''; panel.style.bottom = ''; panel.style.height = '';
+      const bd = document.getElementById('hm-detail-backdrop');
+      if (bd) bd.style.display = 'none';
+    }
+  });
+})();
+
+// Không cần _hmPanelInitDrag nữa – giữ stub để không lỗi các lần gọi cũ
+function _hmPanelInitDrag(panel) {
+  if (!panel) return;
+  panel.style.display       = 'flex';
+  panel.style.flexDirection = 'column';
+  panel.style.overflow      = 'hidden';
+}
+
+// Mở panel + hiện backdrop + focus search
+function _hmOpenPanel(p, showBackdrop) {
+  // Reset inline styles từ drag trước đó
+  p.style.top    = '0';
+  p.style.bottom = '';
+  p.style.height = '100vh';
+  // Đảm bảo flex layout bằng inline style (override mọi CSS conflict)
+  p.style.display       = 'flex';
+  p.style.flexDirection = 'column';
+  p.style.overflow      = 'hidden';
+
+  // Fix scroll div - tìm bằng id trước, fallback bằng vị trí cuối
+  const fixScroll = (el) => {
+    if (!el) return;
+    el.id = 'hm-detail-body'; // đảm bảo có id để CSS match
+    el.style.cssText += ';overflow-y:auto!important;flex:1 1 0!important;min-height:0!important;-webkit-overflow-scrolling:touch;overscroll-behavior:contain';
+  };
+  const byId = p.querySelector('#hm-detail-body');
+  if (byId) {
+    fixScroll(byId);
+  } else {
+    // Fallback: div cuối cùng của panel
+    const divs = p.querySelectorAll(':scope > div');
+    if (divs.length > 0) fixScroll(divs[divs.length - 1]);
+  }
+
+  // Backdrop
+  if (showBackdrop !== false) {
+    let bd = document.getElementById('hm-detail-backdrop');
+    if (!bd) {
+      bd = document.createElement('div');
+      bd.id = 'hm-detail-backdrop';
+      bd.style.cssText = 'position:fixed;inset:0;z-index:9190;background:rgba(0,0,0,.35);display:none';
+      bd.onclick = () => {
+        p.classList.remove('open');
+        p.style.top = ''; p.style.bottom = '0'; p.style.height = '';
+        bd.style.display = 'none';
+      };
+      document.body.appendChild(bd);
+    }
+    bd.style.display = 'block';
+  }
+
+  // Focus ô tìm kiếm
+  setTimeout(() => {
+    const si = p.querySelector('input[type=text]');
+    if (si) si.focus();
+  }, 220);
+}
+
 
 function _lytDetailSearchFn(val) {
   const q = (val||'').toLowerCase().trim();
@@ -7524,6 +7830,58 @@ function lytStatsCardClick(label, color) {
       totalLine = `${total} ngăn Kháng / ${Object.keys(byTram).length} trạm`;
       break;
     }
+    case 'Tổng số thiết bị': {
+      title = '📦 Tổng số thiết bị';
+      // Nhóm theo loại thiết bị
+      const byType = {};
+      rows.forEach(r => {
+        const pl = (r.Phan_loai_thiet_bi||'Khác').trim();
+        if (!byType[pl]) byType[pl] = { qty: 0, trams: new Set() };
+        byType[pl].qty += Number(r.So_luong)||1;
+        if (r.Tram) byType[pl].trams.add((r.Tram||'').trim());
+      });
+      const sorted = Object.entries(byType).sort((a,b) => b[1].qty - a[1].qty);
+      const total = sorted.reduce((s,[,v]) => s + v.qty, 0);
+      sorted.forEach(([pl, v]) => {
+        items.push({ text: pl, sub: `${v.qty.toLocaleString('vi-VN')} TB / ${v.trams.size} trạm`, color: LYT_CAP_COLORS['1']||'#18ffff' });
+      });
+      totalLine = `${total.toLocaleString('vi-VN')} thiết bị · ${sorted.length} loại`;
+      break;
+    }
+    case 'Tổng công suất': {
+      title = '⚡ Tổng công suất MBA';
+      const byTram2 = {};
+      rows.forEach(r => {
+        const t = (r.Tram||'').trim(); if (!t) return;
+        const cs = Number(r.Cong_suat)||0;
+        if (!byTram2[t]) byTram2[t] = { cs: 0, cap: String(r.Cap_dien_ap??'') };
+        byTram2[t].cs += cs;
+      });
+      let total2 = 0;
+      filteredTrams.filter(t => byTram2[t]).forEach(t => {
+        const { cs, cap } = byTram2[t];
+        total2 += cs;
+        if (cs > 0) items.push({ text: t, sub: `${cs.toLocaleString('vi-VN')} MVA`, color: LYT_CAP_COLORS[cap]||'#888' });
+      });
+      totalLine = `${total2.toLocaleString('vi-VN')} MVA tổng / ${items.length} trạm`;
+      break;
+    }
+    case 'Công nghệ thiết bị TBA': {
+      title = '🏗️ Công nghệ thiết bị TBA';
+      const techMap = {};
+      rows.forEach(r => {
+        const tech = (r.Cong_nghe||r.Loai_cong_nghe||'').trim() || 'AIS';
+        if (!techMap[tech]) techMap[tech] = { qty: 0, trams: new Set() };
+        techMap[tech].qty += 1;
+        if (r.Tram) techMap[tech].trams.add((r.Tram||'').trim());
+      });
+      const techColors = { AIS:'#00c8ff', GIS:'#b388ff', HGIS:'#18ffff', KCK:'#00e676' };
+      Object.entries(techMap).sort((a,b)=>b[1].qty-a[1].qty).forEach(([tech, v]) => {
+        items.push({ text: tech, sub: `${v.trams.size} trạm`, color: techColors[tech]||'#ff9100' });
+      });
+      totalLine = `${filteredTrams.length} trạm · ${Object.keys(techMap).length} loại công nghệ`;
+      break;
+    }
     default:
       return; // Card không hỗ trợ drill-down — không mở panel
   }
@@ -7599,18 +7957,19 @@ function lytStatsCardClick(label, color) {
   }
 
   p.innerHTML = `
+    <div class="hm-resize-grip"></div>
     <div class="hm-detail-hd" style="border-left:3px solid ${color||'var(--accent)'}">
       <span style="color:${color||'var(--accent)'}">${title}</span>
       <span class="hm-detail-close"
-        onclick="this.closest('.hm-detail-panel').classList.remove('open')">✕</span>
+        onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span>
     </div>
-    <div style="padding:8px 16px;font-size:9px;color:var(--text-muted);
-      font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,0.06)">
+    <div style="padding:8px 16px;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0">
       ${totalLine}
     </div>
-    <div style="overflow-y:auto;flex:1">${bodyHtml}</div>`;
+    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">${bodyHtml}</div>`;
 
   p.classList.add('open');
+  _hmOpenPanel(p);
 }
 
 function lytNormalizeNganLoai(v) {
@@ -8524,13 +8883,15 @@ function _tbStatCardClick(key) {
   let p=document.getElementById('hm-detail-panel');
   if(!p){p=document.createElement('div');p.id='hm-detail-panel';p.className='hm-detail-panel';document.body.appendChild(p);}
   p.innerHTML=`
+    <div class="hm-resize-grip"></div>
     <div class="hm-detail-hd" style="border-left:3px solid ${col}">
       <span style="color:${col}">${title}</span>
-      <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open')">✕</span>
+      <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span>
     </div>
-    <div style="padding:8px 16px;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,.06)">${totalLine}</div>
-    <div style="overflow-y:auto;flex:1">${bodyHtml||'<div style=\'padding:24px;text-align:center;color:var(--text-muted)\'>Không có dữ liệu</div>'}</div>`;
+    <div style="padding:8px 16px;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">${totalLine}</div>
+    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">${bodyHtml||'<div style=\'padding:24px;text-align:center;color:var(--text-muted)\'>Không có dữ liệu</div>'}</div>`;
   p.classList.add('open');
+  _hmOpenPanel(p);
 }
 
 // ── TABLE ─────────────────────────────────────────────────────
@@ -9281,13 +9642,15 @@ function _tnShowStatPanel(lvl) {
   let p=document.getElementById('hm-detail-panel');
   if(!p){p=document.createElement('div');p.id='hm-detail-panel';p.className='hm-detail-panel';document.body.appendChild(p);}
   p.innerHTML=`
+    <div class="hm-resize-grip"></div>
     <div class="hm-detail-hd" style="border-left:3px solid ${conf.color}">
       <span style="color:${conf.color}">${conf.title}</span>
-      <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open')">✕</span>
+      <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span>
     </div>
-    <div style="padding:8px 16px;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,.06)">${fmt(srcRows.length)} bản ghi · ${tramKeys.length} trạm</div>
-    <div style="overflow-y:auto;flex:1">${bodyHtml||'<div style="padding:24px;text-align:center;color:var(--text-muted)">Không có dữ liệu</div>'}</div>`;
+    <div style="padding:8px 16px;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">${fmt(srcRows.length)} bản ghi · ${tramKeys.length} trạm</div>
+    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">${bodyHtml||'<div style="padding:24px;text-align:center;color:var(--text-muted)">Không có dữ liệu</div>'}</div>`;
   p.classList.add('open');
+  _hmOpenPanel(p);
 }
 
 function _tnStats() {
@@ -10140,13 +10503,15 @@ function _bcStatClick(key, data) {
   let p=document.getElementById('hm-detail-panel');
   if(!p){p=document.createElement('div');p.id='hm-detail-panel';p.className='hm-detail-panel';document.body.appendChild(p);}
   p.innerHTML=`
+    <div class="hm-resize-grip"></div>
     <div class="hm-detail-hd" style="border-left:3px solid ${col}">
       <span style="color:${col}">${title}</span>
-      <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open')">✕</span>
+      <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span>
     </div>
-    <div style="padding:8px 16px;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,.06)">${totalLine}</div>
-    <div style="overflow-y:auto;flex:1">${bodyHtml||'<div style=\"padding:24px;text-align:center;color:var(--text-muted)\">Không có dữ liệu</div>'}</div>`;
+    <div style="padding:8px 16px;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">${totalLine}</div>
+    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">${bodyHtml||'<div style=\"padding:24px;text-align:center;color:var(--text-muted)\">Không có dữ liệu</div>'}</div>`;
   p.classList.add('open');
+  _hmOpenPanel(p);
 }
 // ── MAIN RENDER BÁOCÁO ────────────────────────────────────────
 function bcRenderPage(conf, title) {
@@ -10254,396 +10619,314 @@ function bcRenderPage(conf, title) {
 <div id="changeNotifArea"></div>
 
 <script>
-// ═══════════════════════════════════════
-//   AUTH & USER MANAGEMENT SYSTEM
-// ═══════════════════════════════════════
+// AUTH -- Supabase Auth (signInWithPassword)
+// Cach su dung:
+// 1. Supabase Dashboard > Authentication > Users > Add user (nhap email + password)
+// 2. Chay SQL: insert into evn_user_profiles(id,email,name,role) select id,email,'Ten','\'user\'' from auth.users where email='...';
+// 3. Hoac dung nut Them tai khoan trong Bang Admin
+const _AUTH_SB_URL='https://xqqmfmljwycpehfyknoy.supabase.co';
+const _AUTH_SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxcW1mbWxqd3ljcGVoZnlrbm95Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODM4MDQsImV4cCI6MjA4Nzg1OTgwNH0.J_z0cFqq_Yet-n2X2L_VREdkcAqbkRFpYUp-ti3Fukc';
+const _AUTH_LOG_KEY='evn_audit_log_v1';
+let _authSb=null;
+function _getAuthSb(){if(!_authSb&&window.supabase&&window.supabase.createClient)_authSb=window.supabase.createClient(_AUTH_SB_URL,_AUTH_SB_KEY);return _authSb;}
+function _authCurrentUser(){try{return JSON.parse(sessionStorage.getItem('evn_sess_v3'));}catch{return null;}}
+function _authSaveSession(u){sessionStorage.setItem('evn_sess_v3',JSON.stringify(u));}
+function _authClearSession(){sessionStorage.removeItem('evn_sess_v3');}
+function _authGetLog(){try{return JSON.parse(localStorage.getItem(_AUTH_LOG_KEY)||'[]');}catch{return[];}}
+function _authAddLog(a,d,u){const l=_authGetLog();l.unshift({ts:new Date().toISOString(),user:u||'?',action:a,detail:d});if(l.length>500)l.length=500;try{localStorage.setItem(_AUTH_LOG_KEY,JSON.stringify(l));}catch{}}
 
-// ── Hệ thống tài khoản (localStorage-based, có thể thay bằng Supabase Auth) ──
-const _AUTH_KEY  = 'evn_users_v1';
-const _LOGIN_KEY = 'evn_session_v1';
-const _LOG_KEY   = 'evn_audit_log_v1';
-
-// Default accounts (admin + demo user)
-const _defaultUsers = [
-  { username:'admin',  password:'Admin@EVN2025', role:'admin',  name:'Quản trị viên',  email:'admin@evn.vn',  active:true,  created:'2025-01-01' },
-  { username:'user1',  password:'User@123',      role:'user',   name:'Nguyễn Văn A',   email:'a@evn.vn',      active:true,  created:'2025-01-01' },
-];
-
-function _authGetUsers() {
-  try {
-    const raw = localStorage.getItem(_AUTH_KEY);
-    if (!raw) { localStorage.setItem(_AUTH_KEY, JSON.stringify(_defaultUsers)); return _defaultUsers; }
-    return JSON.parse(raw);
-  } catch { return _defaultUsers; }
-}
-function _authSaveUsers(users) {
-  localStorage.setItem(_AUTH_KEY, JSON.stringify(users));
-}
-function _authGetLog() {
-  try { return JSON.parse(localStorage.getItem(_LOG_KEY)||'[]'); } catch { return []; }
-}
-function _authAddLog(action, detail, user) {
-  const log = _authGetLog();
-  log.unshift({ ts: new Date().toISOString(), user: user||(_authCurrentUser()||{username:'?'}).username, action, detail });
-  if (log.length > 500) log.length = 500;
-  localStorage.setItem(_LOG_KEY, JSON.stringify(log));
-}
-function _authCurrentUser() {
-  try { return JSON.parse(sessionStorage.getItem(_LOGIN_KEY)); } catch { return null; }
-}
-
-// ── LOGIN ──
-function _authLogin() {
-  const u = (document.getElementById('authUser').value||'').trim();
-  const p = document.getElementById('authPass').value||'';
-  const err = document.getElementById('authErr');
-  err.textContent = '';
-  if (!u||!p) { err.textContent = 'Vui lòng nhập đầy đủ thông tin'; return; }
-  const users = _authGetUsers();
-  const found = users.find(x => x.username===u && x.password===p && x.active);
-  if (!found) { err.textContent = 'Tài khoản hoặc mật khẩu không đúng'; return; }
-  // Save session
-  const session = { username:found.username, name:found.name, role:found.role, email:found.email, loginAt:new Date().toISOString() };
-  sessionStorage.setItem(_LOGIN_KEY, JSON.stringify(session));
-  _authAddLog('LOGIN', `Đăng nhập thành công từ ${navigator.userAgent.slice(0,50)}`, found.username);
-  document.getElementById('authOverlay').style.display = 'none';
-  _authInitUserMenu();
-  showChangeNotif('success', 'Đăng nhập thành công', `Xin chào ${found.name}!`);
-}
-
-// Handle Enter key
-document.addEventListener('DOMContentLoaded', () => {
-  ['authUser','authPass'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('keydown', e => { if(e.key==='Enter') _authLogin(); });
-  });
-  // Auto-login if session exists
-  const sess = _authCurrentUser();
-  if (sess) {
-    document.getElementById('authOverlay').style.display = 'none';
+async function _authLogin(){
+  const em=(document.getElementById('authUser').value||'').trim();
+  const pw=document.getElementById('authPass').value||'';
+  const errEl=document.getElementById('authErr');
+  const btn=document.querySelector('.auth-btn');
+  errEl.textContent='';
+  if(!em||!pw){errEl.textContent='Vui long nhap day du thong tin';return;}
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Dang dang nhap...';}
+  try{
+    const sb=_getAuthSb();
+    if(!sb)throw new Error('Khong ket noi duoc Supabase');
+    const{data,error}=await sb.auth.signInWithPassword({email:em,password:pw});
+    if(error){
+      const msg=error.message||'';
+      if(msg.includes('Invalid login')||msg.includes('invalid_credentials'))errEl.textContent='Email hoac mat khau khong dung';
+      else if(msg.includes('Email not confirmed'))errEl.textContent='Email chua xac nhan. Kiem tra hop thu.';
+      else errEl.textContent='Loi: '+msg;
+      return;
+    }
+    const u=data.user,meta=u.user_metadata||{};
+    const role=meta.role||'user';
+    const name=meta.name||meta.full_name||u.email.split('@')[0];
+    const sess={id:u.id,email:u.email,username:u.email,name,role,loginAt:new Date().toISOString()};
+    _authSaveSession(sess);
+    _authAddLog('LOGIN','Dang nhap thanh cong',sess.email);
+    document.getElementById('authOverlay').style.display='none';
     _authInitUserMenu();
+    _authApplyRoleUI(role);
+    showChangeNotif('success','Dang nhap thanh cong','Xin chao '+name+'!');
+  }catch(err){
+    errEl.textContent='Loi ket noi: '+err.message;
+  }finally{
+    if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-sign-in-alt" style="margin-right:6px"></i>Dang nhap';}
   }
+}
+
+document.addEventListener('DOMContentLoaded',async()=>{
+  ['authUser','authPass'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('keydown',e=>{if(e.key==='Enter')_authLogin();});});
+  try{
+    const sb=_getAuthSb();
+    const{data}=await sb.auth.getSession();
+    if(data&&data.session&&data.session.user){
+      const u=data.session.user,meta=u.user_metadata||{};
+      const role=meta.role||'user';
+      const name=meta.name||meta.full_name||u.email.split('@')[0];
+      const sess={id:u.id,email:u.email,username:u.email,name,role};
+      _authSaveSession(sess);
+      document.getElementById('authOverlay').style.display='none';
+      _authInitUserMenu();
+      _authApplyRoleUI(role);
+      return;
+    }
+  }catch{}
+  const sess=_authCurrentUser();
+  if(sess){document.getElementById('authOverlay').style.display='none';_authInitUserMenu();_authApplyRoleUI(sess.role);}
 });
 
-// ── LOGOUT ──
-function _authLogout() {
-  const sess = _authCurrentUser();
-  if (sess) _authAddLog('LOGOUT', 'Đã đăng xuất', sess.username);
-  sessionStorage.removeItem(_LOGIN_KEY);
-  document.getElementById('authOverlay').style.display = 'flex';
+async function _authLogout(){
+  const sess=_authCurrentUser();
+  if(sess)_authAddLog('LOGOUT','Da dang xuat',sess.email||sess.username);
+  try{const sb=_getAuthSb();if(sb)await sb.auth.signOut();}catch{}
+  _authClearSession();
+  document.body.classList.remove('user-mode');
+  const ca=document.getElementById('canvasArea');
+  if(ca){ca.style.gridColumn='';ca.style.padding='';}
+  document.getElementById('authOverlay').style.display='flex';
   document.getElementById('authUser').value='';
   document.getElementById('authPass').value='';
-  const drop = document.getElementById('userMenuDropdown');
-  if (drop) drop.classList.remove('open');
+  const drop=document.getElementById('userMenuDropdown');
+  if(drop)drop.classList.remove('open');
+  const wrap=document.getElementById('_userMenuWrap');
+  if(wrap)wrap.remove();
 }
 
-// ── USER MENU in topbar ──
-function _authInitUserMenu() {
-  const sess = _authCurrentUser();
-  if (!sess) return;
-  // Find topbar-actions
-  const tb = document.querySelector('.topbar-actions');
-  if (!tb) return;
-  // Remove old user menu if exists
-  const old = document.getElementById('_userMenuWrap');
-  if (old) old.remove();
-
-  const wrap = document.createElement('div');
-  wrap.id = '_userMenuWrap';
-  wrap.style.cssText = 'position:relative;';
-  wrap.innerHTML = `
-    <button id="userMenuBtn" onclick="_toggleUserMenu()">
-      <i class="fas fa-user-circle"></i>
-      <span style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sess.name}</span>
-      <span class="auth-role-badge ${sess.role==='admin'?'auth-role-admin':'auth-role-user'}">${sess.role==='admin'?'ADMIN':'USER'}</span>
-      <i class="fas fa-chevron-down" style="font-size:8px;opacity:.6"></i>
-    </button>
-    <div id="userMenuDropdown">
-      <div class="um-header">
-        <div class="um-name">${sess.name}</div>
-        <div class="um-email">${sess.email||sess.username}</div>
-      </div>
-      <div class="um-item" onclick="_openChangePassword()"><i class="fas fa-key"></i> Đổi mật khẩu</div>
-      ${sess.role==='admin'?'<div class="um-item" onclick="_openAdminPanel()"><i class="fas fa-shield-alt"></i> Bảng Admin</div>':''}
-      <div class="um-sep"></div>
-      <div class="um-item danger" onclick="_authLogout()"><i class="fas fa-sign-out-alt"></i> Đăng xuất</div>
-    </div>`;
-  tb.insertBefore(wrap, tb.firstChild);
-
-  // Close on outside click
-  document.addEventListener('click', e => {
-    const drop = document.getElementById('userMenuDropdown');
-    if (drop && drop.classList.contains('open') && !wrap.contains(e.target)) drop.classList.remove('open');
-  });
+function _authInitUserMenu(){
+  const sess=_authCurrentUser();if(!sess)return;
+  const tb=document.querySelector('.topbar-actions');if(!tb)return;
+  const old=document.getElementById('_userMenuWrap');if(old)old.remove();
+  const wrap=document.createElement('div');wrap.id='_userMenuWrap';wrap.style.cssText='position:relative;';
+  const adminBtn=sess.role==='admin'?'<div class="um-item" onclick="_openAdminPanel()"><i class="fas fa-shield-alt"></i> Bang Admin</div>':'';
+  wrap.innerHTML=`<button id="userMenuBtn" onclick="_toggleUserMenu()">
+    <i class="fas fa-user-circle"></i>
+    <span style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sess.name}</span>
+    <span class="auth-role-badge ${sess.role==='admin'?'auth-role-admin':'auth-role-user'}">${sess.role==='admin'?'ADMIN':'USER'}</span>
+    <i class="fas fa-chevron-down" style="font-size:8px;opacity:.6"></i>
+  </button>
+  <div id="userMenuDropdown">
+    <div class="um-header"><div class="um-name">${sess.name}</div><div class="um-email">${sess.email}</div></div>
+    <div class="um-item" onclick="_openChangePassword()"><i class="fas fa-key"></i> Doi mat khau</div>
+    ${adminBtn}
+    <div class="um-sep"></div>
+    <div class="um-item danger" onclick="_authLogout()"><i class="fas fa-sign-out-alt"></i> Dang xuat</div>
+  </div>`;
+  tb.insertBefore(wrap,tb.firstChild);
+  document.addEventListener('click',e=>{const d=document.getElementById('userMenuDropdown');if(d&&d.classList.contains('open')&&!wrap.contains(e.target))d.classList.remove('open');});
 }
+function _toggleUserMenu(){const d=document.getElementById('userMenuDropdown');if(d)d.classList.toggle('open');}
 
-function _toggleUserMenu() {
-  const d = document.getElementById('userMenuDropdown');
-  if (d) d.classList.toggle('open');
-}
-
-// ── CHANGE PASSWORD ──
-function _openChangePassword() {
-  const drop = document.getElementById('userMenuDropdown');
-  if (drop) drop.classList.remove('open');
-  const sess = _authCurrentUser();
-  if (!sess) return;
-  const existing = document.getElementById('_changePwModal');
-  if (existing) existing.remove();
-  const modal = document.createElement('div');
-  modal.id = '_changePwModal';
-  modal.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center';
-  modal.innerHTML = `
-    <div style="background:var(--bg-surface);border:1px solid var(--border-accent);border-radius:14px;padding:28px 32px;width:360px;box-shadow:0 8px 48px rgba(0,0,0,.7)">
-      <div style="font-size:14px;font-weight:800;color:var(--text-primary);margin-bottom:20px"><i class="fas fa-key" style="color:var(--accent);margin-right:8px"></i>Đổi mật khẩu</div>
-      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px">
-        <label style="font-size:11px;color:var(--text-secondary)">Mật khẩu hiện tại</label>
-        <input id="_cpOld" type="password" class="auth-input" placeholder="Nhập mật khẩu cũ">
-      </div>
-      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px">
-        <label style="font-size:11px;color:var(--text-secondary)">Mật khẩu mới</label>
-        <input id="_cpNew" type="password" class="auth-input" placeholder="Tối thiểu 8 ký tự">
-      </div>
-      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:16px">
-        <label style="font-size:11px;color:var(--text-secondary)">Xác nhận mật khẩu mới</label>
-        <input id="_cpCfm" type="password" class="auth-input" placeholder="Nhập lại mật khẩu mới">
-      </div>
-      <div id="_cpErr" style="font-size:11px;color:var(--red);min-height:14px;margin-bottom:10px"></div>
-      <div style="display:flex;gap:8px">
-        <button class="auth-btn" style="flex:1" onclick="_doChangePassword('${sess.username}')">Xác nhận</button>
-        <button onclick="document.getElementById('_changePwModal').remove()"
-          style="flex:0.5;padding:10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:13px;cursor:pointer">Hủy</button>
-      </div>
-    </div>`;
+function _openChangePassword(){
+  const drop=document.getElementById('userMenuDropdown');if(drop)drop.classList.remove('open');
+  const ex=document.getElementById('_changePwModal');if(ex)ex.remove();
+  const modal=document.createElement('div');modal.id='_changePwModal';
+  modal.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center';
+  modal.innerHTML=`<div style="background:var(--bg-surface);border:1px solid var(--border-accent);border-radius:14px;padding:28px 32px;width:360px;box-shadow:0 8px 48px rgba(0,0,0,.7)">
+    <div style="font-size:14px;font-weight:800;color:var(--text-primary);margin-bottom:20px"><i class="fas fa-key" style="color:var(--accent);margin-right:8px"></i>Doi mat khau</div>
+    <div style="margin-bottom:12px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Mat khau moi</label><input id="_cpNew" type="password" class="auth-input" placeholder="Toi thieu 6 ky tu"></div>
+    <div style="margin-bottom:16px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Xac nhan mat khau moi</label><input id="_cpCfm" type="password" class="auth-input" placeholder="Nhap lai"></div>
+    <div id="_cpErr" style="font-size:11px;color:var(--red);min-height:14px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px">
+      <button class="auth-btn" style="flex:1" id="_cpBtn" onclick="_doChangePassword()">Xac nhan</button>
+      <button onclick="document.getElementById('_changePwModal').remove()" style="flex:0.5;padding:10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:13px;cursor:pointer">Huy</button>
+    </div></div>`;
   document.body.appendChild(modal);
 }
-
-function _doChangePassword(username) {
-  const oldPw = document.getElementById('_cpOld').value;
-  const newPw = document.getElementById('_cpNew').value;
-  const cfmPw = document.getElementById('_cpCfm').value;
-  const err = document.getElementById('_cpErr');
-  const users = _authGetUsers();
-  const user = users.find(u=>u.username===username);
-  if (!user || user.password !== oldPw) { err.textContent='Mật khẩu hiện tại không đúng'; return; }
-  if (newPw.length < 8) { err.textContent='Mật khẩu mới phải có ít nhất 8 ký tự'; return; }
-  if (newPw !== cfmPw) { err.textContent='Xác nhận mật khẩu không khớp'; return; }
-  user.password = newPw;
-  _authSaveUsers(users);
-  _authAddLog('CHANGE_PASSWORD', 'Đổi mật khẩu thành công', username);
-  document.getElementById('_changePwModal').remove();
-  showChangeNotif('success', 'Đổi mật khẩu thành công', 'Mật khẩu của bạn đã được cập nhật.');
+async function _doChangePassword(){
+  const nw=document.getElementById('_cpNew').value,cf=document.getElementById('_cpCfm').value;
+  const er=document.getElementById('_cpErr'),btn=document.getElementById('_cpBtn');
+  er.textContent='';
+  if(nw.length<6){er.textContent='Mat khau it nhat 6 ky tu';return;}
+  if(nw!==cf){er.textContent='Xac nhan khong khop';return;}
+  if(btn){btn.disabled=true;btn.textContent='Dang cap nhat...';}
+  try{
+    const sb=_getAuthSb();
+    const{error}=await sb.auth.updateUser({password:nw});
+    if(error){er.textContent='Loi: '+error.message;return;}
+    _authAddLog('CHANGE_PASSWORD','Doi mat khau thanh cong',(_authCurrentUser()||{}).email||'');
+    document.getElementById('_changePwModal').remove();
+    showChangeNotif('success','Doi mat khau thanh cong','');
+  }catch(err){er.textContent='Loi: '+err.message;}
+  finally{if(btn){btn.disabled=false;btn.textContent='Xac nhan';}}
 }
 
-// ── ADMIN PANEL ──
-function _openAdminPanel() {
-  const drop = document.getElementById('userMenuDropdown');
-  if (drop) drop.classList.remove('open');
-  const sess = _authCurrentUser();
-  if (!sess || sess.role !== 'admin') { showChangeNotif('error','Không có quyền','Chỉ Admin mới truy cập được.'); return; }
+function _authApplyRoleUI(role){
+  if(role==='user'){document.body.classList.add('user-mode');}
+  else{document.body.classList.remove('user-mode');const ca=document.getElementById('canvasArea');if(ca){ca.style.gridColumn='';ca.style.padding='';}}
+}
+
+function _openAdminPanel(){
+  const drop=document.getElementById('userMenuDropdown');if(drop)drop.classList.remove('open');
+  const sess=_authCurrentUser();
+  if(!sess||sess.role!=='admin'){showChangeNotif('error','Khong co quyen','Chi Admin moi truy cap.');return;}
   document.getElementById('adminPanel').classList.add('open');
-  _adminTab('users', document.querySelector('.admin-tab'));
+  _adminTab('users',document.querySelector('.admin-tab'));
 }
 
-function _adminTab(tab, el) {
+async function _adminTab(tab,el){
   document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));
-  if (el) el.classList.add('active');
-  const body = document.getElementById('adminBody');
-  if (!body) return;
-
-  if (tab === 'users') {
-    const users = _authGetUsers();
-    body.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <span style="font-size:12px;font-weight:700;color:var(--text-primary)">${users.length} tài khoản</span>
+  if(el)el.classList.add('active');
+  const body=document.getElementById('adminBody');if(!body)return;
+  const sb=_getAuthSb();
+  if(tab==='users'){
+    body.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i> Dang tai...</div>';
+    const{data:profiles,error}=await sb.from('evn_user_profiles').select('*').order('created_at',{ascending:false});
+    if(error){
+      body.innerHTML=`<div style="padding:14px;background:rgba(255,82,82,.08);border:1px solid rgba(255,82,82,.2);border-radius:8px;color:#ff5252;font-size:11px;line-height:1.8">
+        Loi: ${error.message}<br><b>Chay SQL trong Supabase de tao bang:</b>
+        <pre style="margin-top:8px;font-size:9px;color:var(--text-primary);background:rgba(0,0,0,.3);padding:10px;border-radius:6px">create table public.evn_user_profiles (
+  id uuid primary key references auth.users(id),
+  email text, name text, role text default 'user',
+  active boolean default true,
+  created_at timestamptz default now()
+);
+alter table evn_user_profiles enable row level security;
+create policy allow_all on evn_user_profiles for all using (true);</pre></div>`;
+      return;
+    }
+    const capColor=r=>r==='admin'?'rgba(255,215,64,.15)':'rgba(0,200,255,.1)';
+    const iconCls=r=>r==='admin'?'fa-user-shield':'fa-user';
+    const iconCol=r=>r==='admin'?'#ffd740':'var(--accent)';
+    const badgeCls=r=>r==='admin'?'auth-role-admin':'auth-role-user';
+    body.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <span style="font-size:12px;font-weight:700;color:var(--text-primary)">${(profiles||[]).length} tai khoan</span>
         <button onclick="_adminAddUser()" style="padding:6px 14px;border-radius:7px;border:1px solid rgba(0,200,255,.4);background:rgba(0,200,255,.08);color:var(--accent);font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
-          <i class="fas fa-user-plus"></i> Thêm tài khoản
-        </button>
-      </div>
+          <i class="fas fa-user-plus"></i> Them tai khoan
+        </button></div>
       <div style="display:flex;flex-direction:column;gap:7px">
-        ${users.map((u,i)=>`
-          <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:12px">
-            <div style="width:34px;height:34px;border-radius:50%;background:${u.role==='admin'?'rgba(255,215,64,.15)':'rgba(0,200,255,.1)'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
-              <i class="fas ${u.role==='admin'?'fa-user-shield':'fa-user'}" style="color:${u.role==='admin'?'#ffd740':'var(--accent)'}"></i>
-            </div>
-            <div style="flex:1;min-width:0">
-              <div style="font-size:12px;font-weight:700;color:var(--text-primary)">${u.name} <span style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono)">(${u.username})</span></div>
-              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${u.email||'—'} · <span class="auth-role-badge ${u.role==='admin'?'auth-role-admin':'auth-role-user'}">${u.role==='admin'?'ADMIN':'USER'}</span></div>
-            </div>
-            <div style="display:flex;gap:5px;flex-shrink:0">
-              <button onclick="_adminEditUser(${i})" style="padding:4px 10px;border-radius:6px;border:1px solid rgba(0,200,255,.3);background:rgba(0,200,255,.07);color:var(--accent);font-size:10px;cursor:pointer">
-                <i class="fas fa-edit"></i>
-              </button>
-              <button onclick="_adminToggleUser(${i})" style="padding:4px 10px;border-radius:6px;border:1px solid ${u.active?'rgba(255,82,82,.3)':'rgba(0,230,118,.3)'};background:${u.active?'rgba(255,82,82,.07)':'rgba(0,230,118,.07)'};color:${u.active?'#ff5252':'#00e676'};font-size:10px;cursor:pointer" title="${u.active?'Vô hiệu hóa':'Kích hoạt'}">
-                <i class="fas ${u.active?'fa-ban':'fa-check'}"></i>
-              </button>
-            </div>
-          </div>`).join('')}
-      </div>`;
-  }
-
-  else if (tab === 'log') {
-    const log = _authGetLog();
-    const fmtTs = ts => { try { return new Date(ts).toLocaleString('vi-VN'); } catch { return ts; } };
-    const icons = { LOGIN:'fa-sign-in-alt', LOGOUT:'fa-sign-out-alt', CHANGE_PASSWORD:'fa-key', CREATE_USER:'fa-user-plus', TOGGLE_USER:'fa-user-slash', EDIT_USER:'fa-user-edit', DATA_UPDATE:'fa-database' };
-    const cols  = { LOGIN:'#00e676', LOGOUT:'#ffd740', CHANGE_PASSWORD:'#00c8ff', CREATE_USER:'#b388ff', TOGGLE_USER:'#ff9100', EDIT_USER:'#00c8ff', DATA_UPDATE:'#ff9100' };
-    body.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <span style="font-size:12px;font-weight:700;color:var(--text-primary)">${log.length} sự kiện gần đây</span>
-        <button onclick="localStorage.removeItem('${_LOG_KEY}');_adminTab('log',document.querySelectorAll('.admin-tab')[1])" style="padding:4px 10px;border-radius:6px;border:1px solid rgba(255,82,82,.3);background:rgba(255,82,82,.08);color:#ff5252;font-size:10px;cursor:pointer">Xóa log</button>
-      </div>
-      ${log.length===0?'<div style="text-align:center;padding:30px;color:var(--text-muted)">Chưa có nhật ký</div>':
-        '<div style="display:flex;flex-direction:column;gap:4px">'+
-        log.slice(0,100).map(e=>`
-          <div style="display:grid;grid-template-columns:120px 80px 1fr;gap:10px;align-items:center;padding:7px 12px;background:var(--bg-elevated);border-radius:6px;border:1px solid var(--border)">
-            <div style="font-size:9px;color:var(--text-muted);font-family:var(--font-mono)">${fmtTs(e.ts)}</div>
-            <div style="display:flex;align-items:center;gap:4px">
-              <i class="fas ${icons[e.action]||'fa-circle'}" style="font-size:9px;color:${cols[e.action]||'var(--accent)'}"></i>
-              <span style="font-size:9px;color:${cols[e.action]||'var(--accent)'}; font-weight:600">${e.user}</span>
-            </div>
-            <div style="font-size:10px;color:var(--text-secondary)">${e.detail||e.action}</div>
-          </div>`).join('')+
-        '</div>'}`;
-  }
-
-  else if (tab === 'access') {
-    body.innerHTML = `
-      <div style="margin-bottom:14px">
-        <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:8px">Phân quyền vai trò</div>
-        <div style="display:flex;flex-direction:column;gap:6px">
-          ${[
-            ['admin','ADMIN','#ffd740','Quản trị hệ thống','Toàn quyền: xem, cập nhật, tạo tài khoản, xem nhật ký, phân quyền'],
-            ['user','USER','#00c8ff','Người dùng','Xem dữ liệu + cập nhật dữ liệu (không tạo tài khoản, không xem admin panel)'],
-          ].map(([r,lbl,col,name,desc])=>`
-            <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:9px;padding:12px 16px">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-                <span class="auth-role-badge ${r==='admin'?'auth-role-admin':'auth-role-user'}">${lbl}</span>
-                <span style="font-size:12px;font-weight:700;color:var(--text-primary)">${name}</span>
-              </div>
-              <div style="font-size:10px;color:var(--text-secondary);line-height:1.5">${desc}</div>
-            </div>`).join('')}
-        </div>
-        <div style="margin-top:16px;padding:12px 14px;background:rgba(0,200,255,.05);border:1px dashed rgba(0,200,255,.2);border-radius:8px;font-size:10px;color:var(--text-secondary)">
-          <i class="fas fa-info-circle" style="color:var(--accent);margin-right:5px"></i>
-          Để tích hợp phân quyền với Supabase Auth (Row Level Security), vui lòng liên hệ team kỹ thuật để nâng cấp module auth lên server-side.
-        </div>
-      </div>`;
-  }
-}
-
-function _adminToggleUser(idx) {
-  const users = _authGetUsers();
-  const u = users[idx];
-  if (!u) return;
-  if (u.role === 'admin') { showChangeNotif('warning','Không thể vô hiệu hóa','Không thể vô hiệu hóa tài khoản admin.'); return; }
-  u.active = !u.active;
-  _authSaveUsers(users);
-  _authAddLog('TOGGLE_USER', `Tài khoản ${u.username} → ${u.active?'kích hoạt':'vô hiệu hóa'}`);
-  showChangeNotif(u.active?'success':'warning', u.active?'Đã kích hoạt':'Đã vô hiệu hóa', `Tài khoản ${u.name}`);
-  _adminTab('users', document.querySelector('.admin-tab.active'));
-}
-
-function _adminAddUser() {
-  const existing = document.getElementById('_addUserModal');
-  if (existing) existing.remove();
-  const modal = document.createElement('div');
-  modal.id = '_addUserModal';
-  modal.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center';
-  modal.innerHTML = `
-    <div style="background:var(--bg-surface);border:1px solid var(--border-accent);border-radius:14px;padding:28px 32px;width:380px;box-shadow:0 8px 48px rgba(0,0,0,.8)">
-      <div style="font-size:14px;font-weight:800;color:var(--text-primary);margin-bottom:20px"><i class="fas fa-user-plus" style="color:var(--accent);margin-right:8px"></i>Thêm tài khoản mới</div>
-      ${[['_auName','Họ tên','text','Nguyễn Văn A'],['_auUser','Username','text','nvana'],['_auEmail','Email','email','a@evn.vn'],['_auPw','Mật khẩu','password','Tối thiểu 8 ký tự']].map(([id,lbl,type,ph])=>`
-        <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:11px">
-          <label style="font-size:11px;color:var(--text-secondary)">${lbl}</label>
-          <input id="${id}" type="${type}" class="auth-input" placeholder="${ph}">
+        ${(profiles||[]).map(u=>`<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:12px">
+          <div style="width:34px;height:34px;border-radius:50%;background:${capColor(u.role)};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <i class="fas ${iconCls(u.role)}" style="color:${iconCol(u.role)}"></i></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:700;color:var(--text-primary)">${u.name||'—'}</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${u.email||'—'} - <span class="auth-role-badge ${badgeCls(u.role)}">${u.role==='admin'?'ADMIN':'USER'}</span>${!u.active?'<span style="color:#ff5252;font-size:9px;margin-left:6px">VO HIEU</span>':''}</div>
+          </div>
+          <button onclick="_adminToggleUser('${u.id}',${!u.active})" style="padding:4px 10px;border-radius:6px;border:1px solid ${u.active?'rgba(255,82,82,.3)':'rgba(0,230,118,.3)'};background:${u.active?'rgba(255,82,82,.07)':'rgba(0,230,118,.07)'};color:${u.active?'#ff5252':'#00e676'};font-size:10px;cursor:pointer">
+            <i class="fas ${u.active?'fa-ban':'fa-check'}"></i> ${u.active?'Vo hieu':'Kich hoat'}</button>
         </div>`).join('')}
-      <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:11px">
-        <label style="font-size:11px;color:var(--text-secondary)">Vai trò</label>
-        <select id="_auRole" class="auth-input" style="cursor:pointer">
-          <option value="user">USER – Người dùng</option>
-          <option value="admin">ADMIN – Quản trị viên</option>
-        </select>
+      </div>`;
+  }
+  else if(tab==='log'){
+    const log=_authGetLog();
+    const fmtTs=ts=>{try{return new Date(ts).toLocaleString('vi-VN');}catch{return ts;}};
+    const icMap={LOGIN:'fa-sign-in-alt',LOGOUT:'fa-sign-out-alt',CHANGE_PASSWORD:'fa-key',CREATE_USER:'fa-user-plus',TOGGLE_USER:'fa-user-slash'};
+    const colMap={LOGIN:'#00e676',LOGOUT:'#ffd740',CHANGE_PASSWORD:'#00c8ff',CREATE_USER:'#b388ff',TOGGLE_USER:'#ff9100'};
+    body.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <span style="font-size:12px;font-weight:700;color:var(--text-primary)">${log.length} su kien</span>
+        <button onclick="localStorage.removeItem('${_AUTH_LOG_KEY}');_adminTab('log',document.querySelectorAll('.admin-tab')[1])" style="padding:4px 10px;border-radius:6px;border:1px solid rgba(255,82,82,.3);background:rgba(255,82,82,.08);color:#ff5252;font-size:10px;cursor:pointer">Xoa log</button>
       </div>
-      <div id="_auErr" style="font-size:11px;color:var(--red);min-height:14px;margin-bottom:10px"></div>
-      <div style="display:flex;gap:8px">
-        <button class="auth-btn" style="flex:1" onclick="_doAddUser()"><i class="fas fa-save" style="margin-right:5px"></i>Tạo tài khoản</button>
-        <button onclick="document.getElementById('_addUserModal').remove()" style="flex:0.5;padding:10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:13px;cursor:pointer">Hủy</button>
+      ${log.length===0?'<div style="text-align:center;padding:30px;color:var(--text-muted)">Chua co nhat ky</div>':
+        '<div style="display:flex;flex-direction:column;gap:4px">'+log.slice(0,100).map(e=>`<div style="display:grid;grid-template-columns:130px 110px 1fr;gap:8px;align-items:center;padding:7px 12px;background:var(--bg-elevated);border-radius:6px;border:1px solid var(--border)">
+          <div style="font-size:9px;color:var(--text-muted);font-family:var(--font-mono)">${fmtTs(e.ts)}</div>
+          <div style="display:flex;align-items:center;gap:4px"><i class="fas ${icMap[e.action]||'fa-circle'}" style="font-size:9px;color:${colMap[e.action]||'var(--accent)'}"></i>
+            <span style="font-size:9px;color:${colMap[e.action]||'var(--accent)'};font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px">${e.user}</span></div>
+          <div style="font-size:10px;color:var(--text-secondary)">${e.detail||e.action}</div>
+        </div>`).join('')+'</div>'}
+    `;
+  }
+  else if(tab==='access'){
+    body.innerHTML=`<div style="margin-bottom:12px;padding:12px 14px;background:rgba(0,200,255,.05);border:1px solid rgba(0,200,255,.15);border-radius:8px;font-size:11px;color:var(--text-secondary);line-height:1.9">
+      <b style="color:var(--accent);font-size:12px">Cach tao tai khoan moi:</b><br>
+      <b>B1:</b> Supabase Dashboard &gt; Authentication &gt; Users &gt; Add user (email + password)<br>
+      <b>B2:</b> SQL Editor: <code style="color:var(--accent)">insert into evn_user_profiles(id,email,name,role) select id,email,'Ten','user' from auth.users where email='...';</code><br>
+      <b>Hoac nhanh:</b> Dung nut <b>Them tai khoan</b> tab Nguoi dung (tu dong ca 2 buoc)
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:9px;padding:12px 16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px"><span class="auth-role-badge auth-role-admin">ADMIN</span><span style="font-size:12px;font-weight:700;color:var(--text-primary)">Quan tri vien</span></div>
+        <div style="font-size:10px;color:var(--text-secondary)">Toan quyen: xem Layout Editor, chinh sua, tao tai khoan, xem log</div>
+      </div>
+      <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:9px;padding:12px 16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px"><span class="auth-role-badge auth-role-user">USER</span><span style="font-size:12px;font-weight:700;color:var(--text-primary)">Nguoi dung</span></div>
+        <div style="font-size:10px;color:var(--text-secondary)">Chi xem dashboard du lieu, khong thay editor</div>
       </div>
     </div>`;
+  }
+}
+
+async function _adminToggleUser(uid,newActive){
+  const sb=_getAuthSb();
+  const{error}=await sb.from('evn_user_profiles').update({active:newActive}).eq('id',uid);
+  if(error){showChangeNotif('error','Loi',error.message);return;}
+  _authAddLog('TOGGLE_USER','Doi trang thai '+uid);
+  showChangeNotif(newActive?'success':'warning',newActive?'Da kich hoat':'Da vo hieu hoa','');
+  _adminTab('users',document.querySelector('.admin-tab.active'));
+}
+
+function _adminAddUser(){
+  const ex=document.getElementById('_addUserModal');if(ex)ex.remove();
+  const modal=document.createElement('div');modal.id='_addUserModal';
+  modal.style.cssText='position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center';
+  modal.innerHTML=`<div style="background:var(--bg-surface);border:1px solid var(--border-accent);border-radius:14px;padding:28px 32px;width:420px;box-shadow:0 8px 48px rgba(0,0,0,.8)">
+    <div style="font-size:14px;font-weight:800;color:var(--text-primary);margin-bottom:6px"><i class="fas fa-user-plus" style="color:var(--accent);margin-right:8px"></i>Them tai khoan moi</div>
+    <div style="font-size:10px;color:var(--text-muted);margin-bottom:18px">Tao Supabase Auth user + ho so nguoi dung cung luc</div>
+    <div style="margin-bottom:11px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Ho ten *</label><input id="_auName" type="text" class="auth-input" placeholder="Nguyen Van A"></div>
+    <div style="margin-bottom:11px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Email *</label><input id="_auEmail" type="email" class="auth-input" placeholder="nva@evn.vn"></div>
+    <div style="margin-bottom:11px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Mat khau * (toi thieu 6 ky tu)</label><input id="_auPw" type="password" class="auth-input" placeholder="Mat khau dang nhap"></div>
+    <div style="margin-bottom:16px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Vai tro</label>
+      <select id="_auRole" class="auth-input" style="cursor:pointer"><option value="user">USER - Nguoi dung</option><option value="admin">ADMIN - Quan tri vien</option></select></div>
+    <div id="_auErr" style="font-size:11px;color:var(--red);min-height:14px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px">
+      <button id="_auBtn" class="auth-btn" style="flex:1" onclick="_doAddUser()"><i class="fas fa-save" style="margin-right:5px"></i>Tao tai khoan</button>
+      <button onclick="document.getElementById('_addUserModal').remove()" style="flex:0.5;padding:10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:13px;cursor:pointer">Huy</button>
+    </div></div>`;
   document.body.appendChild(modal);
 }
 
-function _doAddUser() {
-  const name  = (document.getElementById('_auName').value||'').trim();
-  const uname = (document.getElementById('_auUser').value||'').trim().toLowerCase();
-  const email = (document.getElementById('_auEmail').value||'').trim();
-  const pw    = document.getElementById('_auPw').value;
-  const role  = document.getElementById('_auRole').value;
-  const err   = document.getElementById('_auErr');
-  if (!name||!uname||!pw) { err.textContent='Vui lòng điền đầy đủ thông tin'; return; }
-  if (pw.length < 8) { err.textContent='Mật khẩu ít nhất 8 ký tự'; return; }
-  const users = _authGetUsers();
-  if (users.find(u=>u.username===uname)) { err.textContent='Username đã tồn tại'; return; }
-  users.push({ username:uname, password:pw, role, name, email, active:true, created:new Date().toISOString().slice(0,10) });
-  _authSaveUsers(users);
-  _authAddLog('CREATE_USER', `Tạo tài khoản ${uname} (${role})`);
-  document.getElementById('_addUserModal').remove();
-  showChangeNotif('success','Tạo tài khoản thành công',`Tài khoản ${name} (${uname}) đã được tạo.`);
-  _adminTab('users', document.querySelector('.admin-tab.active'));
+async function _doAddUser(){
+  const name=(document.getElementById('_auName').value||'').trim();
+  const email=(document.getElementById('_auEmail').value||'').trim();
+  const pw=document.getElementById('_auPw').value;
+  const role=document.getElementById('_auRole').value;
+  const er=document.getElementById('_auErr');
+  const btn=document.getElementById('_auBtn');
+  er.textContent='';
+  if(!name||!email||!pw){er.textContent='Vui long dien day du thong tin';return;}
+  if(pw.length<6){er.textContent='Mat khau it nhat 6 ky tu';return;}
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Dang tao...';}
+  try{
+    const sb=_getAuthSb();
+    const{data:sd,error:se}=await sb.auth.signUp({email,password:pw,options:{data:{name,role}}});
+    if(se){er.textContent=se.message.includes('already registered')?'Email nay da duoc dang ky':'Loi: '+se.message;return;}
+    const newId=sd?.user?.id;
+    if(newId)await sb.from('evn_user_profiles').upsert([{id:newId,email,name,role,active:true}]);
+    _authAddLog('CREATE_USER','Tao tai khoan '+email+' ('+role+')');
+    document.getElementById('_addUserModal').remove();
+    showChangeNotif('success','Tao tai khoan thanh cong',name+' ('+email+') da tao. Kiem tra email xac nhan neu can.');
+    _adminTab('users',document.querySelector('.admin-tab.active'));
+  }catch(err){er.textContent='Loi: '+err.message;}
+  finally{if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-save" style="margin-right:5px"></i>Tao tai khoan';}}
 }
 
-function _adminEditUser(idx) {
-  const users = _authGetUsers();
-  const u = users[idx];
-  if (!u) return;
-  // Quick inline edit - just role toggle for now
-  const newRole = u.role === 'admin' ? 'user' : 'admin';
-  if (!confirm(`Đổi vai trò ${u.name} từ ${u.role.toUpperCase()} → ${newRole.toUpperCase()}?`)) return;
-  u.role = newRole;
-  _authSaveUsers(users);
-  _authAddLog('EDIT_USER', `Đổi vai trò ${u.username}: ${newRole}`);
-  showChangeNotif('success','Cập nhật vai trò',`${u.name} → ${newRole.toUpperCase()}`);
-  _adminTab('users', document.querySelector('.admin-tab.active'));
-}
-
-// ── CHANGE NOTIFICATION SYSTEM ──
-function showChangeNotif(type, title, msg, duration) {
-  const area = document.getElementById('changeNotifArea');
-  if (!area) return;
-  const icons = { success:'fa-check-circle', warning:'fa-exclamation-triangle', error:'fa-times-circle', info:'fa-info-circle' };
-  const colors= { success:'#00e676', warning:'#ffd740', error:'#ff5252', info:'#00c8ff' };
-  const col = colors[type]||colors.info;
-  const notif = document.createElement('div');
-  notif.className = `change-notif ${type}`;
-  const now = new Date().toLocaleTimeString('vi-VN');
-  notif.innerHTML = `
-    <i class="fas ${icons[type]||'fa-info-circle'} cn-icon" style="color:${col}"></i>
-    <div class="cn-content">
-      <div class="cn-title" style="color:${col}">${title}</div>
-      ${msg?`<div class="cn-msg">${msg}</div>`:''}
-      <div class="cn-time">${now}</div>
-    </div>
-    <span class="cn-close" onclick="this.closest('.change-notif').remove()">✕</span>`;
+function showChangeNotif(type,title,msg,duration){
+  const area=document.getElementById('changeNotifArea');if(!area)return;
+  const icons={success:'fa-check-circle',warning:'fa-exclamation-triangle',error:'fa-times-circle',info:'fa-info-circle'};
+  const colors={success:'#00e676',warning:'#ffd740',error:'#ff5252',info:'#00c8ff'};
+  const col=colors[type]||colors.info;
+  const notif=document.createElement('div');notif.className='change-notif '+type;
+  notif.innerHTML=`<i class="fas ${icons[type]||'fa-info-circle'} cn-icon" style="color:${col}"></i><div class="cn-content"><div class="cn-title" style="color:${col}">${title}</div>${msg?`<div class="cn-msg">${msg}</div>`:''}<div class="cn-time">${new Date().toLocaleTimeString('vi-VN')}</div></div><span class="cn-close" onclick="this.closest('.change-notif').remove()">x</span>`;
   area.appendChild(notif);
-  setTimeout(() => { if (notif.parentNode) notif.remove(); }, duration || 5000);
+  setTimeout(()=>{if(notif.parentNode)notif.remove();},duration||5000);
 }
+document.getElementById('adminPanel').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
 
-// Intercept data updates to log them
-// Hook into Supabase calls to auto-log data changes
-const _origToast = window.showToast;
-window.showToast = function(msg, ...args) {
-  if (typeof _origToast === 'function') _origToast(msg, ...args);
-  const sess = _authCurrentUser();
-  if (sess && msg && msg.length > 0) {
-    _authAddLog('DATA_UPDATE', msg.slice(0, 100), sess.username);
-    showChangeNotif('info', 'Cập nhật dữ liệu', msg.slice(0, 80));
-  }
-};
-
-// Close admin panel on backdrop click
-document.getElementById('adminPanel').addEventListener('click', function(e) {
-  if (e.target === this) this.classList.remove('open');
-});
 </script>
 
 </body>
