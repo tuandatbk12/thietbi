@@ -4266,6 +4266,19 @@ function buildSectionWrapper(item, idx) {
   const prev = document.createElement('div');
   prev.className = 'card-preview';
   prev.innerHTML = getPreview(item.type, { ...item.props, _uid: item.uid });
+  // Delegation: click trên bất kỳ phần nào của ic-card -> lytStatsCardClick
+  if (item.type === 'stats') {
+    prev.addEventListener('click', function(e) {
+      if (e.target.closest('.ic-toolbar') || e.target.closest('.ic-sz-btn')) return;
+      const ic = e.target.closest('.ic-card');
+      if (!ic) return;
+      const lbl = ic.dataset.icLabel;
+      const col = ic.dataset.icColor;
+      if (!lbl) return;
+      e.stopPropagation();
+      lytStatsCardClick(lbl, col);
+    });
+  }
 
   const rh = document.createElement('div');
   rh.className = 'resize-handle';
@@ -4953,7 +4966,8 @@ function getPreview(type, props) {
       return `
       <div class="ic-card ${isTechChart && useTechStackLayout ? 'ic-card-tech-stack' : ''}" id="icc_${uid}_${ci}"
         style="--card-color:${c.color};border-color:${c.color}22;border-top-color:${c.color};cursor:pointer;${placementStyle}"
-        onclick="if(!event.target.closest('.ic-toolbar')&&!event.target.closest('.ic-sz-btn')){lytStatsCardClick('${c.label}','${c.color}')}"
+        data-ic-label="${c.label}"
+        data-ic-color="${c.color}"
         ondragover="icDragOver(event,'${uid}',${ci})"
         ondrop="icDrop(event,'${uid}',${ci})"
         ondragleave="icDragLeave(event,'${uid}',${ci})"
