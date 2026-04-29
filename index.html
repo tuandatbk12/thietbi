@@ -4941,11 +4941,11 @@ function getPreview(type, props) {
           <div class="ic-val" ${isComputed ? 'data-computed="true"' : 'contenteditable="true" spellcheck="false"'}
             style="color:${c.color};font-size:${c.valSize||26}px"
             data-uid="${uid}" data-ci="${ci}" data-field="value"
-            ${isComputed ? `onclick="event.stopPropagation();lytStatsCardClick('${c.label}','${c.color}')"` : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'||event.key===\'Tab\'){event.preventDefault();this.closest(\'.ic-card\').querySelector(\'.ic-lbl\').focus()}"'}
+            ${isComputed ? `` : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'||event.key===\'Tab\'){event.preventDefault();this.closest(\'.ic-card\').querySelector(\'.ic-lbl\').focus()}"'}
           >${c.value}</div>
           <div class="${isComputed ? 'ic-lbl' : 'ic-lbl'}" ${isComputed ? '' : 'contenteditable="true" spellcheck="false"'}
             data-uid="${uid}" data-ci="${ci}" data-field="label"
-            ${isComputed ? `onclick="event.stopPropagation();lytStatsCardClick('${c.label}','${c.color}')"` : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}"'}
+            ${isComputed ? `` : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}"'}
           >${c.label}</div>
         </div>
       `;
@@ -4953,10 +4953,7 @@ function getPreview(type, props) {
       return `
       <div class="ic-card ${isTechChart && useTechStackLayout ? 'ic-card-tech-stack' : ''}" id="icc_${uid}_${ci}"
         style="--card-color:${c.color};border-color:${c.color}22;border-top-color:${c.color};cursor:pointer;${placementStyle}"
-        draggable="false"
-        onmousedown="this._icmd=true;this._icmv=false"
-        onmousemove="this._icmv=true"
-        onmouseup="if(this._icmd&&!this._icmv&&!event.target.closest('.ic-toolbar')&&!event.target.closest('.ic-sz-btn')){event.stopPropagation();lytStatsCardClick('${c.label}','${c.color}')}this._icmd=false"
+        onclick="if(!event.target.closest('.ic-toolbar')&&!event.target.closest('.ic-sz-btn')){lytStatsCardClick('${c.label}','${c.color}')}"
         ondragover="icDragOver(event,'${uid}',${ci})"
         ondrop="icDrop(event,'${uid}',${ci})"
         ondragleave="icDragLeave(event,'${uid}',${ci})"
@@ -8065,6 +8062,18 @@ function _recomputeStatsWithFilter() {
                                 card.value = fmt(Math.round(tongCS)); break;
     }
   });
+
+  // ── Cập nhật Công nghệ TBA theo filter ──
+  (function() {
+    const { tech220, tech110, tech22 } = lytComputeTech(rows);
+    const statsItem2 = layout.find(l => l.type === 'stats');
+    if (!statsItem2) return;
+    const techCard = statsItem2.props.cards.find(c => c.chartType === 'tech' || (c.label||'').includes('Công nghệ'));
+    if (!techCard) return;
+    techCard.tech220 = { ...tech220 };
+    techCard.tech110 = { ...tech110 };
+    techCard.tech22  = { ...tech22  };
+  })();
 
   // Cập nhật DOM trực tiếp — KHÔNG chờ RAF để tránh flash giá trị cũ
   const statsWrapper = document.querySelector(`.section-wrapper[data-uid="${statsItem.uid}"]`);
