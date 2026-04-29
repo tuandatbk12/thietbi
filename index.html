@@ -234,6 +234,35 @@ body {
   padding: 7px 10px;
 }
 
+
+/* ═══════════════════════════════════════
+   RESPONSIVE FONT SCALING
+═══════════════════════════════════════ */
+:root {
+  --fs-base: clamp(11px, 1.1vw, 14px);
+  --fs-sm:   clamp(9px,  0.9vw, 11px);
+  --fs-xs:   clamp(8px,  0.8vw, 10px);
+  --fs-lg:   clamp(13px, 1.3vw, 16px);
+  --fs-xl:   clamp(16px, 1.6vw, 22px);
+}
+body { font-size: var(--fs-base); }
+.nav-item { font-size: var(--fs-sm); }
+.nav-sub-item { font-size: var(--fs-sm); }
+.canvas-title { font-size: var(--fs-sm); }
+.panel-label { font-size: var(--fs-xs); }
+.ic-lbl { font-size: var(--fs-sm); }
+.card-title-text { font-size: var(--fs-base); }
+@media (min-width: 1920px) {
+  :root { --fs-base: 15px; --fs-sm: 12px; --fs-xs: 10px; --fs-lg: 17px; --fs-xl: 24px; }
+  .ic-val { font-size: clamp(26px, 2.5vw, 36px); }
+}
+@media (max-width: 1400px) {
+  :root { --fs-base: 12px; --fs-sm: 10px; }
+}
+@media (max-width: 1100px) {
+  :root { --fs-base: 11.5px; --fs-sm: 9.5px; }
+}
+
 /* ═══════════════════════════════════════
    STATUS BAR
 ═══════════════════════════════════════ */
@@ -261,6 +290,7 @@ body {
   border-right: 1px solid var(--border);
   white-space: nowrap;
   flex-shrink: 0;
+  color: var(--text-secondary);
 }
 
 .sb-item:last-child { border-right: none; }
@@ -268,8 +298,8 @@ body {
 .sb-item i { font-size: 9px; opacity: 0.6; }
 
 .sb-val {
-  color: var(--text-secondary);
-  font-weight: 500;
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .sb-dot {
@@ -1871,6 +1901,123 @@ body {
   padding: 4px 6px; outline: none;
 }
 .ic-hex-input:focus { border-color: var(--border-accent); }
+
+
+/* ═══════════════════════════════════════
+   AUTH & USER MANAGEMENT SYSTEM
+═══════════════════════════════════════ */
+/* ── AUTH OVERLAY ── */
+#authOverlay {
+  position:fixed;inset:0;z-index:10000;
+  background:var(--bg-base);
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column; gap:0;
+}
+.auth-box {
+  background:var(--bg-surface);
+  border:1px solid var(--border-accent);
+  border-radius:16px;
+  padding:36px 40px;
+  width:380px;
+  box-shadow:0 8px 48px rgba(0,0,0,.7), 0 0 0 1px rgba(0,200,255,.12);
+}
+.auth-logo { text-align:center; margin-bottom:24px; }
+.auth-logo-icon { width:54px;height:54px;background:linear-gradient(135deg,var(--accent),#0055ff);border-radius:14px;display:inline-flex;align-items:center;justify-content:center;font-size:22px;color:#fff;box-shadow:0 0 24px var(--accent-glow); }
+.auth-title { font-size:18px;font-weight:800;color:var(--text-primary);margin-top:12px; }
+.auth-sub { font-size:11px;color:var(--text-muted);margin-top:4px; }
+.auth-field { display:flex;flex-direction:column;gap:5px;margin-bottom:14px; }
+.auth-label { font-size:11px;color:var(--text-secondary);font-weight:600; }
+.auth-input {
+  padding:9px 13px;border-radius:8px;border:1px solid var(--border);
+  background:var(--bg-elevated);color:var(--text-primary);
+  font-size:13px;font-family:var(--font-sans);outline:none;
+  transition:border-color .15s;
+}
+.auth-input:focus { border-color:var(--border-accent); }
+.auth-btn {
+  width:100%;padding:10px;border-radius:8px;border:none;
+  background:var(--accent);color:var(--bg-base);
+  font-size:13px;font-weight:700;cursor:pointer;
+  transition:all .15s;margin-top:6px;
+}
+.auth-btn:hover { background:#00aadd;box-shadow:0 0 16px var(--accent-glow); }
+.auth-err { font-size:11px;color:var(--red);text-align:center;min-height:16px; }
+.auth-role-badge { display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700; }
+.auth-role-admin { background:rgba(255,215,64,.15);color:#ffd740;border:1px solid rgba(255,215,64,.3); }
+.auth-role-user  { background:rgba(0,200,255,.12);color:var(--accent);border:1px solid rgba(0,200,255,.25); }
+
+/* ── USER MENU in topbar ── */
+#userMenuBtn {
+  display:inline-flex;align-items:center;gap:7px;
+  padding:5px 12px;border-radius:8px;border:1px solid var(--border);
+  background:var(--bg-elevated);color:var(--text-secondary);
+  font-size:11px;cursor:pointer;transition:all .15s;
+}
+#userMenuBtn:hover { border-color:var(--border-accent);color:var(--accent); }
+#userMenuDropdown {
+  position:absolute;top:calc(100% + 6px);right:0;
+  width:220px;background:var(--bg-surface);
+  border:1px solid var(--border-accent);border-radius:10px;
+  box-shadow:0 8px 32px rgba(0,0,0,.6);z-index:9999;
+  display:none;overflow:hidden;
+}
+#userMenuDropdown.open { display:block; }
+.um-header { padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.07);background:var(--bg-elevated); }
+.um-name { font-size:12px;font-weight:700;color:var(--text-primary); }
+.um-email { font-size:10px;color:var(--text-muted);margin-top:2px; }
+.um-item { display:flex;align-items:center;gap:8px;padding:9px 14px;cursor:pointer;font-size:12px;color:var(--text-secondary);transition:all .15s; }
+.um-item:hover { background:var(--bg-hover);color:var(--text-primary); }
+.um-item i { font-size:11px;width:14px;text-align:center; }
+.um-sep { height:1px;background:rgba(255,255,255,.07);margin:3px 0; }
+.um-item.danger:hover { color:var(--red); }
+
+/* ── ADMIN PANEL ── */
+#adminPanel {
+  position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);
+  display:none;align-items:center;justify-content:center;
+}
+#adminPanel.open { display:flex; }
+.admin-modal {
+  background:var(--bg-surface);border:1px solid var(--border-accent);
+  border-radius:16px;width:740px;max-height:82vh;display:flex;flex-direction:column;
+  box-shadow:0 12px 64px rgba(0,0,0,.8);overflow:hidden;
+}
+.admin-hd {
+  padding:16px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;background:var(--bg-elevated);flex-shrink:0;
+}
+.admin-hd-title { font-size:14px;font-weight:800;color:var(--text-primary);flex:1; }
+.admin-tabs { display:flex;border-bottom:1px solid var(--border);flex-shrink:0; }
+.admin-tab {
+  padding:9px 18px;font-size:11px;font-weight:600;cursor:pointer;
+  color:var(--text-muted);border-bottom:2px solid transparent;transition:all .15s;
+}
+.admin-tab.active { color:var(--accent);border-bottom-color:var(--accent);background:rgba(0,200,255,.05); }
+.admin-body { flex:1;overflow-y:auto;padding:16px 20px; }
+
+/* ── CHANGE NOTIFICATION POPUP ── */
+#changeNotifArea {
+  position:fixed;bottom:20px;right:20px;z-index:9800;
+  display:flex;flex-direction:column;gap:8px;pointer-events:none;
+}
+.change-notif {
+  background:var(--bg-surface);border:1px solid rgba(0,200,255,.35);
+  border-radius:10px;padding:10px 14px;
+  display:flex;align-items:flex-start;gap:10px;
+  box-shadow:0 4px 24px rgba(0,0,0,.6);
+  animation:notifSlideIn .25s ease;pointer-events:all;
+  max-width:320px;min-width:260px;
+}
+.change-notif.success { border-color:rgba(0,230,118,.4); }
+.change-notif.warning { border-color:rgba(255,215,64,.4); }
+.change-notif.error   { border-color:rgba(255,82,82,.4); }
+@keyframes notifSlideIn { from{transform:translateX(40px);opacity:0} to{transform:none;opacity:1} }
+.cn-icon { font-size:14px;flex-shrink:0;margin-top:1px; }
+.cn-content { flex:1; }
+.cn-title { font-size:11px;font-weight:700;color:var(--text-primary);margin-bottom:2px; }
+.cn-msg { font-size:10px;color:var(--text-secondary);line-height:1.4; }
+.cn-time { font-size:9px;color:var(--text-muted);margin-top:3px;font-family:var(--font-mono); }
+.cn-close { cursor:pointer;color:var(--text-muted);font-size:12px;padding:0 2px;flex-shrink:0; }
 
 /* ═══════════════════════════════════════
    PROPERTIES PANEL
@@ -6796,7 +6943,7 @@ function lytTLBucketClick(type, bucketKey, bucketLabel, color) {
 }
 
 // ── Shared detail panel (reused by all sections) ──────────────
-function _lytShowDetailPanel(title, color, totalLine, items) {
+function _lytShowDetailPanel(title, color, totalLine, items, mbaSection) {
   if (!items || !items.length) return;
   let p = document.getElementById('hm-detail-panel');
   if (!p) {
@@ -7118,8 +7265,24 @@ function lytChipShowDetail(type) {
     });
   });
   const totalQty = typeRows.reduce((s,d)=>s+(Number(d.So_luong)||1),0);
+
+  // Build MBA/Trạm breakdown sub-section for MBA, MBATD, MBATN types
+  const mbaTypes = new Set(['MBA','MBATD','MBATN','MBA_TU','MBATN']);
+  let mbaSection = null;
+  if (mbaTypes.has(type.trim().toUpperCase()) || type.toUpperCase().includes('MBA')) {
+    const mbaRows = typeRows;
+    const tramMbaMap = {};
+    mbaRows.forEach(d => {
+      const t=(d.Tram||'').trim(); if(!t)return;
+      if(!tramMbaMap[t]) tramMbaMap[t]=[];
+      tramMbaMap[t].push(d);
+    });
+    // Build summary: Tram + each MBA name + qty
+    mbaSection = { type, tramMbaMap, capColor, capLbl, capPrio, tramMaxCap };
+  }
+
   _lytShowDetailPanel(`🔌 ${type}`, 'var(--accent)',
-    `${totalQty.toLocaleString('vi-VN')} thiết bị · ${tramList.length} trạm`, items);
+    `${totalQty.toLocaleString('vi-VN')} thiết bị · ${tramList.length} trạm`, items, mbaSection);
 }
 
 
@@ -7388,6 +7551,43 @@ function lytStatsCardClick(label, color) {
           background:${item.color}18;padding:2px 8px;border-radius:10px">${item.sub}</span>
       </div>${detailHtml}`;
   }).join('');
+
+  // MBA/Tram breakdown section
+  let mbaSectionHtml = '';
+  if (mbaSection) {
+    const { tramMbaMap, capColor, capLbl, capPrio, tramMaxCap } = mbaSection;
+    const tramsSorted = Object.keys(tramMbaMap).sort((a,b)=>{
+      const pa=capPrio[tramMaxCap[a]]??9,pb=capPrio[tramMaxCap[b]]??9;
+      return pa!==pb?pa-pb:a.localeCompare(b,'vi');
+    });
+    let mbaRows = '';
+    tramsSorted.forEach(t => {
+      const rows = tramMbaMap[t];
+      const cv = tramMaxCap[t]||'';
+      const col = capColor[cv]||'#888';
+      const lbl = capLbl[cv]||cv;
+      const totalTram = rows.reduce((s,d)=>s+(Number(d.So_luong)||1),0);
+      mbaRows += `<div style="border-bottom:1px solid rgba(255,255,255,.04)">
+        <div style="padding:6px 16px 3px;display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.02)">
+          <span style="font-size:10px;font-weight:700;color:var(--text-primary);font-family:var(--font-mono)">${t}</span>
+          <div style="display:flex;gap:5px;align-items:center">
+            ${cv?`<span style="font-size:8px;font-weight:700;color:${col};background:${col}18;padding:1px 5px;border-radius:4px">${lbl}</span>`:''}
+            <span style="font-size:9px;color:var(--text-muted);background:rgba(255,255,255,.06);padding:1px 6px;border-radius:5px">${totalTram} TB</span>
+          </div>
+        </div>
+        ${rows.map(d=>`<div style="padding:3px 24px;font-size:9px;color:var(--text-secondary);display:flex;justify-content:space-between;font-family:var(--font-mono)">
+          <span style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.Ten_thiet_bi||''}">${d.Ten_thiet_bi||'—'}</span>
+          <span style="color:var(--accent);flex-shrink:0">${Number(d.So_luong)||1} TB</span>
+        </div>`).join('')}
+      </div>`;
+    });
+    mbaSectionHtml = `<div style="border-top:2px solid rgba(0,200,255,.2);margin-top:6px">
+      <div style="padding:8px 16px 4px;font-size:9px;font-weight:800;color:var(--accent);letter-spacing:.1em;background:rgba(0,200,255,.05)">
+        <i class="fas fa-list-ul" style="margin-right:5px"></i>CHI TIẾT THEO TRẠM
+      </div>
+      ${mbaRows}
+    </div>`;
+  }
 
   // Lấy hoặc tạo panel
   let p = document.getElementById('hm-detail-panel');
@@ -8341,13 +8541,17 @@ function _tbTable() {
   const totalPg = Math.max(1, Math.ceil(total/_tbPageSize));
   const fmt = n => Number(n).toLocaleString('vi-VN');
 
+  // Danh sách loại thiết bị không hiển thị cột Ngăn TB
+  const _tbHideNgan = new Set(['MBA','MC','DCL','MBATD','MBATN']);
+  const _showNganCol = !(_tbFType && _tbHideNgan.has(_tbFType.trim().toUpperCase())) &&
+    !(_tbData && _tbData.length > 0 && _tbData.every(r => _tbHideNgan.has((r.Phan_loai_thiet_bi||'').trim().toUpperCase())));
   const COLS = [
     {k:'Tram',               l:'Trạm',        w:'110px'},
     {k:'Cap_dien_ap',        l:'Cấp ĐA',      w:'68px' },
     {k:'Phan_loai_thiet_bi', l:'Loại TB',     w:'90px' },
     {k:'Ten_thiet_bi',       l:'Tên / KH',    w:'150px'},
     {k:'Kieu',               l:'Kiểu',        w:'80px' },
-    {k:'Ngan_thiet_bi',      l:'Ngăn TB',     w:'120px'},
+    ...(_showNganCol ? [{k:'Ngan_thiet_bi', l:'Ngăn TB', w:'120px'}] : []),
     {k:'So_luong',           l:'SL',          w:'46px', cls:'tb-num'},
     {k:'Hang_san_xuat',      l:'Hãng SX',     w:'90px' },
     {k:'Nam_san_xuat',       l:'Năm SX',      w:'58px', cls:'tb-num'},
@@ -8380,7 +8584,7 @@ function _tbTable() {
       <td>${r.Phan_loai_thiet_bi||'—'}</td>
       <td title="${r.Ten_thiet_bi||''}">${r.Ten_thiet_bi||'—'}</td>
       <td title="${r.Kieu||''}">${r.Kieu||'—'}</td>
-      <td title="${r.Ngan_thiet_bi||''}">${r.Ngan_thiet_bi||'—'}</td>
+      ${_showNganCol ? `<td title="${r.Ngan_thiet_bi||''}">${r.Ngan_thiet_bi||'—'}</td>` : ''}
       <td class="tb-num">${r.So_luong??'—'}</td>
       <td title="${r.Hang_san_xuat||''}">${r.Hang_san_xuat||'—'}</td>
       <td class="tb-num">${r.Nam_san_xuat||'—'}</td>
@@ -9233,7 +9437,14 @@ function _tnSort(c){ if(_tnSortCol===c)_tnSortAsc=!_tnSortAsc;else{_tnSortCol=c;
 function _tnGoPage(p){ const t=Math.max(1,Math.ceil(_tnFiltered.length/_tnPageSize));_tnPage=Math.max(1,Math.min(p,t));_tnRefresh(); }
 function _tnRefresh(){ const el=document.getElementById('_tnTableArea');if(el)el.innerHTML=_tnTable(); }
 function _tnOnSearch(v){ _tnSearchQ=v||'';_tnApply();_tnRefresh(); }
-function _tnOnFilter(k,v){ if(k==='cap')_tnFCap=v;else if(k==='type')_tnFType=v;else if(k==='tram')_tnFTram=v;else if(k==='nhom')_tnFNhom=v;_tnApply();_tnRefresh(); }
+function _tnOnFilter(k,v){
+  if(k==='cap')       _tnFCap=v;
+  else if(k==='type') _tnFType=v;
+  else if(k==='tram') _tnFTram=v;
+  else if(k==='nhom') _tnFNhom=v;
+  else if(k==='doi')  _tnFDoi=v;
+  _tnApply(); _tnRefresh();
+}
 
 function _tnReset(){
   _tnSearchQ=_tnFCap=_tnFType=_tnFTram=_tnFNhom=_tnFDoi='';_tnFAlertOnly=false;
@@ -9397,7 +9608,7 @@ function tnRenderPage(conf, title) {
               if(key==='doi')  { _tnFDoi=v;  _tnOnFilter('doi',v);  _tnRebuildDeps('doi'); }
               else if(key==='tram') { _tnFTram=v; _tnOnFilter('tram',v); _tnRebuildDeps('tram'); }
               else { _tnOnFilter(key,v); }
-              lbl.textContent=v?l:dflt;
+              lbl.textContent=v?l:dflt; btn._active=!!v;
               btn._active=!!v;
               btn.style.borderColor=v?'var(--accent)':'rgba(0,200,255,.4)';
               btn.style.background=v?'rgba(0,200,255,.1)':'';
@@ -9987,5 +10198,453 @@ function bcRenderPage(conf, title) {
 // tnRenderPage already handles mode:'dotxuat' — no changes needed
 
 </script>
+
+<!-- ═══════════════════════════════════════
+     AUTH OVERLAY
+═══════════════════════════════════════ -->
+<div id="authOverlay">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <div class="auth-logo-icon"><i class="fas fa-bolt"></i></div>
+      <div class="auth-title">EVNHANOI Dashboard</div>
+      <div class="auth-sub">Đăng nhập để tiếp tục</div>
+    </div>
+    <div class="auth-field">
+      <label class="auth-label">Tài khoản</label>
+      <input class="auth-input" id="authUser" type="text" placeholder="Nhập username" autocomplete="username">
+    </div>
+    <div class="auth-field">
+      <label class="auth-label">Mật khẩu</label>
+      <input class="auth-input" id="authPass" type="password" placeholder="Nhập mật khẩu" autocomplete="current-password">
+    </div>
+    <div class="auth-err" id="authErr"></div>
+    <button class="auth-btn" onclick="_authLogin()"><i class="fas fa-sign-in-alt" style="margin-right:6px"></i>Đăng nhập</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     USER MENU BUTTON (inserted into topbar via JS)
+═══════════════════════════════════════ -->
+
+<!-- ═══════════════════════════════════════
+     ADMIN PANEL
+═══════════════════════════════════════ -->
+<div id="adminPanel">
+  <div class="admin-modal">
+    <div class="admin-hd">
+      <i class="fas fa-shield-alt" style="color:var(--accent)"></i>
+      <span class="admin-hd-title">Bảng điều khiển Admin</span>
+      <button onclick="document.getElementById('adminPanel').classList.remove('open')"
+        style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px">✕</button>
+    </div>
+    <div class="admin-tabs">
+      <div class="admin-tab active" onclick="_adminTab('users',this)"><i class="fas fa-users" style="margin-right:5px"></i>Người dùng</div>
+      <div class="admin-tab" onclick="_adminTab('log',this)"><i class="fas fa-history" style="margin-right:5px"></i>Nhật ký</div>
+      <div class="admin-tab" onclick="_adminTab('access',this)"><i class="fas fa-key" style="margin-right:5px"></i>Phân quyền</div>
+    </div>
+    <div class="admin-body" id="adminBody">
+      <!-- filled by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     CHANGE NOTIFICATION AREA
+═══════════════════════════════════════ -->
+<div id="changeNotifArea"></div>
+
+<script>
+// ═══════════════════════════════════════
+//   AUTH & USER MANAGEMENT SYSTEM
+// ═══════════════════════════════════════
+
+// ── Hệ thống tài khoản (localStorage-based, có thể thay bằng Supabase Auth) ──
+const _AUTH_KEY  = 'evn_users_v1';
+const _LOGIN_KEY = 'evn_session_v1';
+const _LOG_KEY   = 'evn_audit_log_v1';
+
+// Default accounts (admin + demo user)
+const _defaultUsers = [
+  { username:'admin',  password:'Admin@EVN2025', role:'admin',  name:'Quản trị viên',  email:'admin@evn.vn',  active:true,  created:'2025-01-01' },
+  { username:'user1',  password:'User@123',      role:'user',   name:'Nguyễn Văn A',   email:'a@evn.vn',      active:true,  created:'2025-01-01' },
+];
+
+function _authGetUsers() {
+  try {
+    const raw = localStorage.getItem(_AUTH_KEY);
+    if (!raw) { localStorage.setItem(_AUTH_KEY, JSON.stringify(_defaultUsers)); return _defaultUsers; }
+    return JSON.parse(raw);
+  } catch { return _defaultUsers; }
+}
+function _authSaveUsers(users) {
+  localStorage.setItem(_AUTH_KEY, JSON.stringify(users));
+}
+function _authGetLog() {
+  try { return JSON.parse(localStorage.getItem(_LOG_KEY)||'[]'); } catch { return []; }
+}
+function _authAddLog(action, detail, user) {
+  const log = _authGetLog();
+  log.unshift({ ts: new Date().toISOString(), user: user||(_authCurrentUser()||{username:'?'}).username, action, detail });
+  if (log.length > 500) log.length = 500;
+  localStorage.setItem(_LOG_KEY, JSON.stringify(log));
+}
+function _authCurrentUser() {
+  try { return JSON.parse(sessionStorage.getItem(_LOGIN_KEY)); } catch { return null; }
+}
+
+// ── LOGIN ──
+function _authLogin() {
+  const u = (document.getElementById('authUser').value||'').trim();
+  const p = document.getElementById('authPass').value||'';
+  const err = document.getElementById('authErr');
+  err.textContent = '';
+  if (!u||!p) { err.textContent = 'Vui lòng nhập đầy đủ thông tin'; return; }
+  const users = _authGetUsers();
+  const found = users.find(x => x.username===u && x.password===p && x.active);
+  if (!found) { err.textContent = 'Tài khoản hoặc mật khẩu không đúng'; return; }
+  // Save session
+  const session = { username:found.username, name:found.name, role:found.role, email:found.email, loginAt:new Date().toISOString() };
+  sessionStorage.setItem(_LOGIN_KEY, JSON.stringify(session));
+  _authAddLog('LOGIN', `Đăng nhập thành công từ ${navigator.userAgent.slice(0,50)}`, found.username);
+  document.getElementById('authOverlay').style.display = 'none';
+  _authInitUserMenu();
+  showChangeNotif('success', 'Đăng nhập thành công', `Xin chào ${found.name}!`);
+}
+
+// Handle Enter key
+document.addEventListener('DOMContentLoaded', () => {
+  ['authUser','authPass'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('keydown', e => { if(e.key==='Enter') _authLogin(); });
+  });
+  // Auto-login if session exists
+  const sess = _authCurrentUser();
+  if (sess) {
+    document.getElementById('authOverlay').style.display = 'none';
+    _authInitUserMenu();
+  }
+});
+
+// ── LOGOUT ──
+function _authLogout() {
+  const sess = _authCurrentUser();
+  if (sess) _authAddLog('LOGOUT', 'Đã đăng xuất', sess.username);
+  sessionStorage.removeItem(_LOGIN_KEY);
+  document.getElementById('authOverlay').style.display = 'flex';
+  document.getElementById('authUser').value='';
+  document.getElementById('authPass').value='';
+  const drop = document.getElementById('userMenuDropdown');
+  if (drop) drop.classList.remove('open');
+}
+
+// ── USER MENU in topbar ──
+function _authInitUserMenu() {
+  const sess = _authCurrentUser();
+  if (!sess) return;
+  // Find topbar-actions
+  const tb = document.querySelector('.topbar-actions');
+  if (!tb) return;
+  // Remove old user menu if exists
+  const old = document.getElementById('_userMenuWrap');
+  if (old) old.remove();
+
+  const wrap = document.createElement('div');
+  wrap.id = '_userMenuWrap';
+  wrap.style.cssText = 'position:relative;';
+  wrap.innerHTML = `
+    <button id="userMenuBtn" onclick="_toggleUserMenu()">
+      <i class="fas fa-user-circle"></i>
+      <span style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sess.name}</span>
+      <span class="auth-role-badge ${sess.role==='admin'?'auth-role-admin':'auth-role-user'}">${sess.role==='admin'?'ADMIN':'USER'}</span>
+      <i class="fas fa-chevron-down" style="font-size:8px;opacity:.6"></i>
+    </button>
+    <div id="userMenuDropdown">
+      <div class="um-header">
+        <div class="um-name">${sess.name}</div>
+        <div class="um-email">${sess.email||sess.username}</div>
+      </div>
+      <div class="um-item" onclick="_openChangePassword()"><i class="fas fa-key"></i> Đổi mật khẩu</div>
+      ${sess.role==='admin'?'<div class="um-item" onclick="_openAdminPanel()"><i class="fas fa-shield-alt"></i> Bảng Admin</div>':''}
+      <div class="um-sep"></div>
+      <div class="um-item danger" onclick="_authLogout()"><i class="fas fa-sign-out-alt"></i> Đăng xuất</div>
+    </div>`;
+  tb.insertBefore(wrap, tb.firstChild);
+
+  // Close on outside click
+  document.addEventListener('click', e => {
+    const drop = document.getElementById('userMenuDropdown');
+    if (drop && drop.classList.contains('open') && !wrap.contains(e.target)) drop.classList.remove('open');
+  });
+}
+
+function _toggleUserMenu() {
+  const d = document.getElementById('userMenuDropdown');
+  if (d) d.classList.toggle('open');
+}
+
+// ── CHANGE PASSWORD ──
+function _openChangePassword() {
+  const drop = document.getElementById('userMenuDropdown');
+  if (drop) drop.classList.remove('open');
+  const sess = _authCurrentUser();
+  if (!sess) return;
+  const existing = document.getElementById('_changePwModal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = '_changePwModal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:var(--bg-surface);border:1px solid var(--border-accent);border-radius:14px;padding:28px 32px;width:360px;box-shadow:0 8px 48px rgba(0,0,0,.7)">
+      <div style="font-size:14px;font-weight:800;color:var(--text-primary);margin-bottom:20px"><i class="fas fa-key" style="color:var(--accent);margin-right:8px"></i>Đổi mật khẩu</div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px">
+        <label style="font-size:11px;color:var(--text-secondary)">Mật khẩu hiện tại</label>
+        <input id="_cpOld" type="password" class="auth-input" placeholder="Nhập mật khẩu cũ">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px">
+        <label style="font-size:11px;color:var(--text-secondary)">Mật khẩu mới</label>
+        <input id="_cpNew" type="password" class="auth-input" placeholder="Tối thiểu 8 ký tự">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:16px">
+        <label style="font-size:11px;color:var(--text-secondary)">Xác nhận mật khẩu mới</label>
+        <input id="_cpCfm" type="password" class="auth-input" placeholder="Nhập lại mật khẩu mới">
+      </div>
+      <div id="_cpErr" style="font-size:11px;color:var(--red);min-height:14px;margin-bottom:10px"></div>
+      <div style="display:flex;gap:8px">
+        <button class="auth-btn" style="flex:1" onclick="_doChangePassword('${sess.username}')">Xác nhận</button>
+        <button onclick="document.getElementById('_changePwModal').remove()"
+          style="flex:0.5;padding:10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:13px;cursor:pointer">Hủy</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function _doChangePassword(username) {
+  const oldPw = document.getElementById('_cpOld').value;
+  const newPw = document.getElementById('_cpNew').value;
+  const cfmPw = document.getElementById('_cpCfm').value;
+  const err = document.getElementById('_cpErr');
+  const users = _authGetUsers();
+  const user = users.find(u=>u.username===username);
+  if (!user || user.password !== oldPw) { err.textContent='Mật khẩu hiện tại không đúng'; return; }
+  if (newPw.length < 8) { err.textContent='Mật khẩu mới phải có ít nhất 8 ký tự'; return; }
+  if (newPw !== cfmPw) { err.textContent='Xác nhận mật khẩu không khớp'; return; }
+  user.password = newPw;
+  _authSaveUsers(users);
+  _authAddLog('CHANGE_PASSWORD', 'Đổi mật khẩu thành công', username);
+  document.getElementById('_changePwModal').remove();
+  showChangeNotif('success', 'Đổi mật khẩu thành công', 'Mật khẩu của bạn đã được cập nhật.');
+}
+
+// ── ADMIN PANEL ──
+function _openAdminPanel() {
+  const drop = document.getElementById('userMenuDropdown');
+  if (drop) drop.classList.remove('open');
+  const sess = _authCurrentUser();
+  if (!sess || sess.role !== 'admin') { showChangeNotif('error','Không có quyền','Chỉ Admin mới truy cập được.'); return; }
+  document.getElementById('adminPanel').classList.add('open');
+  _adminTab('users', document.querySelector('.admin-tab'));
+}
+
+function _adminTab(tab, el) {
+  document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  const body = document.getElementById('adminBody');
+  if (!body) return;
+
+  if (tab === 'users') {
+    const users = _authGetUsers();
+    body.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <span style="font-size:12px;font-weight:700;color:var(--text-primary)">${users.length} tài khoản</span>
+        <button onclick="_adminAddUser()" style="padding:6px 14px;border-radius:7px;border:1px solid rgba(0,200,255,.4);background:rgba(0,200,255,.08);color:var(--accent);font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+          <i class="fas fa-user-plus"></i> Thêm tài khoản
+        </button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        ${users.map((u,i)=>`
+          <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:12px">
+            <div style="width:34px;height:34px;border-radius:50%;background:${u.role==='admin'?'rgba(255,215,64,.15)':'rgba(0,200,255,.1)'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <i class="fas ${u.role==='admin'?'fa-user-shield':'fa-user'}" style="color:${u.role==='admin'?'#ffd740':'var(--accent)'}"></i>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:700;color:var(--text-primary)">${u.name} <span style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono)">(${u.username})</span></div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${u.email||'—'} · <span class="auth-role-badge ${u.role==='admin'?'auth-role-admin':'auth-role-user'}">${u.role==='admin'?'ADMIN':'USER'}</span></div>
+            </div>
+            <div style="display:flex;gap:5px;flex-shrink:0">
+              <button onclick="_adminEditUser(${i})" style="padding:4px 10px;border-radius:6px;border:1px solid rgba(0,200,255,.3);background:rgba(0,200,255,.07);color:var(--accent);font-size:10px;cursor:pointer">
+                <i class="fas fa-edit"></i>
+              </button>
+              <button onclick="_adminToggleUser(${i})" style="padding:4px 10px;border-radius:6px;border:1px solid ${u.active?'rgba(255,82,82,.3)':'rgba(0,230,118,.3)'};background:${u.active?'rgba(255,82,82,.07)':'rgba(0,230,118,.07)'};color:${u.active?'#ff5252':'#00e676'};font-size:10px;cursor:pointer" title="${u.active?'Vô hiệu hóa':'Kích hoạt'}">
+                <i class="fas ${u.active?'fa-ban':'fa-check'}"></i>
+              </button>
+            </div>
+          </div>`).join('')}
+      </div>`;
+  }
+
+  else if (tab === 'log') {
+    const log = _authGetLog();
+    const fmtTs = ts => { try { return new Date(ts).toLocaleString('vi-VN'); } catch { return ts; } };
+    const icons = { LOGIN:'fa-sign-in-alt', LOGOUT:'fa-sign-out-alt', CHANGE_PASSWORD:'fa-key', CREATE_USER:'fa-user-plus', TOGGLE_USER:'fa-user-slash', EDIT_USER:'fa-user-edit', DATA_UPDATE:'fa-database' };
+    const cols  = { LOGIN:'#00e676', LOGOUT:'#ffd740', CHANGE_PASSWORD:'#00c8ff', CREATE_USER:'#b388ff', TOGGLE_USER:'#ff9100', EDIT_USER:'#00c8ff', DATA_UPDATE:'#ff9100' };
+    body.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <span style="font-size:12px;font-weight:700;color:var(--text-primary)">${log.length} sự kiện gần đây</span>
+        <button onclick="localStorage.removeItem('${_LOG_KEY}');_adminTab('log',document.querySelectorAll('.admin-tab')[1])" style="padding:4px 10px;border-radius:6px;border:1px solid rgba(255,82,82,.3);background:rgba(255,82,82,.08);color:#ff5252;font-size:10px;cursor:pointer">Xóa log</button>
+      </div>
+      ${log.length===0?'<div style="text-align:center;padding:30px;color:var(--text-muted)">Chưa có nhật ký</div>':
+        '<div style="display:flex;flex-direction:column;gap:4px">'+
+        log.slice(0,100).map(e=>`
+          <div style="display:grid;grid-template-columns:120px 80px 1fr;gap:10px;align-items:center;padding:7px 12px;background:var(--bg-elevated);border-radius:6px;border:1px solid var(--border)">
+            <div style="font-size:9px;color:var(--text-muted);font-family:var(--font-mono)">${fmtTs(e.ts)}</div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <i class="fas ${icons[e.action]||'fa-circle'}" style="font-size:9px;color:${cols[e.action]||'var(--accent)'}"></i>
+              <span style="font-size:9px;color:${cols[e.action]||'var(--accent)'}; font-weight:600">${e.user}</span>
+            </div>
+            <div style="font-size:10px;color:var(--text-secondary)">${e.detail||e.action}</div>
+          </div>`).join('')+
+        '</div>'}`;
+  }
+
+  else if (tab === 'access') {
+    body.innerHTML = `
+      <div style="margin-bottom:14px">
+        <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:8px">Phân quyền vai trò</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${[
+            ['admin','ADMIN','#ffd740','Quản trị hệ thống','Toàn quyền: xem, cập nhật, tạo tài khoản, xem nhật ký, phân quyền'],
+            ['user','USER','#00c8ff','Người dùng','Xem dữ liệu + cập nhật dữ liệu (không tạo tài khoản, không xem admin panel)'],
+          ].map(([r,lbl,col,name,desc])=>`
+            <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:9px;padding:12px 16px">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span class="auth-role-badge ${r==='admin'?'auth-role-admin':'auth-role-user'}">${lbl}</span>
+                <span style="font-size:12px;font-weight:700;color:var(--text-primary)">${name}</span>
+              </div>
+              <div style="font-size:10px;color:var(--text-secondary);line-height:1.5">${desc}</div>
+            </div>`).join('')}
+        </div>
+        <div style="margin-top:16px;padding:12px 14px;background:rgba(0,200,255,.05);border:1px dashed rgba(0,200,255,.2);border-radius:8px;font-size:10px;color:var(--text-secondary)">
+          <i class="fas fa-info-circle" style="color:var(--accent);margin-right:5px"></i>
+          Để tích hợp phân quyền với Supabase Auth (Row Level Security), vui lòng liên hệ team kỹ thuật để nâng cấp module auth lên server-side.
+        </div>
+      </div>`;
+  }
+}
+
+function _adminToggleUser(idx) {
+  const users = _authGetUsers();
+  const u = users[idx];
+  if (!u) return;
+  if (u.role === 'admin') { showChangeNotif('warning','Không thể vô hiệu hóa','Không thể vô hiệu hóa tài khoản admin.'); return; }
+  u.active = !u.active;
+  _authSaveUsers(users);
+  _authAddLog('TOGGLE_USER', `Tài khoản ${u.username} → ${u.active?'kích hoạt':'vô hiệu hóa'}`);
+  showChangeNotif(u.active?'success':'warning', u.active?'Đã kích hoạt':'Đã vô hiệu hóa', `Tài khoản ${u.name}`);
+  _adminTab('users', document.querySelector('.admin-tab.active'));
+}
+
+function _adminAddUser() {
+  const existing = document.getElementById('_addUserModal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = '_addUserModal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:var(--bg-surface);border:1px solid var(--border-accent);border-radius:14px;padding:28px 32px;width:380px;box-shadow:0 8px 48px rgba(0,0,0,.8)">
+      <div style="font-size:14px;font-weight:800;color:var(--text-primary);margin-bottom:20px"><i class="fas fa-user-plus" style="color:var(--accent);margin-right:8px"></i>Thêm tài khoản mới</div>
+      ${[['_auName','Họ tên','text','Nguyễn Văn A'],['_auUser','Username','text','nvana'],['_auEmail','Email','email','a@evn.vn'],['_auPw','Mật khẩu','password','Tối thiểu 8 ký tự']].map(([id,lbl,type,ph])=>`
+        <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:11px">
+          <label style="font-size:11px;color:var(--text-secondary)">${lbl}</label>
+          <input id="${id}" type="${type}" class="auth-input" placeholder="${ph}">
+        </div>`).join('')}
+      <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:11px">
+        <label style="font-size:11px;color:var(--text-secondary)">Vai trò</label>
+        <select id="_auRole" class="auth-input" style="cursor:pointer">
+          <option value="user">USER – Người dùng</option>
+          <option value="admin">ADMIN – Quản trị viên</option>
+        </select>
+      </div>
+      <div id="_auErr" style="font-size:11px;color:var(--red);min-height:14px;margin-bottom:10px"></div>
+      <div style="display:flex;gap:8px">
+        <button class="auth-btn" style="flex:1" onclick="_doAddUser()"><i class="fas fa-save" style="margin-right:5px"></i>Tạo tài khoản</button>
+        <button onclick="document.getElementById('_addUserModal').remove()" style="flex:0.5;padding:10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:13px;cursor:pointer">Hủy</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function _doAddUser() {
+  const name  = (document.getElementById('_auName').value||'').trim();
+  const uname = (document.getElementById('_auUser').value||'').trim().toLowerCase();
+  const email = (document.getElementById('_auEmail').value||'').trim();
+  const pw    = document.getElementById('_auPw').value;
+  const role  = document.getElementById('_auRole').value;
+  const err   = document.getElementById('_auErr');
+  if (!name||!uname||!pw) { err.textContent='Vui lòng điền đầy đủ thông tin'; return; }
+  if (pw.length < 8) { err.textContent='Mật khẩu ít nhất 8 ký tự'; return; }
+  const users = _authGetUsers();
+  if (users.find(u=>u.username===uname)) { err.textContent='Username đã tồn tại'; return; }
+  users.push({ username:uname, password:pw, role, name, email, active:true, created:new Date().toISOString().slice(0,10) });
+  _authSaveUsers(users);
+  _authAddLog('CREATE_USER', `Tạo tài khoản ${uname} (${role})`);
+  document.getElementById('_addUserModal').remove();
+  showChangeNotif('success','Tạo tài khoản thành công',`Tài khoản ${name} (${uname}) đã được tạo.`);
+  _adminTab('users', document.querySelector('.admin-tab.active'));
+}
+
+function _adminEditUser(idx) {
+  const users = _authGetUsers();
+  const u = users[idx];
+  if (!u) return;
+  // Quick inline edit - just role toggle for now
+  const newRole = u.role === 'admin' ? 'user' : 'admin';
+  if (!confirm(`Đổi vai trò ${u.name} từ ${u.role.toUpperCase()} → ${newRole.toUpperCase()}?`)) return;
+  u.role = newRole;
+  _authSaveUsers(users);
+  _authAddLog('EDIT_USER', `Đổi vai trò ${u.username}: ${newRole}`);
+  showChangeNotif('success','Cập nhật vai trò',`${u.name} → ${newRole.toUpperCase()}`);
+  _adminTab('users', document.querySelector('.admin-tab.active'));
+}
+
+// ── CHANGE NOTIFICATION SYSTEM ──
+function showChangeNotif(type, title, msg, duration) {
+  const area = document.getElementById('changeNotifArea');
+  if (!area) return;
+  const icons = { success:'fa-check-circle', warning:'fa-exclamation-triangle', error:'fa-times-circle', info:'fa-info-circle' };
+  const colors= { success:'#00e676', warning:'#ffd740', error:'#ff5252', info:'#00c8ff' };
+  const col = colors[type]||colors.info;
+  const notif = document.createElement('div');
+  notif.className = `change-notif ${type}`;
+  const now = new Date().toLocaleTimeString('vi-VN');
+  notif.innerHTML = `
+    <i class="fas ${icons[type]||'fa-info-circle'} cn-icon" style="color:${col}"></i>
+    <div class="cn-content">
+      <div class="cn-title" style="color:${col}">${title}</div>
+      ${msg?`<div class="cn-msg">${msg}</div>`:''}
+      <div class="cn-time">${now}</div>
+    </div>
+    <span class="cn-close" onclick="this.closest('.change-notif').remove()">✕</span>`;
+  area.appendChild(notif);
+  setTimeout(() => { if (notif.parentNode) notif.remove(); }, duration || 5000);
+}
+
+// Intercept data updates to log them
+// Hook into Supabase calls to auto-log data changes
+const _origToast = window.showToast;
+window.showToast = function(msg, ...args) {
+  if (typeof _origToast === 'function') _origToast(msg, ...args);
+  const sess = _authCurrentUser();
+  if (sess && msg && msg.length > 0) {
+    _authAddLog('DATA_UPDATE', msg.slice(0, 100), sess.username);
+    showChangeNotif('info', 'Cập nhật dữ liệu', msg.slice(0, 80));
+  }
+};
+
+// Close admin panel on backdrop click
+document.getElementById('adminPanel').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+</script>
+
 </body>
 </html>
