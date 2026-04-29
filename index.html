@@ -1861,30 +1861,21 @@ body { font-size: var(--fs-base); }
 .hm-sub-bar { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-family:var(--font-mono); font-size:9px; color:var(--text-muted); margin-bottom:6px; }
 .hm-detail-panel {
   position: fixed;
-  right: 0;
-  top: 0;
+  right: 0; top: 0; bottom: 0;
   width: 380px;
   min-width: 280px;
   max-width: 70vw;
-  height: 100vh;
   z-index: 9200;
   background: var(--bg-surface);
   border-left: 1px solid rgba(255,255,255,0.15);
   box-shadow: -10px 0 40px rgba(0,0,0,.65);
   transform: translateX(100%);
   transition: transform .22s cubic-bezier(0.4,0,0.2,1);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
 }
 .hm-detail-panel.open { transform: translateX(0); }
 /* Khi panel open, đảm bảo flex layout */
-.hm-detail-panel.open {
-  display: flex !important;
-  flex-direction: column !important;
-  overflow: hidden !important;
-  height: 100vh !important;
-}
+
 /* Drag resize handle on left edge */
 .hm-detail-panel .hm-resize-grip {
   position: absolute;
@@ -1902,16 +1893,7 @@ body { font-size: var(--fs-base); }
 
 .hm-detail-hd { padding:12px 16px 10px; font-size:13px; font-weight:700; color:var(--accent); border-bottom:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center; flex-shrink:0; user-select:none; cursor:move; }
 /* Đảm bảo scroll div bên trong panel luôn hoạt động */
-/* Scroll div bên trong panel - target theo id */
-.hm-detail-panel #hm-detail-body {
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  flex: 1 1 0 !important;
-  min-height: 0 !important;
-  max-height: none !important;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-}
+
 /* Header và toolbar không co lại */
 .hm-detail-panel .hm-detail-hd,
 .hm-detail-panel > div[style*="flex-shrink:0"],
@@ -4959,11 +4941,11 @@ function getPreview(type, props) {
           <div class="ic-val" ${isComputed ? 'data-computed="true"' : 'contenteditable="true" spellcheck="false"'}
             style="color:${c.color};font-size:${c.valSize||26}px"
             data-uid="${uid}" data-ci="${ci}" data-field="value"
-            ${isComputed ? `onclick="this.closest('.ic-card').click()"` : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'||event.key===\'Tab\'){event.preventDefault();this.closest(\'.ic-card\').querySelector(\'.ic-lbl\').focus()}"'}
+            ${isComputed ? `onclick="event.stopPropagation();lytStatsCardClick('${c.label}','${c.color}')"` : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'||event.key===\'Tab\'){event.preventDefault();this.closest(\'.ic-card\').querySelector(\'.ic-lbl\').focus()}"'}
           >${c.value}</div>
           <div class="${isComputed ? 'ic-lbl' : 'ic-lbl'}" ${isComputed ? '' : 'contenteditable="true" spellcheck="false"'}
             data-uid="${uid}" data-ci="${ci}" data-field="label"
-            ${isComputed ? `onclick="this.closest('.ic-card').click()"` : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}"'}
+            ${isComputed ? `onclick="event.stopPropagation();lytStatsCardClick('${c.label}','${c.color}')"` : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}"'}
           >${c.label}</div>
         </div>
       `;
@@ -4971,16 +4953,17 @@ function getPreview(type, props) {
       return `
       <div class="ic-card ${isTechChart && useTechStackLayout ? 'ic-card-tech-stack' : ''}" id="icc_${uid}_${ci}"
         style="--card-color:${c.color};border-color:${c.color}22;border-top-color:${c.color};cursor:pointer;${placementStyle}"
-        draggable="true"
-        onclick="if(!event.target.closest('.ic-toolbar')&&!event.target.closest('.ic-sz-btn')&&!event.target.closest('[contenteditable=true]')){lytStatsCardClick('${c.label}','${c.color}')}"
-        ondragstart="icDragStart(event,'${uid}',${ci})"
+        draggable="false"
+        onmousedown="this._icmd=true;this._icmv=false"
+        onmousemove="this._icmv=true"
+        onmouseup="if(this._icmd&&!this._icmv&&!event.target.closest('.ic-toolbar')&&!event.target.closest('.ic-sz-btn')){event.stopPropagation();lytStatsCardClick('${c.label}','${c.color}')}this._icmd=false"
         ondragover="icDragOver(event,'${uid}',${ci})"
         ondrop="icDrop(event,'${uid}',${ci})"
         ondragleave="icDragLeave(event,'${uid}',${ci})"
         ondragend="icDragEnd(event,'${uid}')">
         ${ratioHtml}
         <div class="ic-toolbar">
-          <span class="ic-tbtn ic-drag-btn"><i class="fas fa-grip-vertical"></i></span>
+          <span class="ic-tbtn ic-drag-btn" draggable="true" ondragstart="event.stopPropagation();icDragStart(event,'${uid}',${ci})" title="Kéo để sắp xếp"><i class="fas fa-grip-vertical"></i></span>
           <button class="ic-tbtn" onclick="icPickColor(event,'${uid}',${ci})" title="Màu"><i class="fas fa-palette"></i></button>
           <div class="ic-size-ctrl" title="Cỡ icon">
             <button class="ic-sz-btn" onclick="icAdjustSize('${uid}',${ci},'icon',-2)">−</button>
@@ -7248,29 +7231,10 @@ function _hmPanelInitDrag(panel) {
 
 // Mở panel + hiện backdrop + focus search
 function _hmOpenPanel(p, showBackdrop) {
-  // Reset inline styles từ drag trước đó
+  // Panel dùng overflow-y:auto trực tiếp - không cần flex tricks
   p.style.top    = '0';
-  p.style.bottom = '';
-  p.style.height = '100vh';
-  // Đảm bảo flex layout bằng inline style (override mọi CSS conflict)
-  p.style.display       = 'flex';
-  p.style.flexDirection = 'column';
-  p.style.overflow      = 'hidden';
-
-  // Fix scroll div - tìm bằng id trước, fallback bằng vị trí cuối
-  const fixScroll = (el) => {
-    if (!el) return;
-    el.id = 'hm-detail-body'; // đảm bảo có id để CSS match
-    el.style.cssText += ';overflow-y:auto!important;flex:1 1 0!important;min-height:0!important;-webkit-overflow-scrolling:touch;overscroll-behavior:contain';
-  };
-  const byId = p.querySelector('#hm-detail-body');
-  if (byId) {
-    fixScroll(byId);
-  } else {
-    // Fallback: div cuối cùng của panel
-    const divs = p.querySelectorAll(':scope > div');
-    if (divs.length > 0) fixScroll(divs[divs.length - 1]);
-  }
+  p.style.bottom = '0';
+  p.style.height = '';
 
   // Backdrop
   if (showBackdrop !== false) {
@@ -7281,21 +7245,18 @@ function _hmOpenPanel(p, showBackdrop) {
       bd.style.cssText = 'position:fixed;inset:0;z-index:9190;background:rgba(0,0,0,.35);display:none';
       bd.onclick = () => {
         p.classList.remove('open');
-        p.style.top = ''; p.style.bottom = '0'; p.style.height = '';
         bd.style.display = 'none';
       };
       document.body.appendChild(bd);
     }
     bd.style.display = 'block';
   }
-
-  // Focus ô tìm kiếm
+  // Focus search box
   setTimeout(() => {
     const si = p.querySelector('input[type=text]');
     if (si) si.focus();
   }, 220);
 }
-
 
 function _lytDetailSearchFn(val) {
   const q = (val||'').toLowerCase().trim();
@@ -7619,10 +7580,6 @@ function lytChipReset() {
 
 // ── Stats card click — hiện detail panel bên phải ──────────────
 function lytStatsCardClick(label, color) {
-  if (!_chipAllData || !_chipAllData.length) {
-    if (typeof showToast === 'function') showToast('⏳ Dữ liệu chưa tải xong, vui lòng thử lại...');
-    return;
-  }
   const rows    = (_chipFiltered.length ? _chipFiltered : _chipAllData);
   const capLbl  = {'0':'TT','1':'110kV','2':'220kV','3':'35kV','4':'22kV','6':'6kV','9':'10kV'};
   const capPrio = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
@@ -8950,7 +8907,7 @@ function _tbTable() {
       <td title="${r.Hang_san_xuat||''}">${r.Hang_san_xuat||'—'}</td>
       <td class="tb-num">${r.Nam_san_xuat||'—'}</td>
       <td class="tb-num">${r.Nam_van_hanh||'—'}</td>
-      <td class="${ageCls}">${age>=0?age+'n':'—'}</td>
+      <td class="${ageCls}">${age>=0?age:'—'}</td>
       <td class="tb-num">${r.Cong_suat||'—'}</td>
       <td>${lyLich}</td>
       <td title="${r.Thong_so||''}">${r.Thong_so?r.Thong_so.slice(0,30)+(r.Thong_so.length>30?'…':''):'—'}</td>
