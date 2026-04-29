@@ -1,0 +1,73 @@
+# EVNHANOI Dashboard – Layout Editor
+
+Hệ thống quản lý thiết bị điện lực EVNHANOI.
+Dữ liệu từ Supabase · Biểu đồ Chart.js · Auth Supabase Auth
+
+## Cấu trúc file
+
+```
+├── index.html     # HTML structure (338 dòng)
+├── styles.css     # Toàn bộ CSS (588 rules, design tokens)
+└── app.js         # Logic JavaScript (249 functions)
+```
+
+## Tính năng
+
+- **Thông tin chung** – Stats cards click-to-detail (TBA, thiết bị, ngăn...)
+- **Bộ lọc** – Filter theo trạm, cấp điện áp, loại thiết bị, năm SX/VH
+- **Danh sách thiết bị** – Chip click hiển thị chi tiết theo trạm
+- **Biểu đồ** – Stacked bar theo trạm, pie chart phân loại & công nghệ
+- **TNĐK** – Khối lượng thí nghiệm định kỳ với bộ lọc cascade
+- **Auth** – Supabase Auth (signInWithPassword), phân quyền ADMIN/USER
+- **Layout Editor** – Admin kéo thả, tùy chỉnh sections (chỉ ADMIN thấy)
+
+## Cài đặt Supabase
+
+### 1. Tạo bảng profile người dùng
+
+```sql
+create table public.evn_user_profiles (
+  id         uuid primary key references auth.users(id) on delete cascade,
+  email      text,
+  name       text,
+  role       text default 'user',  -- 'admin' | 'user'
+  active     boolean default true,
+  created_at timestamptz default now()
+);
+alter table evn_user_profiles enable row level security;
+create policy allow_all on evn_user_profiles for all using (true);
+```
+
+### 2. Tạo tài khoản admin đầu tiên
+
+```sql
+-- Sau khi tạo user trong Authentication > Users
+insert into evn_user_profiles (id, email, name, role)
+select id, email, 'Quan tri vien', 'admin'
+from auth.users where email = 'admin@example.com';
+
+-- Cập nhật user_metadata để role có trong JWT token
+update auth.users
+set raw_user_meta_data = raw_user_meta_data || '{"role":"admin","name":"Quan tri vien"}'
+where email = 'admin@example.com';
+```
+
+### 3. Bảng dữ liệu thiết bị
+
+Bảng `TongHopThietBi` với các cột:
+`Tram, Cap_dien_ap, Phan_loai_thiet_bi, Ten_thiet_bi, Kieu, Ngan_thiet_bi, So_luong, Nam_san_xuat, Nam_van_hanh, Cong_suat, Doi, Cong_nghe, ...`
+
+## Tài khoản mặc định
+
+| Role  | Quyền |
+|-------|-------|
+| ADMIN | Xem toàn bộ Layout Editor, quản lý user, xem audit log |
+| USER  | Chỉ xem dashboard dữ liệu, không thấy editor |
+
+## Deploy GitHub Pages
+
+```
+Settings > Pages > Source: main branch > / (root)
+```
+
+URL: `https://<username>.github.io/<repo>/`
