@@ -1871,7 +1871,9 @@ body { font-size: var(--fs-base); }
   box-shadow: -10px 0 40px rgba(0,0,0,.65);
   transform: translateX(100%);
   transition: transform .22s cubic-bezier(0.4,0,0.2,1);
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .hm-detail-panel.open { transform: translateX(0); }
 /* Khi panel open, đảm bảo flex layout */
@@ -4947,13 +4949,17 @@ function getPreview(type, props) {
             ${isComputed ? '' : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'||event.key===\'Tab\'){event.preventDefault();this.closest(\'.ic-card\').querySelector(\'.ic-val\').focus()}"'}
           >${c.icon||'▣'}</div>
           <div class="ic-val" ${isComputed ? 'data-computed="true"' : 'contenteditable="true" spellcheck="false"'}
-            style="color:${c.color};font-size:${c.valSize||26}px"
+            style="color:${c.color};font-size:${c.valSize||26}px;${isComputed?'cursor:pointer;user-select:none':''}"
             data-uid="${uid}" data-ci="${ci}" data-field="value"
-            ${isComputed ? `` : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'||event.key===\'Tab\'){event.preventDefault();this.closest(\'.ic-card\').querySelector(\'.ic-lbl\').focus()}"'}
+            ${isComputed
+              ? `onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\\'")}','${c.color}')"`
+              : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'||event.key===\'Tab\'){event.preventDefault();this.closest(\'.ic-card\').querySelector(\'.ic-lbl\').focus()}"'}
           >${c.value}</div>
-          <div class="${isComputed ? 'ic-lbl' : 'ic-lbl'}" ${isComputed ? '' : 'contenteditable="true" spellcheck="false"'}
+          <div class="${isComputed ? 'ic-lbl' : 'ic-lbl'}" ${isComputed ? 'style="cursor:pointer;user-select:none"' : 'contenteditable="true" spellcheck="false"'}
             data-uid="${uid}" data-ci="${ci}" data-field="label"
-            ${isComputed ? `` : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}"'}
+            ${isComputed
+              ? `onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\\'")}','${c.color}')"`
+              : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}"'}
           >${c.label}</div>
         </div>
       `;
@@ -4961,7 +4967,7 @@ function getPreview(type, props) {
       return `
       <div class="ic-card ${isTechChart && useTechStackLayout ? 'ic-card-tech-stack' : ''}" id="icc_${uid}_${ci}"
         style="--card-color:${c.color};border-color:${c.color}22;border-top-color:${c.color};cursor:pointer;${placementStyle}"
-        draggable="true"
+        draggable="${isComputed ? 'false' : 'true'}"
         onclick="if(!event.target.closest('.ic-toolbar')&&!event.target.closest('.ic-sz-btn')&&!event.target.isContentEditable){lytStatsCardClick('${c.label}','${c.color}')}"
         ondragstart="icDragStart(event,'${uid}',${ci})"
         ondragover="icDragOver(event,'${uid}',${ci})"
