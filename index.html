@@ -6961,7 +6961,7 @@ function renderTimelineSection() {
     </div>
     <div style="background:rgba(255,215,64,.07);border:1px solid rgba(255,215,64,.2);border-radius:8px;padding:10px 14px">
       <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-clock" style="margin-right:4px"></i>Thiết bị lâu nhất</div>
-      <div style="font-size:20px;font-weight:800;font-family:var(--font-mono);color:#ffd740">${oldestY < nowY ? oldestY + ' (' + (nowY-oldestY) + ' năm)' : '—'}</div>
+      <div style="font-size:20px;font-weight:800;font-family:var(--font-mono);color:#ffd740">${oldestY < nowY ? oldestY + ' (' + (nowY-oldestY) + 'n)' : '—'}</div>
     </div>
     <div style="background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.2);border-radius:8px;padding:10px 14px">
       <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-percent" style="margin-right:4px"></i>Tỷ lệ > 15 năm</div>
@@ -6970,7 +6970,7 @@ function renderTimelineSection() {
   </div>
 
   <div style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.08em;margin-bottom:8px">
-    PHÂN TÍCH THỜI GIAN VẬN HÀNH THEO LOẠI THIẾT BỊ
+    PHÂN TÍCH THÂM NIÊN VẬN HÀNH THEO LOẠI THIẾT BỊ
     <span style="margin-left:12px;font-weight:400">
       ${TL_BUCKETS.map(b=>`<span style="color:${b.color};margin-right:10px">■ ${b.label}</span>`).join('')}
     </span>
@@ -7073,7 +7073,7 @@ function lytTLBucketClick(type, bucketKey, bucketLabel, color) {
       const yrs=[...info.years].sort();
       const yrStr=yrs.length?(yrs[0]===yrs[yrs.length-1]?`${yrs[0]}`:`${yrs[0]}–${yrs[yrs.length-1]}`):'—';
       const ages=yrs.map(y=>nowY-y);
-      const ageStr=ages.length?`~${Math.round(ages.reduce((s,a)=>s+a,0)/ages.length)} năm`:'';
+      const ageStr=ages.length?`~${Math.round(ages.reduce((s,a)=>s+a,0)/ages.length)}n`:'';
       items.push({text:t,badge:`${info.qty}TB · ${yrStr}${ageStr?' · '+ageStr:''}`,color:capColor[cap]||'#888'});
     });
   });
@@ -10119,241 +10119,292 @@ let _bcFDoi='', _bcFTram='', _bcFMonth='', _bcFYear='', _bcFType='';
 function _bcRenderByMonth(conf) {
   const rawData = _tnRawData.length ? _tnRawData : (_tnAllData.length ? _tnAllData : []);
   const fmt = n => Number(n).toLocaleString('vi-VN');
-  const fmtD = v => { if(!v)return'—'; const d=new Date(v); return isNaN(d)?v:d.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'}); };
   const sortVi = (a,b) => String(a).localeCompare(String(b),'vi');
-  const now = new Date(); const nowY=now.getFullYear(); const nowM=now.getMonth()+1;
-  const nextM = nowM===12?1:nowM+1; const nextY = nowM===12?nowY+1:nowY;
 
-  // ── Filter options from full dataset ──
+  // Build filter option lists from full dataset
   const allDois  = [...new Set(rawData.map(r=>(r.Doi||'').trim()).filter(Boolean))].sort(sortVi);
   const allTrams = [...new Set(rawData.map(r=>(r.Tram||'').trim()).filter(Boolean))].sort(sortVi);
   const allTypes = [...new Set(rawData.map(r=>(r.Phan_loai_thiet_bi||'').trim()).filter(Boolean))].sort(sortVi);
+  // Collect all years/months from dates
   const allYears = new Set(), allMonths = new Set();
-  rawData.forEach(r=>{
-    const ds=r.Ngay_thi_nghiem||r.Thoi_gian_thi_nghiem_tiep_theo; if(!ds)return;
-    const d=new Date(ds); if(isNaN(d))return;
-    allYears.add(d.getFullYear()); allMonths.add(d.getMonth()+1);
+  rawData.forEach(r => {
+    const ds = r.Ngay_thi_nghiem || r.Thoi_gian_thi_nghiem_tiep_theo;
+    if (!ds) return;
+    const d = new Date(ds); if (isNaN(d)) return;
+    allYears.add(d.getFullYear());
+    allMonths.add(d.getMonth()+1);
   });
-  const yearList=[...allYears].sort((a,b)=>b-a);
-  const monthList=[...allMonths].sort((a,b)=>a-b);
+  const yearList  = [...allYears].sort((a,b)=>b-a);
+  const monthList = [...allMonths].sort((a,b)=>a-b);
 
-  // ── Apply active filters ──
-  const data = rawData.filter(r=>{
-    if(_bcFDoi&&(r.Doi||'').trim()!==_bcFDoi) return false;
-    if(_bcFTram&&(r.Tram||'').trim()!==_bcFTram) return false;
-    if(_bcFType&&(r.Phan_loai_thiet_bi||'').trim()!==_bcFType) return false;
-    if(_bcFYear||_bcFMonth){
-      const ds=r.Ngay_thi_nghiem||r.Thoi_gian_thi_nghiem_tiep_theo; if(!ds)return false;
-      const d=new Date(ds); if(isNaN(d))return false;
-      if(_bcFYear&&String(d.getFullYear())!==String(_bcFYear)) return false;
-      if(_bcFMonth&&String(d.getMonth()+1)!==String(_bcFMonth)) return false;
+  // Apply active filters
+  const data = rawData.filter(r => {
+    if (_bcFDoi  && (r.Doi||'').trim() !== _bcFDoi)                            return false;
+    if (_bcFTram && (r.Tram||'').trim() !== _bcFTram)                          return false;
+    if (_bcFType && (r.Phan_loai_thiet_bi||'').trim() !== _bcFType)            return false;
+    const ds = r.Ngay_thi_nghiem || r.Thoi_gian_thi_nghiem_tiep_theo;
+    if (_bcFYear || _bcFMonth) {
+      if (!ds) return false;
+      const d = new Date(ds); if (isNaN(d)) return false;
+      if (_bcFYear  && String(d.getFullYear()) !== String(_bcFYear))  return false;
+      if (_bcFMonth && String(d.getMonth()+1) !== String(_bcFMonth))  return false;
     }
     return true;
   });
 
-  // ── Stat card values ──
-  const totalTB = rawData.length;
-  const thisMon = rawData.filter(r=>{
-    const ds=r.Thoi_gian_thi_nghiem_tiep_theo; if(!ds)return false;
-    const d=new Date(ds); return d.getFullYear()===nowY&&d.getMonth()+1===nowM;
-  }).length;
-  const nextMon = rawData.filter(r=>{
-    const ds=r.Thoi_gian_thi_nghiem_tiep_theo; if(!ds)return false;
-    const d=new Date(ds); return d.getFullYear()===nextY&&d.getMonth()+1===nextM;
-  }).length;
-
-  // ── Build chart data: X=Trạm, Y=Số TB, 3 bars per Loại TB cluster ──
-  // Bars per type: past TN (grey) / current year TN (cyan) / next scheduled (yellow)
-  const typeList = _bcFType ? [_bcFType] : allTypes.slice(0,10);
-  const TYPE_COLORS = ['#00c8ff','#00e676','#ffd740','#ff9100','#e040fb','#18ffff','#ff5252','#00bcd4','#8bc34a','#b388ff'];
-
-  // Per tram per type: count past TN (Ngay_thi_nghiem in previous years),
-  //                    current (Ngay_thi_nghiem in nowY),
-  //                    upcoming (Thoi_gian_thi_nghiem_tiep_theo >= today)
-  const tramList = _bcFTram ? [_bcFTram] : allTrams;
-  const today = new Date(); today.setHours(0,0,0,0);
-
-  // Build per-tram per-type counts
-  const chartData = {}; // {tram: {type: {past,cur,next}}}
-  tramList.forEach(t=>{ chartData[t]={}; typeList.forEach(tp=>{ chartData[t][tp]={past:0,cur:0,next:0}; }); });
-  rawData.forEach(r=>{
-    const t=(r.Tram||'').trim(); if(!t||!chartData[t])return;
-    const tp=(r.Phan_loai_thiet_bi||'').trim(); if(!chartData[t][tp])return;
-    if(r.Ngay_thi_nghiem){
-      const d=new Date(r.Ngay_thi_nghiem); if(!isNaN(d)){
-        if(d.getFullYear()===nowY) chartData[t][tp].cur++;
-        else if(d<today) chartData[t][tp].past++;
-      }
-    }
-    if(r.Thoi_gian_thi_nghiem_tiep_theo){
-      const d=new Date(r.Thoi_gian_thi_nghiem_tiep_theo); if(!isNaN(d)&&d>=today) chartData[t][tp].next++;
-    }
-  });
-
-  // Month detail table
-  const monthMap={}, monthTypeMap={};
-  data.forEach(r=>{
-    const ds=r.Ngay_thi_nghiem||r.Thoi_gian_thi_nghiem_tiep_theo; if(!ds)return;
-    const d=new Date(ds); if(isNaN(d))return;
-    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    const label=`T${d.getMonth()+1}/${d.getFullYear()}`;
-    if(!monthMap[key])monthMap[key]={label,v:0,year:d.getFullYear(),month:d.getMonth()+1};
+  // Count by month
+  const monthMap = {};
+  const monthTypeMap = {};
+  data.forEach(r => {
+    const dateStr = r.Ngay_thi_nghiem || r.Thoi_gian_thi_nghiem_tiep_theo;
+    if (!dateStr) return;
+    const d = new Date(dateStr);
+    if (isNaN(d)) return;
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const label = `T${d.getMonth()+1}/${d.getFullYear()}`;
+    if (!monthMap[key]) monthMap[key] = { label, v:0, year:d.getFullYear(), month:d.getMonth()+1 };
     monthMap[key].v++;
-    const pl=(r.Phan_loai_thiet_bi||'Khác').trim();
-    if(!monthTypeMap[key])monthTypeMap[key]={};
-    monthTypeMap[key][pl]=(monthTypeMap[key][pl]||0)+1;
+    const pl = (r.Phan_loai_thiet_bi||'Khác').trim();
+    if (!monthTypeMap[key]) monthTypeMap[key] = {};
+    monthTypeMap[key][pl] = (monthTypeMap[key][pl]||0)+1;
   });
-  const COLORS=['#00c8ff','#00e676','#ffd740','#ff9100','#e040fb','#18ffff','#ff4081','#00bcd4','#8bc34a','#ff5252'];
-  const filteredTypes=[...new Set(data.map(r=>(r.Phan_loai_thiet_bi||'Khác').trim()))].sort(sortVi);
-  const months=Object.keys(monthMap).sort().map(k=>monthMap[k]);
 
-  // ── Dropdown helper using global store ──
-  if(!window._bcDdStore)window._bcDdStore={};
-  function mkBcDd(key, dflt, val, items) {
-    window._bcDdStore[key]={items,dflt};
-    const active=!!val; const lbl=val||dflt;
-    const brd=active?'var(--accent)':'rgba(0,200,255,.4)';
-    const bg=active?'rgba(0,200,255,.1)':'var(--bg-elevated)';
-    const col=active?'var(--accent)':'var(--text-primary)';
-    return `<button data-bcddkey="${key}" style="display:inline-flex;align-items:center;justify-content:space-between;gap:6px;padding:5px 10px;border-radius:7px;border:1px solid ${brd};background:${bg};color:${col};font-family:var(--font-mono);font-size:11px;cursor:pointer;outline:none;min-width:100px;white-space:nowrap" onclick="event.stopPropagation();_bcBmDropdown(this,'${key}')">
+  const months = Object.keys(monthMap).sort().map(k=>monthMap[k]);
+  const filteredTypes = [...new Set(data.map(r=>(r.Phan_loai_thiet_bi||'Khác').trim()))].sort((a,b)=>a.localeCompare(b,'vi'));
+  const COLORS = ['#00c8ff','#00e676','#ffd740','#ff9100','#e040fb','#18ffff','#ff4081','#00bcd4','#8bc34a','#ff5252'];
+
+  const totalDone = data.filter(r=>r.Ngay_thi_nghiem).length;
+
+  // Helper: build dropdown using global store (no JSON-in-HTML)
+  if (!window._bcDdStore) window._bcDdStore = {};
+  function mkBcDd(key, dflt, val, items, labelFn) {
+    window._bcDdStore[key] = { items, dflt };
+    const active = !!val;
+    const lbl = val ? (labelFn ? labelFn(val) : val) : dflt;
+    const brd = active ? 'var(--accent)' : 'rgba(0,200,255,.4)';
+    const bg  = active ? 'rgba(0,200,255,.1)' : 'var(--bg-elevated)';
+    const col = active ? 'var(--accent)' : 'var(--text-primary)';
+    return `<button data-bckey="${key}" style="display:inline-flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;border-radius:7px;border:1px solid ${brd};background:${bg};color:${col};font-family:var(--font-mono);font-size:11px;cursor:pointer;outline:none;min-width:115px;white-space:nowrap" onclick="event.stopPropagation();_bcBmDropdown(this,'${key}')">
       <span>${lbl}</span><i class="fas fa-chevron-down" style="font-size:8px;opacity:.6;flex-shrink:0"></i>
     </button>`;
   }
-  const hasFilter=_bcFDoi||_bcFTram||_bcFYear||_bcFMonth||_bcFType;
 
-  // ── Build grouped cluster chart SVG ──
-  function buildClusterChart() {
-    if(!tramList.length||!typeList.length) return '<div style="padding:20px;text-align:center;color:var(--text-muted)">Không có dữ liệu</div>';
-    const BAR_H=140, CLUSTER_GAP=8, BAR_GAP=1;
-    const nTypes=typeList.length, nTrams=Math.min(tramList.length,30); // max 30 trams for readability
-    const shownTrams=tramList.slice(0,nTrams);
-    // 3 bars per type (past=grey, cur=cyan, next=yellow), nTypes clusters per tram
-    const barW=Math.max(4, Math.min(14, Math.floor(900/(nTrams*nTypes*3+nTrams*2))));
-    const clusterW=nTypes*(3*barW+BAR_GAP*2)+CLUSTER_GAP;
-    const totalW=nTrams*clusterW;
-
-    // Find max value across all trams and types
-    let maxV=1;
-    shownTrams.forEach(t=>{typeList.forEach(tp=>{const c=chartData[t]?.[tp]||{}; maxV=Math.max(maxV,c.past||0,c.cur||0,c.next||0);});});
-
-    const tramGroups=shownTrams.map((t,ti)=>{
-      const gx=ti*clusterW;
-      const typeBars=typeList.map((tp,tpi)=>{
-        const c=chartData[t]?.[tp]||{past:0,cur:0,next:0};
-        const tx=tpi*(3*barW+BAR_GAP*2);
-        const hp=Math.max(c.past?1:0, Math.round((c.past/maxV)*BAR_H));
-        const hc=Math.max(c.cur?1:0, Math.round((c.cur/maxV)*BAR_H));
-        const hn=Math.max(c.next?1:0, Math.round((c.next/maxV)*BAR_H));
-        const typeCol=TYPE_COLORS[tpi%TYPE_COLORS.length];
-        return `<g transform="translate(${tx},0)">
-          ${c.past?`<rect x="0" y="${BAR_H-hp}" width="${barW}" height="${hp}" fill="#607d8b" opacity=".8" rx="1"/>
-          <text x="${barW/2}" y="${BAR_H-hp-2}" text-anchor="middle" fill="#607d8b" font-size="5">${c.past}</text>`:''}
-          ${c.cur?`<rect x="${barW+BAR_GAP}" y="${BAR_H-hc}" width="${barW}" height="${hc}" fill="${typeCol}" opacity=".9" rx="1"/>
-          <text x="${barW+BAR_GAP+barW/2}" y="${BAR_H-hc-2}" text-anchor="middle" fill="${typeCol}" font-size="5">${c.cur}</text>`:''}
-          ${c.next?`<rect x="${(barW+BAR_GAP)*2}" y="${BAR_H-hn}" width="${barW}" height="${hn}" fill="#ffd740" opacity=".85" rx="1"/>
-          <text x="${(barW+BAR_GAP)*2+barW/2}" y="${BAR_H-hn-2}" text-anchor="middle" fill="#ffd740" font-size="5">${c.next}</text>`:''}
-        </g>`;
-      }).join('');
-      // Tram label at bottom
-      const tramLabel=t.length>6?t.substring(0,6)+'…':t;
-      return `<g transform="translate(${gx},0)" style="cursor:pointer" onclick="_bcBarClick('${t.replace(/'/g,"\'")}',0,'#00c8ff')">
-        ${typeBars}
-        <text x="${clusterW/2-CLUSTER_GAP/2}" y="${BAR_H+11}" text-anchor="middle" fill="rgba(255,255,255,.5)" font-size="7">${tramLabel}</text>
-        <line x1="0" y1="${BAR_H+1}" x2="${clusterW-CLUSTER_GAP}" y2="${BAR_H+1}" stroke="rgba(255,255,255,.08)" stroke-width="0.5"/>
-      </g>`;
-    }).join('');
-
-    // Type legend at top
-    const typeLegend=typeList.map((tp,i)=>`<g transform="translate(${i*70},0)">
-      <rect x="0" y="3" width="8" height="8" fill="${TYPE_COLORS[i%TYPE_COLORS.length]}" rx="1"/>
-      <text x="11" y="11" fill="rgba(255,255,255,.6)" font-size="8">${tp.length>7?tp.slice(0,7)+'…':tp}</text>
-    </g>`).join('');
-
-    const svgW=Math.max(totalW, 600);
-    return `<div style="overflow-x:auto;padding-bottom:4px">
-      <svg width="${svgW}" height="${BAR_H+60}" xmlns="http://www.w3.org/2000/svg" style="display:block">
-        <g transform="translate(0,6)">${typeLegend}</g>
-        <g transform="translate(0,22)">${tramGroups}</g>
-        <!-- Period legend -->
-        <g transform="translate(0,${BAR_H+34})">
-          <rect x="0" y="0" width="8" height="8" fill="#607d8b" rx="1"/>
-          <text x="11" y="8" fill="rgba(255,255,255,.5)" font-size="8">KL kỳ TN trước</text>
-          <rect x="100" y="0" width="8" height="8" fill="#00c8ff" rx="1"/>
-          <text x="111" y="8" fill="rgba(255,255,255,.5)" font-size="8">KL năm ${nowY}</text>
-          <rect x="190" y="0" width="8" height="8" fill="#ffd740" rx="1"/>
-          <text x="201" y="8" fill="rgba(255,255,255,.5)" font-size="8">KL dự kiến tiếp theo</text>
-        </g>
-      </svg>
-    </div>`;
-  }
+  const hasFilter = _bcFDoi||_bcFTram||_bcFYear||_bcFMonth||_bcFType;
 
   return `
   <!-- Filter toolbar -->
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;margin-bottom:12px">
     <i class="fas fa-filter" style="font-size:10px;color:var(--text-muted)"></i>
-    ${mkBcDd('doi','— Đội —',_bcFDoi,allDois.map(v=>({v,l:v})))}
-    ${mkBcDd('tram','— Trạm —',_bcFTram,allTrams.map(v=>({v,l:v})))}
-    ${mkBcDd('year','Năm',_bcFYear,yearList.map(v=>({v:String(v),l:String(v)})))}
-    ${mkBcDd('month','Tháng',_bcFMonth,monthList.map(v=>({v:String(v),l:'Tháng '+v})))}
-    ${mkBcDd('type','Loại thiết bị',_bcFType,allTypes.map(v=>({v,l:v})))}
-    ${hasFilter?`<button onclick="_bcFDoi='';_bcFTram='';_bcFYear='';_bcFMonth='';_bcFType='';bcRenderPage(window._bcLastConf||{rpt:'by_month',icon:'fa-chart-bar',color:'#00c8ff'},'KL theo tháng')" style="padding:5px 11px;border-radius:6px;border:1px solid rgba(255,82,82,.3);background:rgba(255,82,82,.1);color:#ff5252;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-times"></i> Xóa lọc</button>`:''}
-    <span style="margin-left:auto;font-size:10px;font-family:var(--font-mono);color:var(--text-muted)">${fmt(rawData.length)} bản ghi</span>
+    ${mkBcDd('doi','— Đội —',_bcFDoi, allDois.map(v=>({v,l:v})), v=>v)}
+    ${mkBcDd('tram','— Trạm —',_bcFTram, allTrams.map(v=>({v,l:v})), v=>v)}
+    ${mkBcDd('year','Năm',_bcFYear, yearList.map(v=>({v:String(v),l:String(v)})), v=>v)}
+    ${mkBcDd('month','Tháng',_bcFMonth, monthList.map(v=>({v:String(v),l:`Tháng ${v}`})), v=>`T${v}`)}
+    ${mkBcDd('type','Loại thiết bị',_bcFType, allTypes.map(v=>({v,l:v})), v=>v)}
+    ${hasFilter ? `<button onclick="_bcFDoi='';_bcFTram='';_bcFYear='';_bcFMonth='';_bcFType='';bcRenderPage(window._bcLastConf||{rpt:'by_month',icon:'fa-chart-bar',color:'#00c8ff'},'Khối lượng theo tháng')" style="padding:5px 11px;border-radius:6px;border:1px solid rgba(255,82,82,.3);background:rgba(255,82,82,.1);color:#ff5252;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-times"></i> Xóa lọc</button>` : ''}
+    <span style="margin-left:auto;font-size:10px;font-family:var(--font-mono);color:var(--text-muted)">${fmt(data.length)} bản ghi</span>
   </div>
 
-  <!-- Stat cards -->
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
-    <div style="background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
-      onclick="_bcStatClick('total',rawData)" onmouseenter="this.style.borderColor='rgba(0,200,255,.5)'" onmouseleave="this.style.borderColor='rgba(0,200,255,.2)'">
-      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-database" style="margin-right:4px;color:#00c8ff"></i>Tổng số thiết bị</div>
-      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:var(--accent);margin-bottom:6px">${fmt(totalTB)}</div>
-      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:100%;background:#00c8ff;border-radius:2px"></div></div>
-    </div>
-    <div style="background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
-      onclick="_bcStatClick('thismon',rawData)" onmouseenter="this.style.borderColor='rgba(0,230,118,.5)'" onmouseleave="this.style.borderColor='rgba(0,230,118,.2)'">
-      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-calendar-check" style="margin-right:4px;color:#00e676"></i>Phải TN tháng ${nowM}/${nowY}</div>
-      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:#00e676;margin-bottom:6px">${fmt(thisMon)}</div>
-      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${Math.min(100,thisMon/Math.max(1,totalTB)*2000)}%;background:#00e676;border-radius:2px;transition:width .4s"></div></div>
-    </div>
-    <div style="background:rgba(255,215,64,.07);border:1px solid rgba(255,215,64,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
-      onclick="_bcStatClick('nextmon',rawData)" onmouseenter="this.style.borderColor='rgba(255,215,64,.5)'" onmouseleave="this.style.borderColor='rgba(255,215,64,.2)'">
-      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-calendar-plus" style="margin-right:4px;color:#ffd740"></i>Phải TN tháng ${nextM}/${nextY}</div>
-      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:#ffd740;margin-bottom:6px">${fmt(nextMon)}</div>
-      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${Math.min(100,nextMon/Math.max(1,totalTB)*2000)}%;background:#ffd740;border-radius:2px;transition:width .4s"></div></div>
-    </div>
-  </div>
+  ${(()=>{
+    const now2=new Date(); const nowY2=now2.getFullYear(); const nowM2=now2.getMonth()+1;
+    const nextM2=nowM2===12?1:nowM2+1; const nextY2=nowM2===12?nowY2+1:nowY2;
+    // Count from rawData (not filtered data - always show full totals)
+    const thisMon2 = rawData.filter(r=>{
+      const ds=r.Thoi_gian_thi_nghiem_tiep_theo; if(!ds) return false;
+      const d=new Date(ds); return d.getFullYear()===nowY2 && d.getMonth()+1===nowM2;
+    }).length;
+    const nextMon2 = rawData.filter(r=>{
+      const ds=r.Thoi_gian_thi_nghiem_tiep_theo; if(!ds) return false;
+      const d=new Date(ds); return d.getFullYear()===nextY2 && d.getMonth()+1===nextM2;
+    }).length;
+    function sc2(icon,col,bg,brd,label,val,pct,key) {
+      return `<div style="background:${bg};border:1px solid ${brd};border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
+        onclick="_bcStatClick('${key}',rawData)"
+        onmouseenter="this.style.borderColor='${col}'" onmouseleave="this.style.borderColor='${brd}'">
+        <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas ${icon}" style="margin-right:4px;color:${col}"></i>${label}</div>
+        <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:${col};margin-bottom:6px">${fmt(val)}</div>
+        <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${Math.min(100,pct)}%;background:${col};border-radius:2px;transition:width .4s;box-shadow:0 0 6px ${col}55"></div></div>
+      </div>`;
+    }
+    return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+      ${sc2('fa-database','#00c8ff','rgba(0,200,255,.07)','rgba(0,200,255,.2)','Tổng số thiết bị',rawData.length,100,'total')}
+      ${sc2('fa-calendar-check','#00e676','rgba(0,230,118,.07)','rgba(0,230,118,.2)',`Phải TN tháng ${nowM2}/${nowY2}`,thisMon2,Math.min(100,thisMon2/Math.max(rawData.length,1)*1500),'thismon')}
+      ${sc2('fa-calendar-plus','#ffd740','rgba(255,215,64,.07)','rgba(255,215,64,.2)',`Phải TN tháng ${nextM2}/${nextY2}`,nextMon2,Math.min(100,nextMon2/Math.max(rawData.length,1)*1500),'nextmon')}
+    </div>`;
+  })()}
 
-  <!-- Clustered bar chart: X=Trạm, Y=Số TB, groups=Loại TB, 3 bars=kỳ -->
+  ${(()=>{
+    // ── HYBRID MANAGEMENT CHART ───────────────────────────────
+    // X = 12 tháng năm hiện tại
+    // Bars stacked: TB đã TN (màu theo loại) + TB chưa TN (xám)
+    // Line 1: Kế hoạch tích lũy (cộng dồn TB phải TN từng tháng) - vàng đứt
+    // Line 2: Thực hiện tích lũy (cộng dồn TB đã TN) - xanh liền
+    const cy = new Date().getFullYear();
+    const cm = new Date().getMonth()+1;
+    const TYPE_COLS_H = ['#00c8ff','#00e676','#e040fb','#ff9100','#18ffff','#ff5252','#00bcd4','#8bc34a','#b388ff','#ffd740'];
+    const allTypesSorted = [...new Set(rawData.map(r=>(r.Phan_loai_thiet_bi||'Khác').trim()))].sort((a,b)=>a.localeCompare(b,'vi'));
+
+    // Per month data (1-12)
+    const mDone   = Array(12).fill(0); // TB đã TN (Ngay_thi_nghiem in month)
+    const mPlan   = Array(12).fill(0); // TB kế hoạch (Thoi_gian_thi_nghiem_tiep_theo in month)
+    const mByType = Array.from({length:12},()=>({})); // done by type per month
+
+    rawData.forEach(r => {
+      if (r.Ngay_thi_nghiem) {
+        const d=new Date(r.Ngay_thi_nghiem);
+        if (!isNaN(d) && d.getFullYear()===cy) {
+          const mi=d.getMonth();
+          mDone[mi]++;
+          const tp=(r.Phan_loai_thiet_bi||'Khác').trim();
+          mByType[mi][tp]=(mByType[mi][tp]||0)+1;
+        }
+      }
+      if (r.Thoi_gian_thi_nghiem_tiep_theo) {
+        const d=new Date(r.Thoi_gian_thi_nghiem_tiep_theo);
+        if (!isNaN(d) && d.getFullYear()===cy) mPlan[d.getMonth()]++;
+      }
+    });
+
+    // Cumulative lines
+    const cumDone=[], cumPlan=[];
+    let sd=0, sp=0;
+    for(let i=0;i<12;i++){sd+=mDone[i]; cumDone.push(sd); sp+=mPlan[i]; cumPlan.push(sp);}
+
+    const maxBar=Math.max(...mDone.map((d,i)=>d+Math.max(0,mPlan[i]-d)),1);
+    const maxLine=Math.max(...cumPlan,...cumDone,1);
+
+    const W=56, GAP=8, PAD_L=36, PAD_R=12, PAD_T=24, BAR_H=130, LINE_H=80;
+    const CHART_H=BAR_H+LINE_H+60;
+    const totalW=PAD_L+12*(W+GAP)+PAD_R;
+    const months12=['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'];
+
+    const bars=months12.map((ml,i)=>{
+      const done=mDone[i], plan=mPlan[i];
+      const x=PAD_L+i*(W+GAP);
+      // stacked done bars
+      let stackH=0, stackBars='';
+      allTypesSorted.forEach((tp,ti)=>{
+        const tv=mByType[i][tp]||0; if(!tv) return;
+        const th=Math.max(1,Math.round((tv/maxBar)*BAR_H));
+        stackBars=`<rect x="${x+2}" y="${PAD_T+BAR_H-stackH-th}" width="${W-4}" height="${th}" fill="${TYPE_COLS_H[ti%TYPE_COLS_H.length]}" opacity=".88" rx="1"/>`+stackBars;
+        stackH+=th;
+      });
+      // remaining (plan - done) grey bar
+      const remain=Math.max(0,plan-done);
+      const rh=Math.max(0,Math.round((remain/maxBar)*BAR_H));
+      const dh=Math.max(done?1:0,Math.round((done/maxBar)*BAR_H));
+      const isPast=i<cm-1, isCur=i===cm-1;
+      const barCol=isCur?'rgba(0,200,255,.15)':isPast?'rgba(255,255,255,.03)':'rgba(255,215,64,.06)';
+
+      // % label
+      const pct=plan>0?Math.round(done/plan*100):null;
+      return `<g>
+        <rect x="${x}" y="${PAD_T}" width="${W}" height="${BAR_H}" fill="${barCol}" rx="2"/>
+        ${rh>0?`<rect x="${x+2}" y="${PAD_T+BAR_H-dh-rh}" width="${W-4}" height="${rh}" fill="#607d8b" opacity=".35" rx="1"/>`:''}
+        ${stackBars}
+        ${done>0?`<text x="${x+W/2}" y="${PAD_T+BAR_H-dh-3}" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="8" font-weight="700">${done}</text>`:''}
+        ${pct!==null?`<text x="${x+W/2}" y="${PAD_T+BAR_H+11}" text-anchor="middle" fill="${pct>=100?'#00e676':isCur?'#00c8ff':'rgba(255,255,255,.4)'}" font-size="7.5" font-weight="700">${pct}%</text>`:''}
+        <text x="${x+W/2}" y="${PAD_T+BAR_H+21}" text-anchor="middle" fill="${isCur?'var(--accent)':'rgba(255,255,255,.4)'}" font-size="8" font-weight="${isCur?'700':'400'}">${ml}</text>
+        ${isCur?`<line x1="${x}" y1="${PAD_T}" x2="${x}" y2="${PAD_T+BAR_H}" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="3,2" opacity=".4"/>`:''}
+      </g>`;
+    }).join('');
+
+    // Lines (cumulative) - plotted on bottom half LINE section
+    const lineY0=PAD_T+BAR_H+32;
+    function linePoints(arr, scale){
+      return arr.map((v,i)=>{
+        const x=PAD_L+i*(W+GAP)+W/2;
+        const y=lineY0+LINE_H-Math.max(2,Math.round((v/maxLine)*LINE_H));
+        return `${x},${y}`;
+      }).join(' ');
+    }
+
+    // Y-axis labels (bar section)
+    const yLabels=[0,.25,.5,.75,1].map(f=>{
+      const v=Math.round(f*maxBar);
+      const y=PAD_T+BAR_H-Math.round(f*BAR_H);
+      return `<text x="${PAD_L-4}" y="${y+3}" text-anchor="end" fill="rgba(255,255,255,.25)" font-size="7">${v}</text>
+      <line x1="${PAD_L-2}" y1="${y}" x2="${totalW-PAD_R}" y2="${y}" stroke="rgba(255,255,255,.06)" stroke-width="0.5"/>`;
+    }).join('');
+
+    // Legend
+    const typeLegend=allTypesSorted.slice(0,8).map((tp,i)=>
+      `<g transform="translate(${i*80},0)"><rect width="8" height="8" y="2" fill="${TYPE_COLS_H[i%TYPE_COLS_H.length]}" rx="1"/><text x="11" y="10" fill="rgba(255,255,255,.55)" font-size="8">${tp.length>8?tp.slice(0,8)+'…':tp}</text></g>`
+    ).join('');
+
+    const donePts=linePoints(cumDone,1);
+    const planPts=linePoints(cumPlan,1);
+
+    const dots=cumDone.map((v,i)=>{
+      const x=PAD_L+i*(W+GAP)+W/2;
+      const y=lineY0+LINE_H-Math.max(2,Math.round((v/maxLine)*LINE_H));
+      const pv=cumPlan[i];
+      const py=lineY0+LINE_H-Math.max(2,Math.round((pv/maxLine)*LINE_H));
+      return `<circle cx="${x}" cy="${y}" r="3" fill="#18ffff" stroke="var(--bg-surface)" stroke-width="1"/>
+      <circle cx="${x}" cy="${py}" r="2.5" fill="#ffd740" stroke="var(--bg-surface)" stroke-width="1" opacity=".8"/>`;
+    }).join('');
+
+    return `<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px 14px 10px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em">BIỂU ĐỒ QUẢN LÝ THÍ NGHIỆM NĂM ${cy}</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <span style="font-size:8.5px;display:flex;align-items:center;gap:4px;color:rgba(255,255,255,.5)"><span style="width:14px;height:3px;background:#607d8b;display:inline-block;border-radius:1px"></span>Chưa TN</span>
+          <span style="font-size:8.5px;display:flex;align-items:center;gap:4px;color:rgba(255,255,255,.5)"><span style="width:14px;height:3px;background:#18ffff;display:inline-block;border-radius:1px"></span>Lũy kế thực hiện</span>
+          <span style="font-size:8.5px;display:flex;align-items:center;gap:4px;color:rgba(255,255,255,.5)"><span style="width:14px;height:3px;background:#ffd740;border-top:1px dashed #ffd740;display:inline-block;border-radius:1px"></span>Lũy kế kế hoạch</span>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <svg width="${totalW}" height="${CHART_H}" xmlns="http://www.w3.org/2000/svg" style="display:block">
+          <!-- Type legend -->
+          <g transform="translate(${PAD_L},6)">${typeLegend}</g>
+          <!-- Y-axis labels & grid -->
+          ${yLabels}
+          <!-- Bars -->
+          ${bars}
+          <!-- Divider line -->
+          <line x1="${PAD_L}" y1="${lineY0-4}" x2="${totalW-PAD_R}" y2="${lineY0-4}" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
+          <text x="${PAD_L-4}" y="${lineY0-7}" text-anchor="end" fill="rgba(255,255,255,.3)" font-size="7">Lũy kế</text>
+          <!-- Cumulative plan line (dashed yellow) -->
+          ${cumPlan.some(v=>v>0)?`<polyline points="${planPts}" fill="none" stroke="#ffd740" stroke-width="2" stroke-dasharray="5,3" opacity=".75"/>`:''}
+          <!-- Cumulative done line (solid cyan) -->
+          ${cumDone.some(v=>v>0)?`<polyline points="${donePts}" fill="none" stroke="#18ffff" stroke-width="2"/>`:''}
+          <!-- Dots -->
+          ${dots}
+          <!-- Y-axis line labels (cumulative section) -->
+          ${[0,.5,1].map(f=>{const v=Math.round(f*maxLine);const y=lineY0+LINE_H-Math.round(f*LINE_H);return `<text x="${PAD_L-4}" y="${y+3}" text-anchor="end" fill="rgba(255,255,255,.2)" font-size="6">${v}</text>`;}).join('')}
+        </svg>
+      </div>
+    </div>`;
+  })()}
   <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:14px">
-    <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:10px">
-      BIỂU ĐỒ KHỐI LƯỢNG TN THEO TRẠM &amp; LOẠI THIẾT BỊ
-      <span style="font-weight:400;font-size:9px;margin-left:8px;color:var(--text-muted)">(X=Trạm · cụm=Loại TB · 3 cột=KL kỳ trước/hiện tại/dự kiến)</span>
-    </div>
-    ${buildClusterChart()}
+    <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:12px">BIỂU ĐỒ KHỐI LƯỢNG THEO THÁNG</div>
+    ${_bcBarChart(months.slice(-24), 'Theo tháng', d => {
+      const age = new Date().getFullYear() - d.year;
+      return age === 0 ? '#00e676' : age === 1 ? '#00c8ff' : '#607d8b';
+    })}
   </div>
 
-  <!-- Detail table: Month × Type -->
   <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px">
     <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:10px">CHI TIẾT THEO THÁNG × LOẠI THIẾT BỊ</div>
     <div style="overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:10px">
         <thead><tr style="background:rgba(255,255,255,.03)">
-          <th style="padding:6px 10px;font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:left;position:sticky;top:0;min-width:90px">Tháng</th>
+          <th style="padding:6px 10px;font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:left;position:sticky;top:0;min-width:100px">Tháng</th>
           ${filteredTypes.slice(0,12).map((t,i)=>`<th style="padding:6px 10px;font-size:9px;font-weight:700;color:${COLORS[i%COLORS.length]};text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:right;position:sticky;top:0;white-space:nowrap">${t}</th>`).join('')}
           <th style="padding:6px 10px;font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:right;position:sticky;top:0">Tổng</th>
         </tr></thead>
         <tbody>${Object.keys(monthMap).sort().reverse().map(k=>{
-          const tMap=monthTypeMap[k]||{};
-          const total=monthMap[k].v;
-          const maxVal2=Math.max(...filteredTypes.slice(0,12).map(t=>tMap[t]||0),1);
+          const tMap = monthTypeMap[k]||{};
+          const total = monthMap[k].v;
+          const maxVal = Math.max(...filteredTypes.map(t=>tMap[t]||0),1);
           return `<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
             <td style="padding:5px 10px;font-weight:600;font-family:var(--font-mono)">${monthMap[k].label}</td>
             ${filteredTypes.slice(0,12).map((t,i)=>{
-              const v=tMap[t]||0;
-              const barW=v?Math.max(2,Math.round((v/maxVal2)*50)):0;
-              return `<td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);color:${v?COLORS[i%COLORS.length]:'rgba(255,255,255,.12)'}">
-                ${v?`<span style="display:inline-flex;align-items:center;gap:4px">
-                  <span style="display:inline-block;height:2px;width:${barW}px;background:${COLORS[i%COLORS.length]};border-radius:1px;opacity:.6;vertical-align:middle"></span>${v}
-                </span>`:'—'}
+              const v = tMap[t]||0;
+              const barW = v > 0 ? Math.max(2,Math.round((v/maxVal)*60)) : 0;
+              return `<td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);color:${v?COLORS[i%COLORS.length]:'rgba(255,255,255,.15)'}">
+                ${v ? `<span style="display:inline-flex;align-items:center;gap:5px">
+                  <span style="display:inline-block;height:3px;width:${barW}px;background:${COLORS[i%COLORS.length]};border-radius:2px;opacity:.6;vertical-align:middle"></span>${v}
+                </span>` : '—'}
               </td>`;
             }).join('')}
             <td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);font-weight:700;color:var(--accent)">${total}</td>
@@ -10364,158 +10415,79 @@ function _bcRenderByMonth(conf) {
   </div>`;
 }
 
+// ── DROPDOWN HANDLER for by-month report ──────────────────────
+function _bcBmDropdown(btn, key) {
+  // Read items from global store (avoids JSON-in-HTML issues with Vietnamese chars)
+  const stored = (window._bcDdStore||{})[key] || {items:[], dflt:''};
+  const items = stored.items, dflt = stored.dflt;
+  const ex = document.getElementById('_bcBmDdList');
+  if (ex) { if (ex.dataset.key===key) { ex.remove(); return; } ex.remove(); }
+  const list = document.createElement('div');
+  list.id = '_bcBmDdList'; list.dataset.key = key;
+  list.style.cssText = 'position:fixed;z-index:9999;background:var(--bg-surface,#161b22);border:1px solid rgba(255,255,255,.12);border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.6);min-width:200px;max-height:320px;overflow-y:auto;flex-direction:column;padding:4px 0;display:flex';
+  // Search
+  if (items.length > 8) {
+    const si = document.createElement('input'); si.type='text'; si.placeholder='🔍 Tìm...';
+    si.style.cssText='margin:6px 8px;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:var(--text-primary);font-size:11px;outline:none';
+    si.oninput = ev => { const q=ev.target.value.toLowerCase(); list.querySelectorAll('.bc-dd-item').forEach(el=>{el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';}); };
+    si.onclick = ev => ev.stopPropagation(); list.appendChild(si);
+  }
+  function mkI(v,l) {
+    const d = document.createElement('div'); d.className='bc-dd-item';
+    d.style.cssText='padding:7px 14px;cursor:pointer;font-size:11px;color:var(--text-primary);white-space:nowrap;transition:background .1s';
+    d.textContent=l;
+    d.onmouseenter=()=>{d.style.background='rgba(255,255,255,.07)';}; d.onmouseleave=()=>{d.style.background='';};
+    d.onclick = () => {
+      if (key==='doi')   _bcFDoi=v;
+      else if(key==='tram') _bcFTram=v;
+      else if(key==='year') _bcFYear=v;
+      else if(key==='month') _bcFMonth=v;
+      else if(key==='type') _bcFType=v;
+      list.remove(); document.removeEventListener('click',oc);
+      const conf = window._bcLastConf||{rpt:'by_month',icon:'fa-chart-bar',color:'#00c8ff'};
+      bcRenderPage(conf,'Khối lượng theo tháng');
+    };
+    list.appendChild(d);
+  }
+  mkI('',dflt);
+  items.forEach(it => typeof it==='object' ? mkI(it.v,it.l) : mkI(it,it));
+  document.body.appendChild(list);
+  const rb = btn.getBoundingClientRect();
+  list.style.top=(rb.bottom+4)+'px'; list.style.left=rb.left+'px';
+  let oc; oc=ev=>{if(!list.contains(ev.target)&&ev.target!==btn){list.remove();document.removeEventListener('click',oc);}};
+  setTimeout(()=>document.addEventListener('click',oc),0);
+}
 
+// ── BÁO CÁO: KL THEO NĂM ─────────────────────────────────────
 function _bcRenderByYear(conf) {
-  const rawData = _tnRawData.length ? _tnRawData : (_tnAllData.length ? _tnAllData : []);
+  const data = _tnRawData.length ? _tnRawData : _tnAllData;
   const fmt = n => Number(n).toLocaleString('vi-VN');
   const nowY = new Date().getFullYear();
-  const sortVi=(a,b)=>String(a).localeCompare(String(b),'vi');
 
-  // Filter options
-  const allDois=[...new Set(rawData.map(r=>(r.Doi||'').trim()).filter(Boolean))].sort(sortVi);
-  const allTrams=[...new Set(rawData.map(r=>(r.Tram||'').trim()).filter(Boolean))].sort(sortVi);
-  const allTypes=[...new Set(rawData.map(r=>(r.Phan_loai_thiet_bi||'').trim()).filter(Boolean))].sort(sortVi);
-
-  // Apply filters
-  const data=rawData.filter(r=>{
-    if((window._bcYFDoi||'')&&(r.Doi||'').trim()!==(window._bcYFDoi||'')) return false;
-    if((window._bcYFTram||'')&&(r.Tram||'').trim()!==(window._bcYFTram||'')) return false;
-    if((window._bcYFType||'')&&(r.Phan_loai_thiet_bi||'').trim()!==(window._bcYFType||'')) return false;
-    return true;
-  });
-  if(!window._bcYFDoi) window._bcYFDoi='';
-  if(!window._bcYFTram) window._bcYFTram='';
-  if(!window._bcYFType) window._bcYFType='';
-
-  // Dropdown helper
-  if(!window._bcYDdStore) window._bcYDdStore={};
-  window._bcYDdStore.doi={items:allDois.map(v=>({v,l:v})),dflt:'— Đội —'};
-  window._bcYDdStore.tram={items:allTrams.map(v=>({v,l:v})),dflt:'— Trạm —'};
-  window._bcYDdStore.type={items:allTypes.map(v=>({v,l:v})),dflt:'Loại thiết bị'};
-
-  const mkYDd=(key,dflt,val)=>{
-    const active=!!val;
-    const brd=active?'var(--accent)':'rgba(0,200,255,.4)';
-    const bg=active?'rgba(0,200,255,.1)':'var(--bg-elevated)';
-    const col=active?'var(--accent)':'var(--text-primary)';
-    return `<button data-yddkey="${key}" style="display:inline-flex;align-items:center;justify-content:space-between;gap:6px;padding:5px 10px;border-radius:7px;border:1px solid ${brd};background:${bg};color:${col};font-family:var(--font-mono);font-size:11px;cursor:pointer;min-width:100px" onclick="event.stopPropagation();_bcYDdOpen(this,'${key}')">
-      <span>${val||dflt}</span><i class="fas fa-chevron-down" style="font-size:8px;opacity:.6;flex-shrink:0"></i>
-    </button>`;
-  };
-  const hasYFilter=window._bcYFDoi||window._bcYFTram||window._bcYFType;
-
-  // Build per-year per-type counts and yearly totals
-  const yearMap={}, yearTypeMap={};
-  const tramList=window._bcYFTram?[window._bcYFTram]:allTrams;
-  const typeListY=window._bcYFType?[window._bcYFType]:allTypes.slice(0,10);
-  const TYPE_COLORS=['#00c8ff','#00e676','#ffd740','#ff9100','#e040fb','#18ffff','#ff5252','#00bcd4','#8bc34a','#b388ff'];
-
-  // Per-tram per-type: count by year period
-  const chartDataY={}; // {tram: {type: {prevY:n, curY:n, nextY:n}}}
-  tramList.forEach(t=>{ chartDataY[t]={}; typeListY.forEach(tp=>{ chartDataY[t][tp]={prevY:0,curY:0,nextY:0}; }); });
-  const today=new Date(); today.setHours(0,0,0,0);
-  rawData.forEach(r=>{
-    const t=(r.Tram||'').trim(); if(!t||!chartDataY[t])return;
-    const tp=(r.Phan_loai_thiet_bi||'').trim(); if(!chartDataY[t][tp])return;
-    if(r.Ngay_thi_nghiem){
-      const d=new Date(r.Ngay_thi_nghiem); if(!isNaN(d)){
-        const y=d.getFullYear();
-        if(y===nowY) chartDataY[t][tp].curY++;
-        else if(y<nowY) chartDataY[t][tp].prevY++;
-      }
-    }
-    if(r.Thoi_gian_thi_nghiem_tiep_theo){
-      const d=new Date(r.Thoi_gian_thi_nghiem_tiep_theo); if(!isNaN(d)&&d>=today) chartDataY[t][tp].nextY++;
-    }
-    // For year table
-    const ds=r.Ngay_thi_nghiem||r.Thoi_gian_thi_nghiem_tiep_theo;
-    if(ds){const y=new Date(ds).getFullYear(); if(!isNaN(y)){
-      yearMap[y]=(yearMap[y]||0)+1;
-      const pl=(r.Phan_loai_thiet_bi||'Khác').trim();
-      if(!yearTypeMap[y])yearTypeMap[y]={};
-      yearTypeMap[y][pl]=(yearTypeMap[y][pl]||0)+1;
-    }}
+  const yearMap = {};
+  const yearTypeMap = {};
+  data.forEach(r => {
+    const dateStr = r.Ngay_thi_nghiem || r.Thoi_gian_thi_nghiem_tiep_theo;
+    if (!dateStr) return;
+    const y = new Date(dateStr).getFullYear();
+    if (isNaN(y)) return;
+    yearMap[y] = (yearMap[y]||0) + 1;
+    const pl = (r.Phan_loai_thiet_bi||'Khác').trim();
+    if (!yearTypeMap[y]) yearTypeMap[y] = {};
+    yearTypeMap[y][pl] = (yearTypeMap[y][pl]||0)+1;
   });
 
-  const allTypesY=[...new Set(data.map(r=>(r.Phan_loai_thiet_bi||'Khác').trim()))].sort(sortVi);
-  const COLORS=['#00c8ff','#00e676','#ffd740','#ff9100','#e040fb','#18ffff','#ff4081','#00bcd4','#8bc34a','#ff5252'];
-
-  // Cluster chart
-  function buildYearChart() {
-    if(!tramList.length||!typeListY.length) return '<div style="padding:20px;text-align:center;color:var(--text-muted)">Không có dữ liệu</div>';
-    const BAR_H=140, CLUSTER_GAP=8, BAR_GAP=1;
-    const nTypes=typeListY.length, nTrams=Math.min(tramList.length,25);
-    const shownTrams=tramList.slice(0,nTrams);
-    const barW=Math.max(4,Math.min(14,Math.floor(900/(nTrams*nTypes*3+nTrams*2))));
-    const clusterW=nTypes*(3*barW+BAR_GAP*2)+CLUSTER_GAP;
-    const totalW=nTrams*clusterW;
-    let maxV=1;
-    shownTrams.forEach(t=>{typeListY.forEach(tp=>{const c=chartDataY[t]?.[tp]||{};maxV=Math.max(maxV,c.prevY||0,c.curY||0,c.nextY||0);});});
-
-    const tramGroups=shownTrams.map((t,ti)=>{
-      const gx=ti*clusterW;
-      const typeBars=typeListY.map((tp,tpi)=>{
-        const c=chartDataY[t]?.[tp]||{prevY:0,curY:0,nextY:0};
-        const tx=tpi*(3*barW+BAR_GAP*2);
-        const hp=Math.max(c.prevY?1:0,Math.round((c.prevY/maxV)*BAR_H));
-        const hc=Math.max(c.curY?1:0,Math.round((c.curY/maxV)*BAR_H));
-        const hn=Math.max(c.nextY?1:0,Math.round((c.nextY/maxV)*BAR_H));
-        const typeCol=TYPE_COLORS[tpi%TYPE_COLORS.length];
-        return `<g transform="translate(${tx},0)">
-          ${c.prevY?`<rect x="0" y="${BAR_H-hp}" width="${barW}" height="${hp}" fill="#607d8b" opacity=".8" rx="1"/>
-          <text x="${barW/2}" y="${BAR_H-hp-2}" text-anchor="middle" fill="#607d8b" font-size="5">${c.prevY}</text>`:''}
-          ${c.curY?`<rect x="${barW+BAR_GAP}" y="${BAR_H-hc}" width="${barW}" height="${hc}" fill="${typeCol}" opacity=".9" rx="1"/>
-          <text x="${barW+BAR_GAP+barW/2}" y="${BAR_H-hc-2}" text-anchor="middle" fill="${typeCol}" font-size="5">${c.curY}</text>`:''}
-          ${c.nextY?`<rect x="${(barW+BAR_GAP)*2}" y="${BAR_H-hn}" width="${barW}" height="${hn}" fill="#ffd740" opacity=".85" rx="1"/>
-          <text x="${(barW+BAR_GAP)*2+barW/2}" y="${BAR_H-hn-2}" text-anchor="middle" fill="#ffd740" font-size="5">${c.nextY}</text>`:''}
-        </g>`;
-      }).join('');
-      const tramLabel=t.length>6?t.slice(0,6)+'…':t;
-      return `<g transform="translate(${gx},0)" style="cursor:pointer">
-        ${typeBars}
-        <text x="${clusterW/2-CLUSTER_GAP/2}" y="${BAR_H+11}" text-anchor="middle" fill="rgba(255,255,255,.5)" font-size="7">${tramLabel}</text>
-      </g>`;
-    }).join('');
-
-    const typeLegend=typeListY.map((tp,i)=>`<g transform="translate(${i*70},0)">
-      <rect x="0" y="3" width="8" height="8" fill="${TYPE_COLORS[i%TYPE_COLORS.length]}" rx="1"/>
-      <text x="11" y="11" fill="rgba(255,255,255,.6)" font-size="8">${tp.length>7?tp.slice(0,7)+'…':tp}</text>
-    </g>`).join('');
-
-    const svgW=Math.max(totalW,600);
-    return `<div style="overflow-x:auto;padding-bottom:4px">
-      <svg width="${svgW}" height="${BAR_H+60}" xmlns="http://www.w3.org/2000/svg" style="display:block">
-        <g transform="translate(0,6)">${typeLegend}</g>
-        <g transform="translate(0,22)">${tramGroups}</g>
-        <g transform="translate(0,${BAR_H+34})">
-          <rect x="0" y="0" width="8" height="8" fill="#607d8b" rx="1"/>
-          <text x="11" y="8" fill="rgba(255,255,255,.5)" font-size="8">KL các năm trước</text>
-          <rect x="105" y="0" width="8" height="8" fill="#00c8ff" rx="1"/>
-          <text x="116" y="8" fill="rgba(255,255,255,.5)" font-size="8">KL năm ${nowY}</text>
-          <rect x="200" y="0" width="8" height="8" fill="#ffd740" rx="1"/>
-          <text x="211" y="8" fill="rgba(255,255,255,.5)" font-size="8">KL dự kiến</text>
-        </g>
-      </svg>
-    </div>`;
-  }
-
-  const years=Object.keys(yearMap).map(Number).sort((a,b)=>a-b);
+  const years = Object.keys(yearMap).map(Number).sort((a,b)=>a-b);
+  const allTypes = [...new Set(data.map(r=>(r.Phan_loai_thiet_bi||'Khác').trim()))].sort((a,b)=>a.localeCompare(b,'vi'));
+  const COLORS = ['#00c8ff','#00e676','#ffd740','#ff9100','#b388ff','#18ffff','#ff4081','#00bcd4','#8bc34a','#ff5252'];
 
   return `
-  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;margin-bottom:12px">
-    <i class="fas fa-filter" style="font-size:10px;color:var(--text-muted)"></i>
-    ${mkYDd('doi','— Đội —',window._bcYFDoi)}
-    ${mkYDd('tram','— Trạm —',window._bcYFTram)}
-    ${mkYDd('type','Loại thiết bị',window._bcYFType)}
-    ${hasYFilter?`<button onclick="window._bcYFDoi='';window._bcYFTram='';window._bcYFType='';bcRenderPage(window._bcLastConf||{},'KL theo năm')" style="padding:5px 11px;border-radius:6px;border:1px solid rgba(255,82,82,.3);background:rgba(255,82,82,.1);color:#ff5252;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-times"></i> Xóa lọc</button>`:''}
-    <span style="margin-left:auto;font-size:10px;font-family:var(--font-mono);color:var(--text-muted)">${fmt(data.length)} bản ghi</span>
-  </div>
-
   <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:14px">
-    <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:10px">
-      BIỂU ĐỒ KHỐI LƯỢNG TN THEO TRẠM &amp; LOẠI THIẾT BỊ (THEO NĂM)
-    </div>
-    ${buildYearChart()}
+    <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:12px">BIỂU ĐỒ KHỐI LƯỢNG THEO NĂM</div>
+    ${_bcBarChart(years.map(y=>({label:String(y), v:yearMap[y]})), 'Theo năm', d=>{
+      const y = parseInt(d.label);
+      return y === nowY ? '#00e676' : y === nowY-1 ? '#00c8ff' : y < nowY-2 ? '#607d8b' : '#ffd740';
+    })}
   </div>
 
   <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px">
@@ -10524,14 +10496,14 @@ function _bcRenderByYear(conf) {
       <table style="width:100%;border-collapse:collapse;font-size:10px">
         <thead><tr style="background:rgba(255,255,255,.03)">
           <th style="padding:6px 10px;font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:left;position:sticky;top:0;min-width:70px">Năm</th>
-          ${allTypesY.slice(0,15).map((t,i)=>`<th style="padding:6px 10px;font-size:9px;font-weight:700;color:${COLORS[i%COLORS.length]};text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:right;position:sticky;top:0;white-space:nowrap">${t}</th>`).join('')}
+          ${allTypes.slice(0,15).map((t,i)=>`<th style="padding:6px 10px;font-size:9px;font-weight:700;color:${COLORS[i%COLORS.length]};text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:right;position:sticky;top:0;white-space:nowrap">${t}</th>`).join('')}
           <th style="padding:6px 10px;font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:right;position:sticky;top:0">Tổng</th>
         </tr></thead>
         <tbody>${years.slice().reverse().map(y=>{
-          const tMap=yearTypeMap[y]||{};
+          const tMap = yearTypeMap[y]||{};
           return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);${y===nowY?'background:rgba(0,230,118,.04)':''}">
             <td style="padding:5px 10px;font-weight:700;font-family:var(--font-mono);color:${y===nowY?'#00e676':y===nowY-1?'var(--accent)':'var(--text-primary)'}">${y}</td>
-            ${allTypesY.slice(0,15).map((t,i)=>`<td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);color:${tMap[t]?COLORS[i%COLORS.length]:'rgba(255,255,255,.15)'}">${tMap[t]||'—'}</td>`).join('')}
+            ${allTypes.slice(0,15).map((t,i)=>`<td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);color:${tMap[t]?COLORS[i%COLORS.length]:'rgba(255,255,255,.15)'}">${tMap[t]||'—'}</td>`).join('')}
             <td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);font-weight:700;color:var(--accent)">${yearMap[y]}</td>
           </tr>`;
         }).join('')}</tbody>
@@ -10539,7 +10511,6 @@ function _bcRenderByYear(conf) {
     </div>
   </div>`;
 }
-
 
 // ── BÁO CÁO: THIẾT BỊ QUÁ HẠN ───────────────────────────────
 function _bcRenderOverdue(conf) {
@@ -10640,7 +10611,52 @@ function _bcRenderEarlyPlan(conf) {
 function _bcStatClick(key, data) {
   const fmt = n => Number(n).toLocaleString('vi-VN');
   const fmtD = v => { if(!v) return '—'; const d=new Date(v); return isNaN(d)?v:d.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'}); };
+  const capLbl={'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+  const capCol={'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
+  const rawAll = _tnRawData.length ? _tnRawData : (_tnAllData.length ? _tnAllData : []);
   let title='', totalLine='', bodyHtml='', col='var(--accent)';
+
+  if (key === 'thismon' || key === 'nextmon') {
+    const now=new Date(); const nowY=now.getFullYear(); const nowM=now.getMonth()+1;
+    const tM=key==='thismon'?nowM:(nowM===12?1:nowM+1);
+    const tY=key==='thismon'?nowY:(nowM===12?nowY+1:nowY);
+    col=key==='thismon'?'#00e676':'#ffd740';
+    title=`📅 Phải TN tháng ${tM}/${tY}`;
+    const filtered=rawAll.filter(r=>{
+      const ds=r.Thoi_gian_thi_nghiem_tiep_theo; if(!ds)return false;
+      const d=new Date(ds); return d.getFullYear()===tY&&d.getMonth()+1===tM;
+    });
+    const byTram={};
+    filtered.forEach(r=>{const t=(r.Tram||'—').trim();if(!byTram[t])byTram[t]=[];byTram[t].push(r);});
+    const tKeys=Object.keys(byTram).sort((a,b)=>a.localeCompare(b,'vi'));
+    totalLine=`${fmt(filtered.length)} thiết bị · ${tKeys.length} trạm`;
+    bodyHtml=tKeys.map(t=>{
+      const arr=byTram[t]; const cap=String(arr[0]?.Cap_dien_ap??'');
+      return `<div style="border-bottom:1px solid rgba(255,255,255,.06)">
+        <div style="padding:7px 16px 3px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:10px;font-weight:700">${t}</span>
+          <div style="display:flex;gap:5px;align-items:center">
+            ${cap&&cap!=='null'?`<span style="font-size:8px;color:${capCol[cap]};background:${capCol[cap]}18;padding:1px 5px;border-radius:6px;font-weight:700">${capLbl[cap]}</span>`:''}
+            <span style="font-size:9px;color:var(--text-muted);background:rgba(255,255,255,.05);padding:1px 6px;border-radius:6px">${arr.length}</span>
+          </div>
+        </div>
+        ${arr.map(r=>`<div style="padding:3px 24px;font-size:9px;color:var(--text-secondary);display:flex;justify-content:space-between;gap:8px">
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${r.Phan_loai_thiet_bi||'—'} · ${r.Ten_thiet_bi||r.Ngan_thiet_bi||'—'}</span>
+          <span style="color:${col};font-family:var(--font-mono);flex-shrink:0">${fmtD(r.Thoi_gian_thi_nghiem_tiep_theo)}</span>
+        </div>`).join('')}
+      </div>`;
+    }).join('')||'<div style="padding:24px;text-align:center;color:var(--text-muted)">Không có dữ liệu</div>';
+    let p=document.getElementById('hm-detail-panel');
+    if(!p){p=document.createElement('div');p.id='hm-detail-panel';p.className='hm-detail-panel';document.body.appendChild(p);}
+    p.innerHTML=`<div class="hm-resize-grip"></div>
+      <div class="hm-detail-hd" style="border-left:3px solid ${col}">
+        <span style="color:${col}">${title}</span>
+        <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span>
+      </div>
+      <div style="padding:8px 16px;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">${totalLine}</div>
+      <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;overscroll-behavior:contain">${bodyHtml}</div>`;
+    p.classList.add('open'); _hmOpenPanel(p); return;
+  }
 
   if (key === 'total') {
     col='#00c8ff'; title='📋 Tổng bản ghi thí nghiệm';
