@@ -7675,11 +7675,17 @@ function lytChipReset() {
 
 // ── Stats card click — hiện detail panel bên phải ──────────────
 function lytStatsCardClick(label, color) {
-  const rows    = (_chipFiltered.length ? _chipFiltered : _chipAllData);
+  // Guard: data chưa load
+  if (!_chipAllData || !_chipAllData.length) {
+    if (typeof showToast === 'function') showToast('⏳ Dữ liệu chưa tải xong, vui lòng thử lại...');
+    return;
+  }
+
+  const rows    = (_chipFiltered && _chipFiltered.length ? _chipFiltered : _chipAllData);
   const capLbl  = {'0':'TT','1':'110kV','2':'220kV','3':'35kV','4':'22kV','6':'6kV','9':'10kV'};
   const capPrio = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
 
-  // Build maxCap map từ toàn bộ data
+  // Build maxCap map
   const tramMaxCap = {};
   _chipAllData.forEach(d => {
     const t = (d.Tram||'').trim(); if (!t) return;
@@ -7688,15 +7694,14 @@ function lytStatsCardClick(label, color) {
     if (!tramMaxCap[t] || (capPrio[c]??99) < (capPrio[tramMaxCap[t]]??99)) tramMaxCap[t] = c;
   });
 
-  // Danh sách trạm xuất hiện trong rows
   const filteredTrams = [...new Set(rows.map(d=>(d.Tram||'').trim()).filter(Boolean))];
   filteredTrams.sort((a,b) => {
     const pa = capPrio[tramMaxCap[a]]??9, pb = capPrio[tramMaxCap[b]]??9;
-    return pa!==pb ? pa-pb : a.localeCompare(b);
+    return pa!==pb ? pa-pb : a.localeCompare(b,'vi');
   });
 
   let title = label;
-  let items = [];      // [{text, sub, color}]
+  let items = [];
   let totalLine = '';
 
   switch (label) {
@@ -7742,8 +7747,7 @@ function lytStatsCardClick(label, color) {
       });
       let total = 0;
       filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const cnt = byTram[t].size;
-        total += cnt;
+        const cnt = byTram[t].size; total += cnt;
         items.push({ text: t, sub: `${cnt} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888' });
       });
       totalLine = `${total} ngăn / ${items.length} trạm`;
@@ -7761,8 +7765,7 @@ function lytStatsCardClick(label, color) {
       });
       let total = 0;
       filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort();
-        total += ngans.length;
+        const ngans = [...byTram[t]].sort(); total += ngans.length;
         items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
       });
       totalLine = `${total} ngăn ĐZ / ${Object.keys(byTram).length} trạm`;
@@ -7780,8 +7783,7 @@ function lytStatsCardClick(label, color) {
       });
       let total = 0;
       filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort();
-        total += ngans.length;
+        const ngans = [...byTram[t]].sort(); total += ngans.length;
         items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
       });
       totalLine = `${total} ngăn MBA / ${Object.keys(byTram).length} trạm`;
@@ -7799,8 +7801,7 @@ function lytStatsCardClick(label, color) {
       });
       let total = 0;
       filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort();
-        total += ngans.length;
+        const ngans = [...byTram[t]].sort(); total += ngans.length;
         items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
       });
       totalLine = `${total} ngăn XT / ${Object.keys(byTram).length} trạm`;
@@ -7818,8 +7819,7 @@ function lytStatsCardClick(label, color) {
       });
       let total = 0;
       filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort();
-        total += ngans.length;
+        const ngans = [...byTram[t]].sort(); total += ngans.length;
         items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
       });
       totalLine = `${total} ngăn LL / ${Object.keys(byTram).length} trạm`;
@@ -7837,8 +7837,7 @@ function lytStatsCardClick(label, color) {
       });
       let total = 0;
       filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort();
-        total += ngans.length;
+        const ngans = [...byTram[t]].sort(); total += ngans.length;
         items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
       });
       totalLine = `${total} ngăn TBN / ${Object.keys(byTram).length} trạm`;
@@ -7856,8 +7855,7 @@ function lytStatsCardClick(label, color) {
       });
       let total = 0;
       filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort();
-        total += ngans.length;
+        const ngans = [...byTram[t]].sort(); total += ngans.length;
         items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
       });
       totalLine = `${total} ngăn TD / ${Object.keys(byTram).length} trạm`;
@@ -7875,8 +7873,7 @@ function lytStatsCardClick(label, color) {
       });
       let total = 0;
       filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort();
-        total += ngans.length;
+        const ngans = [...byTram[t]].sort(); total += ngans.length;
         items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
       });
       totalLine = `${total} ngăn Kháng / ${Object.keys(byTram).length} trạm`;
@@ -7884,7 +7881,6 @@ function lytStatsCardClick(label, color) {
     }
     case 'Tổng số thiết bị': {
       title = '📦 Tổng số thiết bị';
-      // Nhóm theo loại thiết bị
       const byType = {};
       rows.forEach(r => {
         const pl = (r.Phan_loai_thiet_bi||'Khác').trim();
@@ -7935,93 +7931,19 @@ function lytStatsCardClick(label, color) {
       break;
     }
     default:
-      return; // Card không hỗ trợ drill-down — không mở panel
+      // Card không hỗ trợ drill-down — thử hiển thị tổng quan
+      items.push({ text: label, sub: 'Không có dữ liệu chi tiết', color: color||'var(--accent)' });
+      totalLine = '';
+      break;
   }
 
-  if (!items.length) return;
-
-  // Build panel HTML
-  let bodyHtml = items.map((item, i) => {
-    if (item.isGroup) {
-      return `<div style="padding:6px 16px 3px;font-size:8px;font-weight:700;letter-spacing:.1em;
-        color:${item.color};background:var(--bg-elevated);position:sticky;top:0;
-        border-bottom:1px solid rgba(255,255,255,0.05)">${item.text}</div>`;
-    }
-    const detailHtml = item.detail
-      ? `<div style="padding:2px 16px 6px 24px">` +
-        item.detail.map(n => `<div style="font-size:9.5px;color:var(--text-muted);padding:2px 0;
-          border-bottom:1px solid rgba(255,255,255,0.04);font-family:var(--font-mono)">• ${n}</div>`).join('') +
-        `</div>`
-      : '';
-    return `<div style="display:flex;justify-content:space-between;align-items:center;
-        padding:7px 16px;border-bottom:1px solid rgba(255,255,255,0.05);
-        font-family:var(--font-mono)">
-        <span style="font-size:10px;color:var(--text-secondary)">${item.text}</span>
-        <span style="font-size:9px;font-weight:700;color:${item.color};
-          background:${item.color}18;padding:2px 8px;border-radius:10px">${item.sub}</span>
-      </div>${detailHtml}`;
-  }).join('');
-
-  // MBA/Tram breakdown section
-  let mbaSectionHtml = '';
-  if (mbaSection) {
-    const { tramMbaMap, capColor, capLbl, capPrio, tramMaxCap } = mbaSection;
-    const tramsSorted = Object.keys(tramMbaMap).sort((a,b)=>{
-      const pa=capPrio[tramMaxCap[a]]??9,pb=capPrio[tramMaxCap[b]]??9;
-      return pa!==pb?pa-pb:a.localeCompare(b,'vi');
-    });
-    let mbaRows = '';
-    tramsSorted.forEach(t => {
-      const rows = tramMbaMap[t];
-      const cv = tramMaxCap[t]||'';
-      const col = capColor[cv]||'#888';
-      const lbl = capLbl[cv]||cv;
-      const totalTram = rows.reduce((s,d)=>s+(Number(d.So_luong)||1),0);
-      mbaRows += `<div style="border-bottom:1px solid rgba(255,255,255,.04)">
-        <div style="padding:6px 16px 3px;display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.02)">
-          <span style="font-size:10px;font-weight:700;color:var(--text-primary);font-family:var(--font-mono)">${t}</span>
-          <div style="display:flex;gap:5px;align-items:center">
-            ${cv?`<span style="font-size:8px;font-weight:700;color:${col};background:${col}18;padding:1px 5px;border-radius:4px">${lbl}</span>`:''}
-            <span style="font-size:9px;color:var(--text-muted);background:rgba(255,255,255,.06);padding:1px 6px;border-radius:5px">${totalTram} TB</span>
-          </div>
-        </div>
-        ${rows.map(d=>`<div style="padding:3px 24px;font-size:9px;color:var(--text-secondary);display:flex;justify-content:space-between;font-family:var(--font-mono)">
-          <span style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.Ten_thiet_bi||''}">${d.Ten_thiet_bi||'—'}</span>
-          <span style="color:var(--accent);flex-shrink:0">${Number(d.So_luong)||1} TB</span>
-        </div>`).join('')}
-      </div>`;
-    });
-    mbaSectionHtml = `<div style="border-top:2px solid rgba(0,200,255,.2);margin-top:6px">
-      <div style="padding:8px 16px 4px;font-size:9px;font-weight:800;color:var(--accent);letter-spacing:.1em;background:rgba(0,200,255,.05)">
-        <i class="fas fa-list-ul" style="margin-right:5px"></i>CHI TIẾT THEO TRẠM
-      </div>
-      ${mbaRows}
-    </div>`;
+  if (!items.length) {
+    items.push({ text: 'Không có dữ liệu', sub: 'Vui lòng kiểm tra kết nối Supabase', color: '#ff5252' });
+    totalLine = '0 bản ghi';
   }
 
-  // Lấy hoặc tạo panel
-  let p = document.getElementById('hm-detail-panel');
-  if (!p) {
-    p = document.createElement('div');
-    p.id        = 'hm-detail-panel';
-    p.className = 'hm-detail-panel';
-    document.body.appendChild(p);
-  }
-
-  p.innerHTML = `
-    <div class="hm-resize-grip"></div>
-    <div class="hm-detail-hd" style="border-left:3px solid ${color||'var(--accent)'}">
-      <span style="color:${color||'var(--accent)'}">${title}</span>
-      <span class="hm-detail-close"
-        onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span>
-    </div>
-    <div style="padding:8px 16px;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0">
-      ${totalLine}
-    </div>
-    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">${bodyHtml}</div>`;
-
-  p.classList.add('open');
-  _hmOpenPanel(p);
+  // Delegate to the standard panel function (_lytShowDetailPanel)
+  _lytShowDetailPanel(title, color || 'var(--accent)', totalLine, items, null);
 }
 
 function lytNormalizeNganLoai(v) {
