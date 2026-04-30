@@ -4266,19 +4266,7 @@ function buildSectionWrapper(item, idx) {
   const prev = document.createElement('div');
   prev.className = 'card-preview';
   prev.innerHTML = getPreview(item.type, { ...item.props, _uid: item.uid });
-  // Delegation: click trên bất kỳ phần nào của ic-card -> lytStatsCardClick
-  if (item.type === 'stats') {
-    prev.addEventListener('click', function(e) {
-      if (e.target.closest('.ic-toolbar') || e.target.closest('.ic-sz-btn')) return;
-      const ic = e.target.closest('.ic-card');
-      if (!ic) return;
-      const lbl = ic.dataset.icLabel;
-      const col = ic.dataset.icColor;
-      if (!lbl) return;
-      e.stopPropagation();
-      lytStatsCardClick(lbl, col);
-    });
-  }
+
 
   const rh = document.createElement('div');
   rh.className = 'resize-handle';
@@ -4779,10 +4767,13 @@ const _renderTechChart = (c, cardUid, ci) => {
     let html = `<div class="ic-tech-cap" style="display:flex;align-items:center;gap:6px;justify-content:space-between">
       <span>⚡</span>${dropHV}</div>`;
     html += `<div class="ic-tech-grid">`;
-    html += barItem('ais',    'AIS',        ais,    maxHV);
-    html += barItem('honhop', 'HGIS – AIS', honhop, maxHV);
-    html += barItem('gis',    'GIS',        gis,    maxHV);
-    html += barItem('hgis',   'HGIS',       hgis,   maxHV);
+    if (ais    > 0) html += barItem('ais',    'AIS',        ais,    maxHV);
+    if (honhop > 0) html += barItem('honhop', 'HGIS – AIS', honhop, maxHV);
+    if (gis    > 0) html += barItem('gis',    'GIS',        gis,    maxHV);
+    if (hgis   > 0) html += barItem('hgis',   'HGIS',       hgis,   maxHV);
+    // Nếu tất cả = 0 (section trống), hiện AIS mặc định
+    if (ais === 0 && gis === 0 && hgis === 0 && honhop === 0)
+      html += barItem('ais', 'AIS', 0, 1);
     html += `</div>`;
     return html;
   }
@@ -4790,11 +4781,15 @@ const _renderTechChart = (c, cardUid, ci) => {
   function buildLVSection() {
     // 22kV: GIS | GIS+KCK (hỗn hợp) | KCK (Khí-Chân không)
     const t = t22;
+    const total = (t.GIS||0) + (t.KCK||0) + (t.GIS_KCK||0);
+    if (total === 0) return ''; // Không có thiết bị 22-35kV -> ẩn section
     const maxV = Math.max(t.GIS||0, t.GIS_KCK||0, t.KCK||0, 1);
     let html = `<div class="ic-tech-cap" style="margin-top:8px">⚡ 22 – 35kV</div>`;
     html += `<div class="ic-tech-grid">`;
-    html += barItem('gis',    'GIS',              t.GIS||0,     maxV);
-    html += barItem('kck',    'Khí – Chân không', t.KCK||0,     maxV);
+    if ((t.GIS||0) > 0)
+      html += barItem('gis',    'GIS',              t.GIS||0,     maxV);
+    if ((t.KCK||0) > 0)
+      html += barItem('kck',    'Khí – Chân không', t.KCK||0,     maxV);
     if ((t.GIS_KCK||0) > 0)
       html += barItem('honhop', 'GIS + KCK',      t.GIS_KCK||0, maxV);
     html += `</div>`;
@@ -4966,8 +4961,9 @@ function getPreview(type, props) {
       return `
       <div class="ic-card ${isTechChart && useTechStackLayout ? 'ic-card-tech-stack' : ''}" id="icc_${uid}_${ci}"
         style="--card-color:${c.color};border-color:${c.color}22;border-top-color:${c.color};cursor:pointer;${placementStyle}"
-        data-ic-label="${c.label}"
-        data-ic-color="${c.color}"
+        draggable="true"
+        onclick="if(!event.target.closest('.ic-toolbar')&&!event.target.closest('.ic-sz-btn')&&!event.target.isContentEditable){lytStatsCardClick('${c.label}','${c.color}')}"
+        ondragstart="icDragStart(event,'${uid}',${ci})"
         ondragover="icDragOver(event,'${uid}',${ci})"
         ondrop="icDrop(event,'${uid}',${ci})"
         ondragleave="icDragLeave(event,'${uid}',${ci})"
@@ -7234,39 +7230,127 @@ function _lytShowDetailPanel(title, color, totalLine, items, mbaSection) {
 
 // Không cần _hmPanelInitDrag nữa – giữ stub để không lỗi các lần gọi cũ
 function _hmPanelInitDrag(panel) {
-  if (!panel) return;
-  panel.style.display       = 'flex';
+  if (!panel || panel._dragInited) return;
+  panel._dragInited = true;
+
+  // ── Ensure panel is display:flex flex-direction:column ──
+  panel.style.display = 'flex';
   panel.style.flexDirection = 'column';
-  panel.style.overflow      = 'hidden';
+  panel.style.overflow = 'hidden';
+
+  // ── Add resize grip if not present ──
+  if (!panel.querySelector('.hm-resize-grip')) {
+    const grip = document.createElement('div');
+    grip.className = 'hm-resize-grip';
+    panel.insertBefore(grip, panel.firstChild);
+  }
+
+  // ── Ensure all flex:1 children are scrollable ──
+  panel.querySelectorAll('[style*="flex:1"]').forEach(el => {
+    el.style.overflowY = 'auto';
+    el.style.minHeight = '0';
+    el.style.overscrollBehavior = 'contain';
+    el.style.webkitOverflowScrolling = 'touch';
+  });
+
+  // ── LEFT EDGE DRAG = RESIZE WIDTH ──
+  const grip2 = panel.querySelector('.hm-resize-grip');
+  if (grip2) {
+    let startX, startW;
+    grip2.addEventListener('mousedown', e => {
+      e.preventDefault();
+      startX = e.clientX;
+      startW = panel.offsetWidth;
+      grip2.classList.add('dragging');
+      const onMove = ev => {
+        const newW = Math.max(260, Math.min(window.innerWidth * 0.7, startW + (startX - ev.clientX)));
+        panel.style.width = newW + 'px';
+      };
+      const onUp = () => {
+        grip2.classList.remove('dragging');
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+    // Touch resize
+    grip2.addEventListener('touchstart', e => {
+      const t0 = e.touches[0]; startX = t0.clientX; startW = panel.offsetWidth;
+    }, { passive: true });
+    grip2.addEventListener('touchmove', e => {
+      const t0 = e.touches[0];
+      const newW = Math.max(260, Math.min(window.innerWidth * 0.7, startW + (startX - t0.clientX)));
+      panel.style.width = newW + 'px';
+    }, { passive: true });
+  }
+
+  // ── HEADER DRAG = VERTICAL POSITION ──
+  const hd = panel.querySelector('.hm-detail-hd');
+  if (hd) {
+    let startY, startTop;
+    hd.addEventListener('mousedown', e => {
+      if (e.target.classList.contains('hm-detail-close')) return;
+      e.preventDefault();
+      startY = e.clientY;
+      startTop = parseInt(panel.style.top || '0', 10);
+      const onMove = ev => {
+        const newTop = Math.max(0, Math.min(window.innerHeight - 80, startTop + ev.clientY - startY));
+        panel.style.top = newTop + 'px';
+        panel.style.bottom = 'auto';
+        panel.style.height = (window.innerHeight - newTop) + 'px';
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+
+  // ── KEYBOARD CLOSE (Escape) ──
+  if (!window._hmEscBound) {
+    window._hmEscBound = true;
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        const p = document.getElementById('hm-detail-panel');
+        if (p && p.classList.contains('open')) {
+          p.classList.remove('open');
+          p.style.top = ''; p.style.bottom = ''; p.style.height = '';
+          const bd = document.getElementById('hm-detail-backdrop');
+          if (bd) bd.style.display = 'none';
+        }
+      }
+    });
+  }
 }
 
-// Mở panel + hiện backdrop + focus search
+// Universal panel open — call after setting innerHTML + classList.add('open')
 function _hmOpenPanel(p, showBackdrop) {
-  // Panel dùng overflow-y:auto trực tiếp - không cần flex tricks
-  p.style.top    = '0';
-  p.style.bottom = '0';
-  p.style.height = '';
-
-  // Backdrop
+  _hmPanelInitDrag(p);
+  // Reset panel position
+  p.style.top = ''; p.style.bottom = '0'; p.style.height = '';
   if (showBackdrop !== false) {
     let bd = document.getElementById('hm-detail-backdrop');
     if (!bd) {
       bd = document.createElement('div');
       bd.id = 'hm-detail-backdrop';
-      bd.style.cssText = 'position:fixed;inset:0;z-index:9190;background:rgba(0,0,0,.35);display:none';
+      bd.style.cssText = 'position:fixed;inset:0;z-index:9190;background:rgba(0,0,0,.35);display:none;backdrop-filter:blur(1px)';
       bd.onclick = () => {
         p.classList.remove('open');
-        bd.style.display = 'none';
+        p.style.top=''; p.style.bottom='0'; p.style.height='';
+        bd.style.display='none';
       };
       document.body.appendChild(bd);
     }
     bd.style.display = 'block';
   }
-  // Focus search box
+  // Focus search if present
   setTimeout(() => {
     const si = p.querySelector('input[type=text]');
     if (si) si.focus();
-  }, 220);
+  }, 250);
 }
 
 function _lytDetailSearchFn(val) {
@@ -8087,6 +8171,23 @@ function _recomputeStatsWithFilter() {
     techCard.tech220 = { ...tech220 };
     techCard.tech110 = { ...tech110 };
     techCard.tech22  = { ...tech22  };
+  })();
+
+  // Update tech chart DOM trực tiếp (không chờ RAF)
+  (function() {
+    const si = layout.find(l => l.type === 'stats');
+    if (!si) return;
+    const tc = si.props.cards.find(c => c.chartType === 'tech');
+    if (!tc) return;
+    const uid = si.uid;
+    const ci  = si.props.cards.indexOf(tc);
+    const el  = document.getElementById(`tc_${uid}_${ci}`);
+    if (!el) return;
+    const rowEl = document.getElementById(`tr_${uid}_${ci}`);
+    if (!rowEl) return;
+    // Re-render tech rows bằng cách gọi lại logic buildHVSection + buildLVSection
+    // Đơn giản: trigger scheduleCanvasRender ngay
+    scheduleCanvasRender(uid);
   })();
 
   // Cập nhật DOM trực tiếp — KHÔNG chờ RAF để tránh flash giá trị cũ
