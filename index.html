@@ -115,6 +115,12 @@ body.user-mode #canvas,
 body.user-mode #tbPageOverlay {
   padding: 16px 24px !important;
 }
+body.user-mode #tbPageOverlay {
+  top: calc(var(--topbar-h, 56px) + 36px) !important; /* topbar + tab strip */
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+}
 /* Section cards: ẩn drag handle, card actions, card-act-btn */
 body.user-mode .card-drag,
 body.user-mode .card-actions,
@@ -168,7 +174,8 @@ body.user-mode .section-card.is-selected {
   align-items: center;
   padding: 0 20px;
   gap: 14px;
-  z-index: 100;
+  z-index: 9100;
+  position: relative;
 }
 
 .brand {
@@ -1499,12 +1506,12 @@ body { font-size: var(--fs-base); }
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 14px 16px 12px;
+  padding: 14px 14px 12px;
   overflow: hidden;
   position: relative;
   transition: border-color var(--transition), box-shadow var(--transition);
   cursor: default;
-  min-height: 120px;
+  min-height: 108px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1557,7 +1564,6 @@ body { font-size: var(--fs-base); }
   gap: 0;
   overflow: hidden;
   min-width: 0;
-  min-height: 0;
 }
 
 /* Icon — small, top-left, dimmed */
@@ -1615,14 +1621,6 @@ body { font-size: var(--fs-base); }
   text-shadow: 0 0 24px color-mix(in srgb, var(--card-color, #00c8ff) 50%, transparent);
 }
 .ic-val:focus { border-bottom-color: var(--card-color, var(--accent)); }
-/* Computed card val — larger */
-[data-computed="true"] {
-  font-size: clamp(32px, 4vw, 56px) !important;
-  font-weight: 800 !important;
-  letter-spacing: -0.05em !important;
-  line-height: 1 !important;
-  text-shadow: 0 0 32px color-mix(in srgb, var(--card-color, #00c8ff) 60%, transparent) !important;
-}
 
 /* Label below number */
 .ic-lbl {
@@ -3218,7 +3216,7 @@ body.preview-mode .section-card {
 </div>
 
 <!-- ═══ THIẾT BỊ PAGE OVERLAY ═══ -->
-<div id="tbPageOverlay" style="display:none;position:absolute;inset:0;background:var(--bg-main,#0d1117);overflow-y:auto;z-index:100;padding:20px 24px;box-sizing:border-box"></div>
+<div id="tbPageOverlay" style="display:none;position:fixed;top:calc(var(--topbar-h,56px) + var(--statusbar-h,32px));left:0;right:0;bottom:0;background:var(--bg-main,#0d1117);overflow-y:auto;z-index:100;padding:20px 24px;box-sizing:border-box"></div>
 
 <!-- ═══ RIGHT PANEL — LAYERS + PROPERTIES ═══ -->
 <div class="props-panel">
@@ -4116,27 +4114,6 @@ let _canvasRenderRAF = 0;
 let _canvasNeedsFull = false;
 const _canvasDirtyUids = new Set();
 
-// ── Auto-fit computed card values to prevent overflow ──────────
-function _icAutoFit() {
-  document.querySelectorAll('.ic-card').forEach(card => {
-    const valEl = card.querySelector('[data-computed="true"]');
-    if (!valEl) return;
-    const cardW = card.clientWidth - 32;
-    if (cardW <= 0) return;
-    valEl.style.fontSize = '';
-    let fs = parseFloat(getComputedStyle(valEl).fontSize);
-    let iter = 0;
-    while (valEl.scrollWidth > cardW && fs > 18 && iter++ < 25) {
-      fs = Math.max(18, fs - 2);
-      valEl.style.fontSize = fs + 'px';
-    }
-  });
-}
-window.addEventListener('resize', () => {
-  clearTimeout(window._icFitRAF);
-  window._icFitRAF = setTimeout(_icAutoFit, 100);
-});
-
 function scheduleCanvasRender(uid = null) {
   if (uid) _canvasDirtyUids.add(uid);
   else _canvasNeedsFull = true;
@@ -4972,37 +4949,25 @@ function getPreview(type, props) {
           ${extraHtml}
         </div>
       ` : `
-        <div class="ic-body" style="${isComputed ? 'flex-direction:row;align-items:center;justify-content:space-between;gap:10px' : ''}">
-          ${isComputed ? `
-          <div style="display:flex;flex-direction:column;justify-content:space-between;flex:1;min-width:0;height:100%;padding:2px 0">
-            <div class="ic-icon" style="font-size:${c.iconSize||22}px;margin-bottom:0;opacity:.8;cursor:pointer;user-select:none"
-              onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\\'")}','${c.color}')"
-            >${c.icon||'▣'}</div>
-            <div class="ic-lbl" style="cursor:pointer;user-select:none;white-space:normal;line-height:1.3;font-size:clamp(9px,0.85vw,11px)"
-              data-uid="${uid}" data-ci="${ci}" data-field="label"
-              onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\\'")}','${c.color}')"
-            >${c.label}</div>
-          </div>
-          <div class="ic-val" data-computed="true"
-            style="color:${c.color};text-align:right;flex-shrink:0;cursor:pointer;user-select:none;font-size:clamp(32px,${c.valSize||42}px,max(${c.valSize||42}px,4vw))"
-            data-uid="${uid}" data-ci="${ci}" data-field="value"
-            onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\\'")}','${c.color}')"
-          >${c.value}</div>
-          ` : `
-          <div class="ic-icon" contenteditable="true" spellcheck="false"
+        <div class="ic-body">
+          <div class="ic-icon" ${isComputed ? '' : 'contenteditable="true" spellcheck="false"'}
             data-uid="${uid}" data-ci="${ci}" data-field="icon"
             style="font-size:${c.iconSize||18}px"
-            onblur="icSave(this)" onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();this.closest('.ic-card').querySelector('.ic-val').focus()}"
+            ${isComputed ? '' : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'||event.key===\'Tab\'){event.preventDefault();this.closest(\'.ic-card\').querySelector(\'.ic-val\').focus()}"'}
           >${c.icon||'▣'}</div>
-          <div class="ic-val" contenteditable="true" spellcheck="false"
-            style="color:${c.color};font-size:${c.valSize||26}px"
+          <div class="ic-val" ${isComputed ? 'data-computed="true"' : 'contenteditable="true" spellcheck="false"'}
+            style="color:${c.color};font-size:${c.valSize||26}px;${isComputed?'cursor:pointer;user-select:none':''}"
             data-uid="${uid}" data-ci="${ci}" data-field="value"
-            onblur="icSave(this)" onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();this.closest('.ic-card').querySelector('.ic-lbl').focus()}"
+            ${isComputed
+              ? `onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\\'")}','${c.color}')"`
+              : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'||event.key===\'Tab\'){event.preventDefault();this.closest(\'.ic-card\').querySelector(\'.ic-lbl\').focus()}"'}
           >${c.value}</div>
-          <div class="ic-lbl" contenteditable="true" spellcheck="false"
+          <div class="${isComputed ? 'ic-lbl' : 'ic-lbl'}" ${isComputed ? 'style="cursor:pointer;user-select:none"' : 'contenteditable="true" spellcheck="false"'}
             data-uid="${uid}" data-ci="${ci}" data-field="label"
-            onblur="icSave(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"
-          >${c.label}</div>`}
+            ${isComputed
+              ? `onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\\'")}','${c.color}')"`
+              : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}"'}
+          >${c.label}</div>
         </div>
       `;
 
@@ -8534,7 +8499,7 @@ async function loadStatsFromSupabase() {
     renderCanvas();
     renderQuickNav();
     // Sau khi canvas render xong, render chips + charts với dữ liệu thực
-    setTimeout(() => { renderChipsSection(); renderChartsSection(); renderTimelineSection(); renderLiveFilterSection(); _icAutoFit(); }, 100);
+    setTimeout(() => { renderChipsSection(); renderChartsSection(); renderTimelineSection(); renderLiveFilterSection(); }, 80);
     showToast('✓ Đã cập nhật dữ liệu từ Supabase (' + allRows.length.toLocaleString('vi-VN') + ' dòng)');
   } catch (err) {
     console.error('[Supabase Stats Error]', err);
@@ -10764,7 +10729,7 @@ function _authInitUserMenu(){
   const sess=_authCurrentUser();if(!sess)return;
   const tb=document.querySelector('.topbar-actions');if(!tb)return;
   const old=document.getElementById('_userMenuWrap');if(old)old.remove();
-  const wrap=document.createElement('div');wrap.id='_userMenuWrap';wrap.style.cssText='position:relative;';
+  const wrap=document.createElement('div');wrap.id='_userMenuWrap';wrap.style.cssText='position:relative;z-index:9200;';
   const adminBtn=sess.role==='admin'?'<div class="um-item" onclick="_openAdminPanel()"><i class="fas fa-shield-alt"></i> Bang Admin</div>':'';
   wrap.innerHTML=`<button id="userMenuBtn" onclick="_toggleUserMenu()">
     <i class="fas fa-user-circle"></i>
