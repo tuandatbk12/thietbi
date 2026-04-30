@@ -1504,7 +1504,7 @@ body { font-size: var(--fs-base); }
   position: relative;
   transition: border-color var(--transition), box-shadow var(--transition);
   cursor: default;
-  min-height: 108px;
+  min-height: 120px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1561,13 +1561,13 @@ body { font-size: var(--fs-base); }
 
 /* Icon — small, top-left, dimmed */
 .ic-icon {
-  font-size: 18px;
+  font-size: 22px;
   line-height: 1;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   outline: none;
   border-radius: 3px;
   display: inline-block;
-  min-width: 24px;
+  min-width: 28px;
   cursor: text;
   transition: background var(--transition);
   flex-shrink: 0;
@@ -1598,29 +1598,29 @@ body { font-size: var(--fs-base); }
 /* BIG number */
 .ic-val {
   font-family: var(--font-mono);
-  font-size: clamp(20px, 2.2vw, 30px);
-  font-weight: 700;
+  font-size: clamp(24px, 3vw, 42px);
+  font-weight: 800;
   line-height: 1;
   outline: none;
   border-bottom: 2px solid transparent;
   cursor: text;
-  transition: border-color var(--transition);
+  transition: border-color var(--transition), font-size .15s;
   min-width: 0;
   display: block;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-shadow: 0 0 24px color-mix(in srgb, var(--card-color, #00c8ff) 50%, transparent);
+  text-shadow: 0 0 28px color-mix(in srgb, var(--card-color, #00c8ff) 55%, transparent);
 }
 .ic-val:focus { border-bottom-color: var(--card-color, var(--accent)); }
 
 /* Label below number */
 .ic-lbl {
-  font-size: 10.5px;
-  font-weight: 400;
+  font-size: clamp(9px, 0.95vw, 12px);
+  font-weight: 500;
   color: var(--text-secondary);
-  margin-top: 5px;
+  margin-top: 6px;
   outline: none;
   border-bottom: 1px solid transparent;
   cursor: text;
@@ -4942,28 +4942,27 @@ function getPreview(type, props) {
           ${extraHtml}
         </div>
       ` : `
-        <div class="ic-body" style="${isComputed ? 'display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;flex:1' : ''}">
+        <div class="ic-body" style="${isComputed?'flex-direction:row;align-items:stretch;justify-content:space-between;gap:10px':''}">
           ${isComputed ? `
-          <div style="display:flex;flex-direction:column;align-items:flex-start;gap:5px;flex-shrink:0;min-width:0;max-width:55%"
-            onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\\'")}','${c.color}')" style="cursor:pointer">
-            <div class="ic-icon" style="font-size:${c.iconSize||16}px;opacity:.75;line-height:1">${c.icon||'▣'}</div>
-            <div class="ic-lbl" style="cursor:pointer;user-select:none;white-space:normal;line-height:1.3;font-size:clamp(8px,0.85vw,10.5px)"
-              data-uid="${uid}" data-ci="${ci}" data-field="label"
-            >${c.label}</div>
+          <!-- Computed: icon+label left, big number right -->
+          <div style="display:flex;flex-direction:column;justify-content:space-between;min-width:0;flex:1;cursor:pointer"
+            onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\'")}','${c.color}')">
+            <div class="ic-icon" style="font-size:${c.iconSize||20}px;color:${c.color};opacity:.8">${c.icon||'▣'}</div>
+            <div class="ic-lbl" style="cursor:pointer;user-select:none;white-space:normal;line-height:1.35;color:var(--text-secondary)">${c.label}</div>
           </div>
           <div class="ic-val" data-computed="true"
-            style="color:${c.color};font-size:clamp(20px,${c.valSize||32}px,max(${c.valSize||32}px,2.8vw));cursor:pointer;user-select:none;text-align:right;line-height:1;flex-shrink:0"
+            style="color:${c.color};font-size:clamp(26px,${c.valSize||34}px,max(${c.valSize||34}px,3.2vw));cursor:pointer;user-select:none;text-align:right;align-self:center;flex-shrink:0;line-height:1;letter-spacing:-0.04em"
             data-uid="${uid}" data-ci="${ci}" data-field="value"
-            onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\\'")}','${c.color}')"
+            onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\'")}','${c.color}')"
           >${c.value}</div>
           ` : `
           <div class="ic-icon" contenteditable="true" spellcheck="false"
             data-uid="${uid}" data-ci="${ci}" data-field="icon"
-            style="font-size:${c.iconSize||18}px"
+            style="font-size:${c.iconSize||20}px"
             onblur="icSave(this)" onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();this.closest('.ic-card').querySelector('.ic-val').focus()}"
           >${c.icon||'▣'}</div>
           <div class="ic-val" contenteditable="true" spellcheck="false"
-            style="color:${c.color};font-size:${c.valSize||26}px"
+            style="color:${c.color};font-size:${c.valSize||28}px"
             data-uid="${uid}" data-ci="${ci}" data-field="value"
             onblur="icSave(this)" onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();this.closest('.ic-card').querySelector('.ic-lbl').focus()}"
           >${c.value}</div>
@@ -4984,7 +4983,7 @@ function getPreview(type, props) {
         ondrop="icDrop(event,'${uid}',${ci})"
         ondragleave="icDragLeave(event,'${uid}',${ci})"
         ondragend="icDragEnd(event,'${uid}')">
-        ${isComputed ? '' : ratioHtml}
+        ${ratioHtml}
         <div class="ic-toolbar">
           <span class="ic-tbtn ic-drag-btn" draggable="true" ondragstart="event.stopPropagation();icDragStart(event,'${uid}',${ci})" title="Kéo để sắp xếp"><i class="fas fa-grip-vertical"></i></span>
           <button class="ic-tbtn" onclick="icPickColor(event,'${uid}',${ci})" title="Màu"><i class="fas fa-palette"></i></button>
@@ -6980,7 +6979,7 @@ function renderTimelineSection() {
   </div>
 
   <div style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.08em;margin-bottom:8px">
-    PHÂN TÍCH THỜI GIAN VẬN HÀNH THEO LOẠI THIẾT BỊ
+    PHÂN TÍCH THÂM NIÊN VẬN HÀNH THEO LOẠI THIẾT BỊ
     <span style="margin-left:12px;font-weight:400">
       ${TL_BUCKETS.map(b=>`<span style="color:${b.color};margin-right:10px">■ ${b.label}</span>`).join('')}
     </span>
@@ -7083,7 +7082,7 @@ function lytTLBucketClick(type, bucketKey, bucketLabel, color) {
       const yrs=[...info.years].sort();
       const yrStr=yrs.length?(yrs[0]===yrs[yrs.length-1]?`${yrs[0]}`:`${yrs[0]}–${yrs[yrs.length-1]}`):'—';
       const ages=yrs.map(y=>nowY-y);
-      const ageStr=ages.length?`~${Math.round(ages.reduce((s,a)=>s+a,0)/ages.length)}n`:'';
+      const ageStr=ages.length?`~${Math.round(ages.reduce((s,a)=>s+a,0)/ages.length)} năm`:'';
       items.push({text:t,badge:`${info.qty}TB · ${yrStr}${ageStr?' · '+ageStr:''}`,color:capColor[cap]||'#888'});
     });
   });
@@ -7900,14 +7899,39 @@ function lytStatsCardClick(label, color) {
       const byType = {};
       rows.forEach(r => {
         const pl = (r.Phan_loai_thiet_bi||'Khác').trim();
-        if (!byType[pl]) byType[pl] = { qty: 0, trams: new Set() };
+        if (!byType[pl]) byType[pl] = { qty: 0, trams: {}, rows: [] };
         byType[pl].qty += Number(r.So_luong)||1;
-        if (r.Tram) byType[pl].trams.add((r.Tram||'').trim());
+        const t = (r.Tram||'').trim();
+        if (t) {
+          if (!byType[pl].trams[t]) byType[pl].trams[t] = { qty:0, devices:[] };
+          byType[pl].trams[t].qty += Number(r.So_luong)||1;
+          byType[pl].trams[t].devices.push(r);
+        }
       });
       const sorted = Object.entries(byType).sort((a,b) => b[1].qty - a[1].qty);
       const total = sorted.reduce((s,[,v]) => s + v.qty, 0);
+      const nowY = new Date().getFullYear();
       sorted.forEach(([pl, v]) => {
-        items.push({ text: pl, sub: `${v.qty.toLocaleString('vi-VN')} TB / ${v.trams.size} trạm`, color: LYT_CAP_COLORS['1']||'#18ffff' });
+        const tramCount = Object.keys(v.trams).length;
+        // Build sub-detail: each tram with its devices
+        const tramsSorted = Object.entries(v.trams).sort((a,b)=>{
+          const ca = tramMaxCap[a[0]]||'', cb = tramMaxCap[b[0]]||'';
+          return (capPrio[ca]??9)-(capPrio[cb]??9)||a[0].localeCompare(b[0],'vi');
+        });
+        const detail = tramsSorted.map(([t, tInfo]) => {
+          const cap = tramMaxCap[t]||'';
+          const capTag = cap ? ` [${capLbl[cap]||cap}]` : '';
+          // Each device in this tram
+          const devStr = tInfo.devices.map(r => {
+            const dn = (r.Ten_thiet_bi||r.Ngan_thiet_bi||'—').trim();
+            const nvh = Number(r.Nam_van_hanh)||0;
+            const age = nvh>1970 ? nowY-nvh : -1;
+            const sl = Number(r.So_luong)||1;
+            return `  • ${dn}${nvh>1970?' · '+nvh:''}${age>=0?' · ~'+age+' năm VH':''}${sl>1?' (×'+sl+')':''}`;
+          }).join('\n');
+          return t+capTag+' — '+tInfo.qty+' TB\n'+devStr;
+        });
+        items.push({ text: pl, sub: `${v.qty.toLocaleString('vi-VN')} TB · ${tramCount} trạm`, color: LYT_CAP_COLORS['1']||'#18ffff', detail });
       });
       totalLine = `${total.toLocaleString('vi-VN')} thiết bị · ${sorted.length} loại`;
       break;
@@ -8936,7 +8960,7 @@ function _tbTable() {
     {k:'Hang_san_xuat',      l:'Hãng SX',     w:'90px' },
     {k:'Nam_san_xuat',       l:'Năm SX',      w:'58px', cls:'tb-num'},
     {k:'Nam_van_hanh',       l:'Năm VH',      w:'58px', cls:'tb-num'},
-    {k:'_age',               l:'Thời gian VH',   w:'70px', cls:'tb-num'},
+    {k:'_age',               l:'Thâm niên',   w:'70px', cls:'tb-num'},
     {k:'Cong_suat',          l:'CS (MVA)',    w:'68px', cls:'tb-num'},
     {k:'Ly_lich',            l:'Lý lịch',     w:'80px' },
     {k:'Thong_so',           l:'Thông số',    w:'100px'},
@@ -9029,7 +9053,7 @@ function _tbShowLyLich(idx) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
         ${[['Loại thiết bị',r.Phan_loai_thiet_bi,'#00c8ff'],['Số lượng',r.So_luong??'—','#00e676'],
            ['Hãng sản xuất',r.Hang_san_xuat,'#ffd740'],['Năm sản xuất',r.Nam_san_xuat,'#ffd740'],
-           ['Năm vận hành',r.Nam_van_hanh,'#00c8ff'],['Thời gian VH',age>=0?age+' năm':'—',age>=15?'#ff5252':age>=10?'#ffd740':'#00e676'],
+           ['Năm vận hành',r.Nam_van_hanh,'#00c8ff'],['Thâm niên',age>=0?age+' năm':'—',age>=15?'#ff5252':age>=10?'#ffd740':'#00e676'],
            ['Công suất (MVA)',r.Cong_suat,'#b388ff'],['Đội quản lý',r.Doi,'#888']
         ].map(([l,v,col])=>`<div style="background:rgba(255,255,255,.04);border-radius:7px;padding:8px 10px;border:1px solid rgba(255,255,255,.07)">
           <div style="font-size:8.5px;color:var(--text-muted);margin-bottom:3px">${l}</div>
@@ -9052,7 +9076,7 @@ function _tbShowLyLich(idx) {
 function _tbExportCSV() {
   const rows = _tbFiltered;
   if (!rows.length) return;
-  const hdr = ['Trạm','Cấp ĐA','Loại TB','Tên/Ký hiệu','Ngăn TB','Số lượng','Hãng SX','Năm SX','Năm VH','Thời gian VH','CS(MVA)','Lý lịch','Thông số','Đội'].join(',');
+  const hdr = ['Trạm','Cấp ĐA','Loại TB','Tên/Ký hiệu','Ngăn TB','Số lượng','Hãng SX','Năm SX','Năm VH','Thâm niên','CS(MVA)','Lý lịch','Thông số','Đội'].join(',');
   const body = rows.map(r=>{
     const age=_tbAge(r);
     return [r.Tram,_tbCapLbl[String(r.Cap_dien_ap??'')]||r.Cap_dien_ap,r.Phan_loai_thiet_bi,r.Ten_thiet_bi,r.Ngan_thiet_bi,r.So_luong,r.Hang_san_xuat,r.Nam_san_xuat,r.Nam_van_hanh,age>=0?age:'',r.Cong_suat,r.Ly_lich,r.Thong_so,r.Doi]
@@ -9065,7 +9089,7 @@ function _tbExportCSV() {
 
 function _tbExportOne(idx) {
   const r=_tbFiltered[idx]; if(!r) return;
-  const fields=[['Trạm',r.Tram],['Cấp ĐA',_tbCapLbl[String(r.Cap_dien_ap??'')]||r.Cap_dien_ap],['Loại TB',r.Phan_loai_thiet_bi],['Tên/Ký hiệu',r.Ten_thiet_bi],['Ngăn TB',r.Ngan_thiet_bi],['Số lượng',r.So_luong],['Hãng SX',r.Hang_san_xuat],['Năm SX',r.Nam_san_xuat],['Năm VH',r.Nam_van_hanh],['Thời gian VH',_tbAge(r)>=0?_tbAge(r):''],['CS(MVA)',r.Cong_suat],['Thông số',r.Thong_so],['Lý lịch',r.Ly_lich],['Đội',r.Doi]];
+  const fields=[['Trạm',r.Tram],['Cấp ĐA',_tbCapLbl[String(r.Cap_dien_ap??'')]||r.Cap_dien_ap],['Loại TB',r.Phan_loai_thiet_bi],['Tên/Ký hiệu',r.Ten_thiet_bi],['Ngăn TB',r.Ngan_thiet_bi],['Số lượng',r.So_luong],['Hãng SX',r.Hang_san_xuat],['Năm SX',r.Nam_san_xuat],['Năm VH',r.Nam_van_hanh],['Thâm niên',_tbAge(r)>=0?_tbAge(r):''],['CS(MVA)',r.Cong_suat],['Thông số',r.Thong_so],['Lý lịch',r.Ly_lich],['Đội',r.Doi]];
   const csv='\uFEFF'+fields.map(([k,v])=>`"${k}","${String(v||'').replace(/"/g,'""')}"`).join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
@@ -9077,7 +9101,6 @@ function _tbSort(col){if(_tbSortCol===col)_tbSortAsc=!_tbSortAsc;else{_tbSortCol
 function _tbGoPage(p){const tot=Math.max(1,Math.ceil(_tbFiltered.length/_tbPageSize));_tbPage=Math.max(1,Math.min(p,tot));_tbRefreshContent();}
 function _tbOnSearch(v){_tbSearchQ=v||'';_tbApply();_tbRefreshContent();}
 let _tbFCongSuat = '';
-let _tbDdRefs = {}; // module-level for reset
 function _tbOnFilter(k,v){
   if(k==='cap')        _tbFCap=v;
   else if(k==='type')  _tbFType=v;
@@ -9091,11 +9114,14 @@ function _tbOnFilter(k,v){
 }
 function _tbReset(){
   _tbSearchQ=_tbFCap=_tbFType=_tbFTram=_tbFHang=_tbFYear=_tbFKieu=_tbFOpyr='';
-  _tbFCongSuat='';
-  // Reset tất cả cascade dropdowns
-  Object.values(_tbDdRefs).forEach(btn=>{ try{ btn.reset(); }catch(_){} });
-  const rb=document.getElementById('_tbResetBtn');
-  if(rb){ rb.style.display='none'; }
+  if(typeof _tbFCongSuat!=='undefined')_tbFCongSuat='';
+  // Reset all trigger labels in overlay
+  document.querySelectorAll('#tbPageOverlay .hm-tram-trigger-label').forEach(el=>{
+    el.textContent = el.dataset.default||el.textContent;
+  });
+  document.querySelectorAll('#tbPageOverlay .hm-tram-trigger').forEach(el=>{
+    el.classList.remove('open'); el.style.borderColor=''; el.style.background=''; el.style.color='';
+  });
   const si=document.getElementById('_tbSi');if(si)si.value='';
   _tbApply();_tbRefreshContent();
 }
@@ -9290,7 +9316,7 @@ function _tbLoadFromSource(source, conf) {
   // Khi thay đổi một filter, tất cả filter sau đó phải rebuild từ source
   // đã lọc qua các filter trước.
 
-  _tbDdRefs = {}; // reset for this render
+  const _tbDdRefs = {}; // key → {btn, lbl, ico, setItems, reset}
   const _tbCapPrioCasc = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
   const _sortViCasc = (a,b) => a.localeCompare(b,'vi');
   const _sortNumCasc = (a,b) => Number(b)-Number(a);
@@ -10098,52 +10124,68 @@ function _bcGroupedTable(rows, colDefs) {
 }
 
 // ── CHART BUILDERS (SVG bar charts) ──────────────────────────
-// Full-width bar chart with per-bar colors
-function _bcBarChartFull(data) {
-  if(!data||!data.length) return '<div style="padding:20px;text-align:center;color:var(--text-muted)">Không có dữ liệu</div>';
-  const maxVal=Math.max(...data.map(d=>d.v),1);
-  const BAR_H=140;
-  const totalBars=data.length;
-  // Use percentage widths so chart fills container
-  const bars=data.map((d,i)=>{
-    const h=Math.max(2,Math.round((d.v/maxVal)*BAR_H));
-    const col=d.col||'#00c8ff';
-    const safeLabel=(d.label||'').replace(/'/g,"\\'");
-    return `<div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;cursor:pointer;padding:0 1px"
-      onclick="_bcBarClick('${safeLabel}',${d.v},'${col}')"
-      onmouseenter="this.querySelector('.bc-bar-inner').style.filter='brightness(1.25)'"
-      onmouseleave="this.querySelector('.bc-bar-inner').style.filter=''">
-      <div style="font-size:8px;color:${col};font-weight:700;margin-bottom:2px;font-family:var(--font-mono)">${d.v}</div>
-      <div style="width:100%;height:${BAR_H}px;display:flex;align-items:flex-end;position:relative">
-        <div class="bc-bar-inner" style="width:100%;height:${h}px;background:${col};border-radius:2px 2px 0 0;opacity:.85;transition:filter .15s"></div>
-      </div>
-      <div style="font-size:7.5px;color:rgba(255,255,255,.45);margin-top:3px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${d.label}</div>
-    </div>`;
-  }).join('');
-  return `<div style="display:flex;align-items:flex-end;gap:0;width:100%;min-height:${BAR_H+40}px;overflow-x:auto">${bars}</div>`;
-}
-
-function _bcBarChart(data, title, colorFn) {
-  if (!data.length) return '';
+// Stacked+cluster combo chart with per-type breakdown + trend line
+function _bcBarChart(data, title, colorFn, typeMap) {
+  if (!data.length) return '<div style="padding:20px;text-align:center;color:var(--text-muted)">Không có dữ liệu</div>';
+  const TYPE_COLORS = ['#00c8ff','#00e676','#ffd740','#ff9100','#e040fb','#18ffff','#ff5252','#00bcd4','#8bc34a','#b388ff'];
+  const allTypes = typeMap ? [...new Set(Object.values(typeMap).flatMap(m=>Object.keys(m)))].sort() : [];
+  const hasTypes = allTypes.length > 0;
   const maxVal = Math.max(...data.map(d=>d.v), 1);
-  const BAR_H = 160, BAR_W = Math.max(24, Math.min(48, Math.floor(680 / data.length)));
-  const bars = data.map((d,i) => {
+  const BAR_H = 140;
+  const n = data.length;
+  const BAR_W = Math.max(16, Math.min(52, Math.floor(900 / Math.max(n, 1)) - 4));
+  const GAP = Math.max(2, Math.min(5, BAR_W * 0.15));
+  const TOTAL_W = n * (BAR_W + GAP);
+
+  const bars = data.map((d, i) => {
     const h = Math.max(2, Math.round((d.v / maxVal) * BAR_H));
-    const x = i * (BAR_W + 4);
+    const x = i * (BAR_W + GAP);
     const col = colorFn ? colorFn(d) : '#00c8ff';
-    return `<g transform="translate(${x}, 0)">
-      <rect y="${BAR_H - h}" width="${BAR_W}" height="${h}" fill="${col}" rx="2" opacity=".85"/>
-      <text x="${BAR_W/2}" y="${BAR_H + 14}" text-anchor="middle" fill="rgba(255,255,255,.5)" font-size="9">${d.label}</text>
-      <text x="${BAR_W/2}" y="${BAR_H - h - 4}" text-anchor="middle" fill="${col}" font-size="10" font-weight="700">${d.v}</text>
+    const safeLabel = (d.label||'').replace(/'/g,"\'");
+    const safeCol = col.replace(/'/g,"\'");
+    let segments = '';
+    if (hasTypes && typeMap && typeMap[d.label]) {
+      const tMap = typeMap[d.label];
+      let yOff = BAR_H;
+      allTypes.forEach((t,ti) => {
+        const tv = tMap[t]||0; if(!tv) return;
+        const th = Math.max(1, Math.round((tv/maxVal)*BAR_H));
+        yOff -= th;
+        segments += `<rect x="0" y="${yOff}" width="${BAR_W}" height="${th}" fill="${TYPE_COLORS[ti%TYPE_COLORS.length]}" opacity=".88" rx="1"/>`;
+      });
+    } else {
+      segments = `<rect y="${BAR_H-h}" width="${BAR_W}" height="${h}" fill="${col}" rx="2" opacity=".85"/>`;
+    }
+    const fontSize = BAR_W > 28 ? 9 : 7;
+    return `<g transform="translate(${x},0)" style="cursor:pointer"
+      onclick="_bcBarClick('${safeLabel}',${d.v},'${safeCol}')"
+      onmouseenter="Array.from(this.querySelectorAll('rect')).forEach(r=>r.style.filter='brightness(1.25)')"
+      onmouseleave="Array.from(this.querySelectorAll('rect')).forEach(r=>r.style.filter='')">
+      ${segments}
+      <text x="${BAR_W/2}" y="${BAR_H-h-4}" text-anchor="middle" fill="${col}" font-size="${fontSize}" font-weight="700">${d.v}</text>
+      <text x="${BAR_W/2}" y="${BAR_H+12}" text-anchor="middle" fill="rgba(255,255,255,.45)" font-size="${Math.max(6,fontSize-1)}">${d.label}</text>
     </g>`;
   }).join('');
-  const totalW = data.length * (BAR_W + 4);
-  return `<div style="overflow-x:auto;padding:8px 0">
-    <svg width="${totalW}" height="${BAR_H + 40}" xmlns="http://www.w3.org/2000/svg">
-      <g transform="translate(0, 10)">${bars}</g>
+
+  // Trend line
+  const trendLine = n > 1 ? `<polyline points="${data.map((d,i)=>{
+    const x=i*(BAR_W+GAP)+BAR_W/2;
+    const y=BAR_H-Math.max(2,Math.round((d.v/maxVal)*BAR_H));
+    return x+','+y;
+  }).join(' ')}" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="1.5" stroke-dasharray="4,3"/>
+  ${data.map((d,i)=>{const x=i*(BAR_W+GAP)+BAR_W/2;const y=BAR_H-Math.max(2,Math.round((d.v/maxVal)*BAR_H));return `<circle cx="${x}" cy="${y}" r="2.5" fill="rgba(255,255,255,.5)"/>`;}).join('')}` : '';
+
+  const legend = hasTypes ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+    ${allTypes.map((t,i)=>`<span style="font-size:8.5px;display:flex;align-items:center;gap:4px;color:var(--text-secondary)"><span style="width:8px;height:8px;border-radius:1px;background:${TYPE_COLORS[i%TYPE_COLORS.length]};display:inline-block;flex-shrink:0"></span>${t}</span>`).join('')}
+  </div>` : '';
+
+  return `${legend}<div style="overflow-x:auto;padding:4px 0 6px">
+    <svg width="${Math.max(TOTAL_W, 600)}" height="${BAR_H+28}" xmlns="http://www.w3.org/2000/svg" style="display:block;min-width:100%">
+      <g transform="translate(0,6)">${bars}${trendLine}</g>
     </svg>
   </div>`;
 }
+
 
 // ── BÁO CÁO: KL THEO THÁNG ───────────────────────────────────
 // State for by-month filters
@@ -10208,17 +10250,13 @@ function _bcRenderByMonth(conf) {
 
   const totalDone = data.filter(r=>r.Ngay_thi_nghiem).length;
 
-  // Helper: build styled dropdown button - store data globally
-  if(!window._bcDdStore) window._bcDdStore={};
+  // Helper: build styled dropdown
   function mkBcDd(key, dflt, val, items, labelFn) {
-    window._bcDdStore[key] = {items, dflt, labelFn:labelFn?labelFn.toString():null};
     const active = !!val;
+    const ddStyle = `display:inline-flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;border-radius:7px;border:1px solid ${active?'var(--accent)':'rgba(0,200,255,.4)'};background:${active?'rgba(0,200,255,.1)':'var(--bg-elevated)'};color:${active?'var(--accent)':'var(--text-primary)'};font-family:var(--font-mono);font-size:11px;cursor:pointer;outline:none;min-width:120px;white-space:nowrap;position:relative`;
     const lbl = val ? (labelFn ? labelFn(val) : val) : dflt;
-    const border = active?'var(--accent)':'rgba(0,200,255,.4)';
-    const bg = active?'rgba(0,200,255,.1)':'var(--bg-elevated)';
-    const col = active?'var(--accent)':'var(--text-primary)';
-    return `<button data-bcddkey="${key}" style="display:inline-flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;border-radius:7px;border:1px solid ${border};background:${bg};color:${col};font-family:var(--font-mono);font-size:11px;cursor:pointer;outline:none;min-width:110px;white-space:nowrap" onclick="event.stopPropagation();_bcBmDropdown(this,'${key}')">
-      <span>${lbl}</span><i class="fas fa-chevron-down" style="font-size:8px;opacity:.6;flex-shrink:0"></i>
+    return `<button style="${ddStyle}" onclick="_bcBmDropdown(this,'${key}',${JSON.stringify(items)},${JSON.stringify(dflt)})">
+      <span>${lbl}</span><i class="fas fa-chevron-down" style="font-size:8px;opacity:.6"></i>
     </button>`;
   }
 
@@ -10237,81 +10275,33 @@ function _bcRenderByMonth(conf) {
     <span style="margin-left:auto;font-size:10px;font-family:var(--font-mono);color:var(--text-muted)">${fmt(data.length)} bản ghi</span>
   </div>
 
-  ${(()=>{
-    const now=new Date(); const nowY=now.getFullYear(); const nowM=now.getMonth()+1;
-    const nextM=nowM===12?1:nowM+1; const nextY=nowM===12?nowY+1:nowY;
-    const totalTB = new Set(rawData.map(r=>r.id||r.Ten_thiet_bi+'|'+r.Tram)).size || rawData.length;
-    // TB phải TN tháng này: Thoi_gian_thi_nghiem_tiep_theo trong tháng hiện tại
-    const thisMon = rawData.filter(r=>{
-      const ds=r.Thoi_gian_thi_nghiem_tiep_theo; if(!ds)return false;
-      const d=new Date(ds); return d.getFullYear()===nowY&&d.getMonth()+1===nowM;
-    });
-    // TB phải TN tháng tới
-    const nextMon = rawData.filter(r=>{
-      const ds=r.Thoi_gian_thi_nghiem_tiep_theo; if(!ds)return false;
-      const d=new Date(ds); return d.getFullYear()===nextY&&d.getMonth()+1===nextM;
-    });
-    const sc=(icon,col,bg,brd,label,val,pct,key)=>`
-      <div style="background:${bg};border:1px solid ${brd};border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
-        onclick="_bcStatClick('${key}',rawData)" onmouseenter="this.style.borderColor='${col}'" onmouseleave="this.style.borderColor='${brd}'">
-        <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas ${icon}" style="margin-right:4px;color:${col}"></i>${label}</div>
-        <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:${col};margin-bottom:6px">${fmt(val)}</div>
-        <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${Math.min(100,pct)}%;background:${col};border-radius:2px;transition:width .4s;box-shadow:0 0 6px ${col}55"></div></div>
-      </div>`;
-    return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
-      ${sc('fa-database','#00c8ff','rgba(0,200,255,.07)','rgba(0,200,255,.2)','Tổng số thiết bị',rawData.length,100,'total')}
-      ${sc('fa-calendar-check','#00e676','rgba(0,230,118,.07)','rgba(0,230,118,.2)',`Phải TN tháng ${nowM}/${nowY}`,thisMon.length,thisMon.length/Math.max(1,rawData.length)*100*20,'thismon')}
-      ${sc('fa-calendar-plus','#ffd740','rgba(255,215,64,.07)','rgba(255,215,64,.2)',`Phải TN tháng ${nextM}/${nextY}`,nextMon.length,nextMon.length/Math.max(1,rawData.length)*100*20,'nextmon')}
-    </div>`;
-  })()}
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+    <div style="background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
+      onclick="_bcStatClick('total',rawData)" onmouseenter="this.style.borderColor='rgba(0,200,255,.5)'" onmouseleave="this.style.borderColor='rgba(0,200,255,.2)'">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-list" style="margin-right:4px"></i>Tổng bản ghi</div>
+      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:var(--accent);margin-bottom:6px">${fmt(data.length)}</div>
+      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:100%;background:#00c8ff;border-radius:2px"></div></div>
+    </div>
+    <div style="background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
+      onclick="_bcStatClick('done',rawData)" onmouseenter="this.style.borderColor='rgba(0,230,118,.5)'" onmouseleave="this.style.borderColor='rgba(0,230,118,.2)'">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-check-circle" style="margin-right:4px"></i>Đã thí nghiệm (có ngày TN)</div>
+      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:#00e676;margin-bottom:6px">${fmt(totalDone)}</div>
+      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${data.length>0?Math.round(totalDone/data.length*100):0}%;background:#00e676;border-radius:2px;transition:width .4s"></div></div>
+    </div>
+    <div style="background:rgba(255,215,64,.07);border:1px solid rgba(255,215,64,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
+      onclick="_bcStatClick('months',rawData)" onmouseenter="this.style.borderColor='rgba(255,215,64,.5)'" onmouseleave="this.style.borderColor='rgba(255,215,64,.2)'">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-calendar" style="margin-right:4px"></i>Số tháng có TN</div>
+      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:#ffd740;margin-bottom:6px">${months.length}</div>
+      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${Math.min(100,months.length*8)}%;background:#ffd740;border-radius:2px"></div></div>
+    </div>
+  </div>
 
   <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:14px">
-    <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:8px">BIỂU ĐỒ KHỐI LƯỢNG THEO THÁNG</div>
-    <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
-      <span style="font-size:9px;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#607d8b;display:inline-block"></span>TN gần nhất (quá khứ)</span>
-      <span style="font-size:9px;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#00c8ff;display:inline-block"></span>Năm ${new Date().getFullYear()-1}</span>
-      <span style="font-size:9px;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#00e676;display:inline-block"></span>Năm ${new Date().getFullYear()} (hiện tại)</span>
-      <span style="font-size:9px;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#ffd740;display:inline-block"></span>TN tiếp theo (tương lai)</span>
-    </div>
-    ${(()=>{
-      const nowY=new Date().getFullYear();
-      // Period 1: past TN (Ngay_thi_nghiem, year < nowY-1)
-      // Period 2: last year TN  
-      // Period 3: current year TN
-      // Period 4: future (Thoi_gian_thi_nghiem_tiep_theo > today)
-      const pastMap={}, lastYMap={}, currYMap={}, futureMap={};
-      const today=new Date(); today.setHours(0,0,0,0);
-      rawData.forEach(r=>{
-        // Past TN
-        if(r.Ngay_thi_nghiem){
-          const d=new Date(r.Ngay_thi_nghiem); if(!isNaN(d)){
-            const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-            const lbl=`T${d.getMonth()+1}/${d.getFullYear()}`;
-            if(d.getFullYear()===nowY){ currYMap[k]=(currYMap[k]||0)+1; if(!currYMap[k+'_l'])currYMap[k+'_l']=lbl; }
-            else if(d.getFullYear()===nowY-1){ lastYMap[k]=(lastYMap[k]||0)+1; if(!lastYMap[k+'_l'])lastYMap[k+'_l']=lbl; }
-            else{ pastMap[k]=(pastMap[k]||0)+1; if(!pastMap[k+'_l'])pastMap[k+'_l']=lbl; }
-          }
-        }
-        // Future TN
-        if(r.Thoi_gian_thi_nghiem_tiep_theo){
-          const d=new Date(r.Thoi_gian_thi_nghiem_tiep_theo); if(!isNaN(d)&&d>=today){
-            const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-            const lbl=`T${d.getMonth()+1}/${d.getFullYear()}`;
-            futureMap[k]=(futureMap[k]||0)+1; if(!futureMap[k+'_l'])futureMap[k+'_l']=lbl;
-          }
-        }
-      });
-      // Build combined sorted array
-      const allKeys=new Set([...Object.keys(pastMap),...Object.keys(lastYMap),...Object.keys(currYMap),...Object.keys(futureMap)].filter(k=>!k.includes('_l'))).values();
-      const combined=[...new Set([...Object.keys(pastMap),...Object.keys(lastYMap),...Object.keys(currYMap),...Object.keys(futureMap)].filter(k=>!k.includes('_l')))].sort();
-      const chartData=combined.map(k=>{
-        const v=(pastMap[k]||0)+(lastYMap[k]||0)+(currYMap[k]||0)+(futureMap[k]||0);
-        const [y,m]=k.split('-').map(Number);
-        const col=futureMap[k]?'#ffd740':currYMap[k]?'#00e676':lastYMap[k]?'#00c8ff':'#607d8b';
-        return {label:`T${m}/${y}`,v,col,k};
-      });
-      return _bcBarChartFull(chartData);
-    })()}
+    <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:12px">BIỂU ĐỒ KHỐI LƯỢNG THEO THÁNG</div>
+    ${_bcBarChart(months.slice(-24), 'Theo tháng', d => {
+      const age = new Date().getFullYear() - d.year;
+      return age === 0 ? '#00e676' : age === 1 ? '#00c8ff' : '#607d8b';
+    }, (() => { const m={}; Object.keys(monthMap).sort().slice(-24).forEach(k=>{ m[monthMap[k].label]=monthTypeMap[k]||{}; }); return m; })())}
   </div>
 
   <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px">
@@ -10347,9 +10337,7 @@ function _bcRenderByMonth(conf) {
 }
 
 // ── DROPDOWN HANDLER for by-month report ──────────────────────
-function _bcBmDropdown(btn, key) {
-  const stored = (window._bcDdStore||{})[key]||{items:[],dflt:''};
-  const items = stored.items, dflt = stored.dflt;
+function _bcBmDropdown(btn, key, items, dflt) {
   const ex = document.getElementById('_bcBmDdList');
   if (ex) { if (ex.dataset.key===key) { ex.remove(); return; } ex.remove(); }
   const list = document.createElement('div');
@@ -10389,32 +10377,10 @@ function _bcBmDropdown(btn, key) {
 }
 
 // ── BÁO CÁO: KL THEO NĂM ─────────────────────────────────────
-// State for by-year filters (shared store with by-month but separate vars)
-let _bcYFDoi='', _bcYFTram='', _bcYFType='';
-
 function _bcRenderByYear(conf) {
-  const rawData = _tnRawData.length ? _tnRawData : _tnAllData;
+  const data = _tnRawData.length ? _tnRawData : _tnAllData;
   const fmt = n => Number(n).toLocaleString('vi-VN');
   const nowY = new Date().getFullYear();
-  const sortVi=(a,b)=>String(a).localeCompare(String(b),'vi');
-
-  const allDois=[...new Set(rawData.map(r=>(r.Doi||'').trim()).filter(Boolean))].sort(sortVi);
-  const allTrams=[...new Set(rawData.map(r=>(r.Tram||'').trim()).filter(Boolean))].sort(sortVi);
-  const allTypes=[...new Set(rawData.map(r=>(r.Phan_loai_thiet_bi||'').trim()).filter(Boolean))].sort(sortVi);
-
-  // Apply filters
-  const data = rawData.filter(r=>{
-    if(_bcYFDoi && (r.Doi||'').trim()!==_bcYFDoi) return false;
-    if(_bcYFTram && (r.Tram||'').trim()!==_bcYFTram) return false;
-    if(_bcYFType && (r.Phan_loai_thiet_bi||'').trim()!==_bcYFType) return false;
-    return true;
-  });
-
-  // Store for dropdowns
-  if(!window._bcYDdStore) window._bcYDdStore={};
-  window._bcYDdStore.doi={items:allDois.map(v=>({v,l:v})),dflt:'— Đội —'};
-  window._bcYDdStore.tram={items:allTrams.map(v=>({v,l:v})),dflt:'— Trạm —'};
-  window._bcYDdStore.type={items:allTypes.map(v=>({v,l:v})),dflt:'Loại thiết bị'};
 
   const yearMap = {};
   const yearTypeMap = {};
@@ -10430,32 +10396,16 @@ function _bcRenderByYear(conf) {
   });
 
   const years = Object.keys(yearMap).map(Number).sort((a,b)=>a-b);
-  const allTypesY = [...new Set(data.map(r=>(r.Phan_loai_thiet_bi||'Khác').trim()))].sort((a,b)=>a.localeCompare(b,'vi'));
+  const allTypes = [...new Set(data.map(r=>(r.Phan_loai_thiet_bi||'Khác').trim()))].sort((a,b)=>a.localeCompare(b,'vi'));
   const COLORS = ['#00c8ff','#00e676','#ffd740','#ff9100','#b388ff','#18ffff','#ff4081','#00bcd4','#8bc34a','#ff5252'];
 
-  const mkYDd=(key,dflt,val)=>{
-    const stored=(window._bcYDdStore||{})[key]||{items:[],dflt};
-    const active=!!val; const lbl=val||dflt;
-    return `<button data-yddkey="${key}" style="display:inline-flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;border-radius:7px;border:1px solid ${active?'var(--accent)':'rgba(0,200,255,.4)'};background:${active?'rgba(0,200,255,.1)':'var(--bg-elevated)'};color:${active?'var(--accent)':'var(--text-primary)'};font-family:var(--font-mono);font-size:11px;cursor:pointer;min-width:110px" onclick="event.stopPropagation();_bcYDdOpen(this,'${key}')">
-      <span>${lbl}</span><i class="fas fa-chevron-down" style="font-size:8px;opacity:.6;flex-shrink:0"></i>
-    </button>`;
-  };
-  const hasYFilter=_bcYFDoi||_bcYFTram||_bcYFType;
   return `
-  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;margin-bottom:12px">
-    <i class="fas fa-filter" style="font-size:10px;color:var(--text-muted)"></i>
-    ${mkYDd('doi','— Đội —',_bcYFDoi)}
-    ${mkYDd('tram','— Trạm —',_bcYFTram)}
-    ${mkYDd('type','Loại thiết bị',_bcYFType)}
-    ${hasYFilter?`<button onclick="_bcYFDoi='';_bcYFTram='';_bcYFType='';bcRenderPage(window._bcLastConf||{},'KL theo năm')" style="padding:5px 11px;border-radius:6px;border:1px solid rgba(255,82,82,.3);background:rgba(255,82,82,.1);color:#ff5252;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-times"></i> Xóa lọc</button>`:''}
-    <span style="margin-left:auto;font-size:10px;font-family:var(--font-mono);color:var(--text-muted)">${fmt(data.length)} bản ghi</span>
-  </div>
   <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:14px">
     <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:12px">BIỂU ĐỒ KHỐI LƯỢNG THEO NĂM</div>
     ${_bcBarChart(years.map(y=>({label:String(y), v:yearMap[y]})), 'Theo năm', d=>{
       const y = parseInt(d.label);
       return y === nowY ? '#00e676' : y === nowY-1 ? '#00c8ff' : y < nowY-2 ? '#607d8b' : '#ffd740';
-    })}
+    }, (() => { const m={}; years.forEach(y=>{ m[String(y)]=yearTypeMap[y]||{}; }); return m; })())}
   </div>
 
   <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px">
@@ -10464,14 +10414,14 @@ function _bcRenderByYear(conf) {
       <table style="width:100%;border-collapse:collapse;font-size:10px">
         <thead><tr style="background:rgba(255,255,255,.03)">
           <th style="padding:6px 10px;font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:left;position:sticky;top:0;min-width:70px">Năm</th>
-          ${allTypesY.slice(0,15).map((t,i)=>`<th style="padding:6px 10px;font-size:9px;font-weight:700;color:${COLORS[i%COLORS.length]};text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:right;position:sticky;top:0;white-space:nowrap">${t}</th>`).join('')}
+          ${allTypes.slice(0,15).map((t,i)=>`<th style="padding:6px 10px;font-size:9px;font-weight:700;color:${COLORS[i%COLORS.length]};text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:right;position:sticky;top:0;white-space:nowrap">${t}</th>`).join('')}
           <th style="padding:6px 10px;font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:right;position:sticky;top:0">Tổng</th>
         </tr></thead>
         <tbody>${years.slice().reverse().map(y=>{
           const tMap = yearTypeMap[y]||{};
           return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);${y===nowY?'background:rgba(0,230,118,.04)':''}">
             <td style="padding:5px 10px;font-weight:700;font-family:var(--font-mono);color:${y===nowY?'#00e676':y===nowY-1?'var(--accent)':'var(--text-primary)'}">${y}</td>
-            ${allTypesY.slice(0,15).map((t,i)=>`<td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);color:${tMap[t]?COLORS[i%COLORS.length]:'rgba(255,255,255,.15)'}">${tMap[t]||'—'}</td>`).join('')}
+            ${allTypes.slice(0,15).map((t,i)=>`<td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);color:${tMap[t]?COLORS[i%COLORS.length]:'rgba(255,255,255,.15)'}">${tMap[t]||'—'}</td>`).join('')}
             <td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);font-weight:700;color:var(--accent)">${yearMap[y]}</td>
           </tr>`;
         }).join('')}</tbody>
@@ -10575,48 +10525,62 @@ function _bcRenderEarlyPlan(conf) {
 }
 
 
-// ── BY-YEAR DROPDOWN HANDLER ─────────────────────────────────
-function _bcYDdOpen(btn, key) {
-  const stored=(window._bcYDdStore||{})[key]||{items:[],dflt:''};
-  const items=stored.items, dflt=stored.dflt;
-  const ex=document.getElementById('_bcYDdList');
-  if(ex){if(ex.dataset.key===key){ex.remove();return;}ex.remove();}
-  const list=document.createElement('div'); list.id='_bcYDdList'; list.dataset.key=key;
-  list.style.cssText='position:fixed;z-index:9999;background:var(--bg-surface,#161b22);border:1px solid rgba(255,255,255,.12);border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.6);min-width:200px;max-height:320px;overflow-y:auto;flex-direction:column;padding:4px 0;display:flex';
-  if(items.length>8){
-    const si=document.createElement('input'); si.type='text'; si.placeholder='🔍 Tìm...';
-    si.style.cssText='margin:6px 8px;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:var(--text-primary);font-size:11px;outline:none';
-    si.oninput=ev=>{const q=ev.target.value.toLowerCase();list.querySelectorAll('.ydd-item').forEach(el=>{el.style.display=el.textContent.toLowerCase().includes(q)?'':'none';});};
-    si.onclick=ev=>ev.stopPropagation(); list.appendChild(si);
-  }
-  function mkI(v,l){
-    const d=document.createElement('div'); d.className='ydd-item';
-    d.style.cssText='padding:7px 14px;cursor:pointer;font-size:11px;color:var(--text-primary);white-space:nowrap;transition:background .1s';
-    d.textContent=l;
-    d.onmouseenter=()=>d.style.background='rgba(255,255,255,.07)'; d.onmouseleave=()=>d.style.background='';
-    d.onclick=()=>{
-      if(key==='doi') _bcYFDoi=v;
-      else if(key==='tram') _bcYFTram=v;
-      else if(key==='type') _bcYFType=v;
-      list.remove(); document.removeEventListener('click',oc);
-      bcRenderPage(window._bcLastConf||{},'KL theo năm');
-    };
-    list.appendChild(d);
-  }
-  mkI('',dflt);
-  items.forEach(it=>typeof it==='object'?mkI(it.v,it.l):mkI(it,it));
-  document.body.appendChild(list);
-  const rb=btn.getBoundingClientRect();
-  list.style.top=(rb.bottom+4)+'px'; list.style.left=rb.left+'px';
-  let oc; oc=ev=>{if(!list.contains(ev.target)&&ev.target!==btn){list.remove();document.removeEventListener('click',oc);}};
-  setTimeout(()=>document.addEventListener('click',oc),0);
-}
-
 // ── BC STAT CARD CLICK ────────────────────────────────────────
 function _bcStatClick(key, data) {
   const fmt = n => Number(n).toLocaleString('vi-VN');
   const fmtD = v => { if(!v) return '—'; const d=new Date(v); return isNaN(d)?v:d.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'}); };
+  const capLbl={'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+  const capCol={'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
   let title='', totalLine='', bodyHtml='', col='var(--accent)';
+  const rawData = _tnRawData.length ? _tnRawData : (_tnAllData.length ? _tnAllData : []);
+
+  // Handle thismon / nextmon
+  if (key === 'thismon' || key === 'nextmon') {
+    const now = new Date(); const nowY=now.getFullYear(); const nowM=now.getMonth()+1;
+    const targetM = key==='thismon' ? nowM : (nowM===12?1:nowM+1);
+    const targetY = key==='thismon' ? nowY : (nowM===12?nowY+1:nowY);
+    col = key==='thismon' ? '#00e676' : '#ffd740';
+    title = `📅 Thiết bị phải TN tháng ${targetM}/${targetY}`;
+    const filtered = rawData.filter(r=>{
+      const ds=r.Thoi_gian_thi_nghiem_tiep_theo; if(!ds) return false;
+      const d=new Date(ds); return d.getFullYear()===targetY && d.getMonth()+1===targetM;
+    });
+    // Group by tram
+    const byTram={};
+    filtered.forEach(r=>{const t=(r.Tram||'—').trim();if(!byTram[t])byTram[t]=[];byTram[t].push(r);});
+    const tramKeys=Object.keys(byTram).sort((a,b)=>a.localeCompare(b,'vi'));
+    totalLine = `${fmt(filtered.length)} thiết bị · ${tramKeys.length} trạm`;
+    bodyHtml = tramKeys.map(t=>{
+      const arr=byTram[t];
+      const cap=String(arr[0]?.Cap_dien_ap??'');
+      return `<div style="border-bottom:1px solid rgba(255,255,255,.06)">
+        <div style="padding:7px 16px 3px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:10px;font-weight:700;color:var(--text-primary)">${t}</span>
+          <div style="display:flex;gap:5px;align-items:center">
+            ${cap&&cap!=='null'?`<span style="font-size:8px;font-weight:700;color:${capCol[cap]};background:${capCol[cap]}18;padding:1px 5px;border-radius:6px">${capLbl[cap]}</span>`:''}
+            <span style="font-size:9px;color:var(--text-muted);background:rgba(255,255,255,.05);padding:1px 6px;border-radius:6px">${arr.length}</span>
+          </div>
+        </div>
+        ${arr.map(r=>{
+          const s=_tnAlertStatus(r);
+          return `<div style="padding:3px 24px;font-size:9px;color:var(--text-secondary);display:flex;justify-content:space-between;gap:8px">
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.Phan_loai_thiet_bi||'—'} · ${r.Ten_thiet_bi||r.Ngan_thiet_bi||'—'}</span>
+            <span style="color:${s.color||col};font-family:var(--font-mono);flex-shrink:0">${fmtD(r.Thoi_gian_thi_nghiem_tiep_theo)}</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }).join('') || '<div style="padding:24px;text-align:center;color:var(--text-muted)">Không có dữ liệu</div>';
+    let p=document.getElementById('hm-detail-panel');
+    if(!p){p=document.createElement('div');p.id='hm-detail-panel';p.className='hm-detail-panel';document.body.appendChild(p);}
+    p.innerHTML=`<div class="hm-resize-grip"></div>
+      <div class="hm-detail-hd" style="border-left:3px solid ${col}">
+        <span style="color:${col}">${title}</span>
+        <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span>
+      </div>
+      <div style="padding:8px 16px;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">${totalLine}</div>
+      <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">${bodyHtml}</div>`;
+    p.classList.add('open'); _hmOpenPanel(p); return;
+  }
 
   if (key === 'total') {
     col='#00c8ff'; title='📋 Tổng bản ghi thí nghiệm';
@@ -10835,16 +10799,6 @@ async function _authLogin(){
     _authInitUserMenu();
     _authApplyRoleUI(role);
     showChangeNotif('success','Dang nhap thanh cong','Xin chao '+name+'!');
-    // Xóa cache và tải lại dữ liệu từ Supabase
-    try {
-      [LYT_DATA_CACHE_KEY, LYT_DATA_CACHE_META_KEY, _TN_CACHE_KEY].forEach(k => {
-        try { localStorage.removeItem(k); } catch(_) {}
-      });
-      _chipAllData=[]; _chipFiltered=[];
-      if(typeof loadStatsFromSupabase==='function') setTimeout(loadStatsFromSupabase, 400);
-      if(typeof _tnLoadData==='function') _tnRawData=[], _tnAllData=[];
-      showChangeNotif('info','Đang tải lại dữ liệu...','Cache đã được xóa, đang kết nối Supabase');
-    } catch(cacheErr) { console.warn('Cache clear error:', cacheErr); }
   }catch(err){
     errEl.textContent='Loi ket noi: '+err.message;
   }finally{
