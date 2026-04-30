@@ -168,7 +168,8 @@ body.user-mode .section-card.is-selected {
   align-items: center;
   padding: 0 20px;
   gap: 14px;
-  z-index: 100;
+  z-index: 250;
+  position: relative;
 }
 
 .brand {
@@ -337,7 +338,7 @@ body { font-size: var(--fs-base); }
 .card-title-text { font-size: var(--fs-base); }
 @media (min-width: 1920px) {
   :root { --fs-base: 15px; --fs-sm: 12px; --fs-xs: 10px; --fs-lg: 17px; --fs-xl: 24px; }
-  .ic-val { font-size: clamp(26px, 2.5vw, 36px); }
+  .ic-val { font-size: clamp(20px, 3.5vw, 34px); }
 }
 @media (max-width: 1400px) {
   :root { --fs-base: 12px; --fs-sm: 10px; }
@@ -1474,7 +1475,7 @@ body { font-size: var(--fs-base); }
   .ic-wrap.ic-wrap-tech-layout .ic-card-tech-stack {
     grid-column: auto;
     grid-row: auto;
-    min-height: 108px;
+    min-height: 115px;
   }
 }
 
@@ -1504,7 +1505,7 @@ body { font-size: var(--fs-base); }
   position: relative;
   transition: border-color var(--transition), box-shadow var(--transition);
   cursor: default;
-  min-height: 108px;
+  min-height: 115px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1561,9 +1562,9 @@ body { font-size: var(--fs-base); }
 
 /* Icon — small, top-left, dimmed */
 .ic-icon {
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   outline: none;
   border-radius: 3px;
   display: inline-block;
@@ -1598,8 +1599,8 @@ body { font-size: var(--fs-base); }
 /* BIG number */
 .ic-val {
   font-family: var(--font-mono);
-  font-size: clamp(20px, 2.2vw, 30px);
-  font-weight: 700;
+  font-size: clamp(22px, 2.8vw, 36px);
+  font-weight: 800;
   line-height: 1;
   outline: none;
   border-bottom: 2px solid transparent;
@@ -1617,7 +1618,7 @@ body { font-size: var(--fs-base); }
 
 /* Label below number */
 .ic-lbl {
-  font-size: 10.5px;
+  font-size: clamp(9px, 0.9vw, 11.5px);
   font-weight: 400;
   color: var(--text-secondary);
   margin-top: 5px;
@@ -10175,7 +10176,7 @@ function _bcRenderByMonth(conf) {
 
   const totalDone = data.filter(r=>r.Ngay_thi_nghiem).length;
 
-  // Helper: build dropdown using global store (no JSON-in-HTML)
+  // Helper: build dropdown using global store (no JSON-in-HTML encoding issues)
   if (!window._bcDdStore) window._bcDdStore = {};
   function mkBcDd(key, dflt, val, items, labelFn) {
     window._bcDdStore[key] = { items, dflt };
@@ -10204,177 +10205,23 @@ function _bcRenderByMonth(conf) {
     <span style="margin-left:auto;font-size:10px;font-family:var(--font-mono);color:var(--text-muted)">${fmt(data.length)} bản ghi</span>
   </div>
 
-  ${(()=>{
-    const now2=new Date(); const nowY2=now2.getFullYear(); const nowM2=now2.getMonth()+1;
-    const nextM2=nowM2===12?1:nowM2+1; const nextY2=nowM2===12?nowY2+1:nowY2;
-    // Count from rawData (not filtered data - always show full totals)
-    const thisMon2 = rawData.filter(r=>{
-      const ds=r.Thoi_gian_thi_nghiem_tiep_theo; if(!ds) return false;
-      const d=new Date(ds); return d.getFullYear()===nowY2 && d.getMonth()+1===nowM2;
-    }).length;
-    const nextMon2 = rawData.filter(r=>{
-      const ds=r.Thoi_gian_thi_nghiem_tiep_theo; if(!ds) return false;
-      const d=new Date(ds); return d.getFullYear()===nextY2 && d.getMonth()+1===nextM2;
-    }).length;
-    function sc2(icon,col,bg,brd,label,val,pct,key) {
-      return `<div style="background:${bg};border:1px solid ${brd};border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
-        onclick="_bcStatClick('${key}',rawData)"
-        onmouseenter="this.style.borderColor='${col}'" onmouseleave="this.style.borderColor='${brd}'">
-        <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas ${icon}" style="margin-right:4px;color:${col}"></i>${label}</div>
-        <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:${col};margin-bottom:6px">${fmt(val)}</div>
-        <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${Math.min(100,pct)}%;background:${col};border-radius:2px;transition:width .4s;box-shadow:0 0 6px ${col}55"></div></div>
-      </div>`;
-    }
+  ${(() => {
+    const _now = new Date(); const _nowY = _now.getFullYear(); const _nowM = _now.getMonth()+1;
+    const _nextM = _nowM===12?1:_nowM+1; const _nextY = _nowM===12?_nowY+1:_nowY;
+    const _thisCnt = rawData.filter(r=>{ const ds=r.Thoi_gian_thi_nghiem_tiep_theo; if(!ds)return false; const d=new Date(ds); return d.getFullYear()===_nowY&&d.getMonth()+1===_nowM; }).length;
+    const _nextCnt = rawData.filter(r=>{ const ds=r.Thoi_gian_thi_nghiem_tiep_theo; if(!ds)return false; const d=new Date(ds); return d.getFullYear()===_nextY&&d.getMonth()+1===_nextM; }).length;
+    const _sc = (icon,col,bgA,brdA,lbl,val,pct,key) => `<div style="background:${bgA};border:1px solid ${brdA};border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s" onclick="_bcStatClick('${key}',rawData)" onmouseenter="this.style.borderColor='${col}'" onmouseleave="this.style.borderColor='${brdA}'">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas ${icon}" style="margin-right:4px;color:${col}"></i>${lbl}</div>
+      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:${col};margin-bottom:6px">${fmt(val)}</div>
+      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${Math.min(100,pct)}%;background:${col};border-radius:2px;transition:width .4s;box-shadow:0 0 5px ${col}55"></div></div>
+    </div>`;
     return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
-      ${sc2('fa-database','#00c8ff','rgba(0,200,255,.07)','rgba(0,200,255,.2)','Tổng số thiết bị',rawData.length,100,'total')}
-      ${sc2('fa-calendar-check','#00e676','rgba(0,230,118,.07)','rgba(0,230,118,.2)',`Phải TN tháng ${nowM2}/${nowY2}`,thisMon2,Math.min(100,thisMon2/Math.max(rawData.length,1)*1500),'thismon')}
-      ${sc2('fa-calendar-plus','#ffd740','rgba(255,215,64,.07)','rgba(255,215,64,.2)',`Phải TN tháng ${nextM2}/${nextY2}`,nextMon2,Math.min(100,nextMon2/Math.max(rawData.length,1)*1500),'nextmon')}
+      ${_sc('fa-database','#00c8ff','rgba(0,200,255,.07)','rgba(0,200,255,.2)','Tổng số thiết bị',rawData.length,100,'total')}
+      ${_sc('fa-calendar-check','#00e676','rgba(0,230,118,.07)','rgba(0,230,118,.2)',`Phải TN tháng ${_nowM}/${_nowY}`,_thisCnt,Math.min(100,_thisCnt/Math.max(rawData.length,1)*1000),'thismon')}
+      ${_sc('fa-calendar-plus','#ffd740','rgba(255,215,64,.07)','rgba(255,215,64,.2)',`Phải TN tháng ${_nextM}/${_nextY}`,_nextCnt,Math.min(100,_nextCnt/Math.max(rawData.length,1)*1000),'nextmon')}
     </div>`;
   })()}
 
-  ${(()=>{
-    // ── HYBRID MANAGEMENT CHART ───────────────────────────────
-    // X = 12 tháng năm hiện tại
-    // Bars stacked: TB đã TN (màu theo loại) + TB chưa TN (xám)
-    // Line 1: Kế hoạch tích lũy (cộng dồn TB phải TN từng tháng) - vàng đứt
-    // Line 2: Thực hiện tích lũy (cộng dồn TB đã TN) - xanh liền
-    const cy = new Date().getFullYear();
-    const cm = new Date().getMonth()+1;
-    const TYPE_COLS_H = ['#00c8ff','#00e676','#e040fb','#ff9100','#18ffff','#ff5252','#00bcd4','#8bc34a','#b388ff','#ffd740'];
-    const allTypesSorted = [...new Set(rawData.map(r=>(r.Phan_loai_thiet_bi||'Khác').trim()))].sort((a,b)=>a.localeCompare(b,'vi'));
-
-    // Per month data (1-12)
-    const mDone   = Array(12).fill(0); // TB đã TN (Ngay_thi_nghiem in month)
-    const mPlan   = Array(12).fill(0); // TB kế hoạch (Thoi_gian_thi_nghiem_tiep_theo in month)
-    const mByType = Array.from({length:12},()=>({})); // done by type per month
-
-    rawData.forEach(r => {
-      if (r.Ngay_thi_nghiem) {
-        const d=new Date(r.Ngay_thi_nghiem);
-        if (!isNaN(d) && d.getFullYear()===cy) {
-          const mi=d.getMonth();
-          mDone[mi]++;
-          const tp=(r.Phan_loai_thiet_bi||'Khác').trim();
-          mByType[mi][tp]=(mByType[mi][tp]||0)+1;
-        }
-      }
-      if (r.Thoi_gian_thi_nghiem_tiep_theo) {
-        const d=new Date(r.Thoi_gian_thi_nghiem_tiep_theo);
-        if (!isNaN(d) && d.getFullYear()===cy) mPlan[d.getMonth()]++;
-      }
-    });
-
-    // Cumulative lines
-    const cumDone=[], cumPlan=[];
-    let sd=0, sp=0;
-    for(let i=0;i<12;i++){sd+=mDone[i]; cumDone.push(sd); sp+=mPlan[i]; cumPlan.push(sp);}
-
-    const maxBar=Math.max(...mDone.map((d,i)=>d+Math.max(0,mPlan[i]-d)),1);
-    const maxLine=Math.max(...cumPlan,...cumDone,1);
-
-    const W=56, GAP=8, PAD_L=36, PAD_R=12, PAD_T=24, BAR_H=130, LINE_H=80;
-    const CHART_H=BAR_H+LINE_H+60;
-    const totalW=PAD_L+12*(W+GAP)+PAD_R;
-    const months12=['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'];
-
-    const bars=months12.map((ml,i)=>{
-      const done=mDone[i], plan=mPlan[i];
-      const x=PAD_L+i*(W+GAP);
-      // stacked done bars
-      let stackH=0, stackBars='';
-      allTypesSorted.forEach((tp,ti)=>{
-        const tv=mByType[i][tp]||0; if(!tv) return;
-        const th=Math.max(1,Math.round((tv/maxBar)*BAR_H));
-        stackBars=`<rect x="${x+2}" y="${PAD_T+BAR_H-stackH-th}" width="${W-4}" height="${th}" fill="${TYPE_COLS_H[ti%TYPE_COLS_H.length]}" opacity=".88" rx="1"/>`+stackBars;
-        stackH+=th;
-      });
-      // remaining (plan - done) grey bar
-      const remain=Math.max(0,plan-done);
-      const rh=Math.max(0,Math.round((remain/maxBar)*BAR_H));
-      const dh=Math.max(done?1:0,Math.round((done/maxBar)*BAR_H));
-      const isPast=i<cm-1, isCur=i===cm-1;
-      const barCol=isCur?'rgba(0,200,255,.15)':isPast?'rgba(255,255,255,.03)':'rgba(255,215,64,.06)';
-
-      // % label
-      const pct=plan>0?Math.round(done/plan*100):null;
-      return `<g>
-        <rect x="${x}" y="${PAD_T}" width="${W}" height="${BAR_H}" fill="${barCol}" rx="2"/>
-        ${rh>0?`<rect x="${x+2}" y="${PAD_T+BAR_H-dh-rh}" width="${W-4}" height="${rh}" fill="#607d8b" opacity=".35" rx="1"/>`:''}
-        ${stackBars}
-        ${done>0?`<text x="${x+W/2}" y="${PAD_T+BAR_H-dh-3}" text-anchor="middle" fill="rgba(255,255,255,.7)" font-size="8" font-weight="700">${done}</text>`:''}
-        ${pct!==null?`<text x="${x+W/2}" y="${PAD_T+BAR_H+11}" text-anchor="middle" fill="${pct>=100?'#00e676':isCur?'#00c8ff':'rgba(255,255,255,.4)'}" font-size="7.5" font-weight="700">${pct}%</text>`:''}
-        <text x="${x+W/2}" y="${PAD_T+BAR_H+21}" text-anchor="middle" fill="${isCur?'var(--accent)':'rgba(255,255,255,.4)'}" font-size="8" font-weight="${isCur?'700':'400'}">${ml}</text>
-        ${isCur?`<line x1="${x}" y1="${PAD_T}" x2="${x}" y2="${PAD_T+BAR_H}" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="3,2" opacity=".4"/>`:''}
-      </g>`;
-    }).join('');
-
-    // Lines (cumulative) - plotted on bottom half LINE section
-    const lineY0=PAD_T+BAR_H+32;
-    function linePoints(arr, scale){
-      return arr.map((v,i)=>{
-        const x=PAD_L+i*(W+GAP)+W/2;
-        const y=lineY0+LINE_H-Math.max(2,Math.round((v/maxLine)*LINE_H));
-        return `${x},${y}`;
-      }).join(' ');
-    }
-
-    // Y-axis labels (bar section)
-    const yLabels=[0,.25,.5,.75,1].map(f=>{
-      const v=Math.round(f*maxBar);
-      const y=PAD_T+BAR_H-Math.round(f*BAR_H);
-      return `<text x="${PAD_L-4}" y="${y+3}" text-anchor="end" fill="rgba(255,255,255,.25)" font-size="7">${v}</text>
-      <line x1="${PAD_L-2}" y1="${y}" x2="${totalW-PAD_R}" y2="${y}" stroke="rgba(255,255,255,.06)" stroke-width="0.5"/>`;
-    }).join('');
-
-    // Legend
-    const typeLegend=allTypesSorted.slice(0,8).map((tp,i)=>
-      `<g transform="translate(${i*80},0)"><rect width="8" height="8" y="2" fill="${TYPE_COLS_H[i%TYPE_COLS_H.length]}" rx="1"/><text x="11" y="10" fill="rgba(255,255,255,.55)" font-size="8">${tp.length>8?tp.slice(0,8)+'…':tp}</text></g>`
-    ).join('');
-
-    const donePts=linePoints(cumDone,1);
-    const planPts=linePoints(cumPlan,1);
-
-    const dots=cumDone.map((v,i)=>{
-      const x=PAD_L+i*(W+GAP)+W/2;
-      const y=lineY0+LINE_H-Math.max(2,Math.round((v/maxLine)*LINE_H));
-      const pv=cumPlan[i];
-      const py=lineY0+LINE_H-Math.max(2,Math.round((pv/maxLine)*LINE_H));
-      return `<circle cx="${x}" cy="${y}" r="3" fill="#18ffff" stroke="var(--bg-surface)" stroke-width="1"/>
-      <circle cx="${x}" cy="${py}" r="2.5" fill="#ffd740" stroke="var(--bg-surface)" stroke-width="1" opacity=".8"/>`;
-    }).join('');
-
-    return `<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px 14px 10px;margin-bottom:14px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-        <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em">BIỂU ĐỒ QUẢN LÝ THÍ NGHIỆM NĂM ${cy}</div>
-        <div style="display:flex;gap:12px;flex-wrap:wrap">
-          <span style="font-size:8.5px;display:flex;align-items:center;gap:4px;color:rgba(255,255,255,.5)"><span style="width:14px;height:3px;background:#607d8b;display:inline-block;border-radius:1px"></span>Chưa TN</span>
-          <span style="font-size:8.5px;display:flex;align-items:center;gap:4px;color:rgba(255,255,255,.5)"><span style="width:14px;height:3px;background:#18ffff;display:inline-block;border-radius:1px"></span>Lũy kế thực hiện</span>
-          <span style="font-size:8.5px;display:flex;align-items:center;gap:4px;color:rgba(255,255,255,.5)"><span style="width:14px;height:3px;background:#ffd740;border-top:1px dashed #ffd740;display:inline-block;border-radius:1px"></span>Lũy kế kế hoạch</span>
-        </div>
-      </div>
-      <div style="overflow-x:auto">
-        <svg width="${totalW}" height="${CHART_H}" xmlns="http://www.w3.org/2000/svg" style="display:block">
-          <!-- Type legend -->
-          <g transform="translate(${PAD_L},6)">${typeLegend}</g>
-          <!-- Y-axis labels & grid -->
-          ${yLabels}
-          <!-- Bars -->
-          ${bars}
-          <!-- Divider line -->
-          <line x1="${PAD_L}" y1="${lineY0-4}" x2="${totalW-PAD_R}" y2="${lineY0-4}" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
-          <text x="${PAD_L-4}" y="${lineY0-7}" text-anchor="end" fill="rgba(255,255,255,.3)" font-size="7">Lũy kế</text>
-          <!-- Cumulative plan line (dashed yellow) -->
-          ${cumPlan.some(v=>v>0)?`<polyline points="${planPts}" fill="none" stroke="#ffd740" stroke-width="2" stroke-dasharray="5,3" opacity=".75"/>`:''}
-          <!-- Cumulative done line (solid cyan) -->
-          ${cumDone.some(v=>v>0)?`<polyline points="${donePts}" fill="none" stroke="#18ffff" stroke-width="2"/>`:''}
-          <!-- Dots -->
-          ${dots}
-          <!-- Y-axis line labels (cumulative section) -->
-          ${[0,.5,1].map(f=>{const v=Math.round(f*maxLine);const y=lineY0+LINE_H-Math.round(f*LINE_H);return `<text x="${PAD_L-4}" y="${y+3}" text-anchor="end" fill="rgba(255,255,255,.2)" font-size="6">${v}</text>`;}).join('')}
-        </svg>
-      </div>
-    </div>`;
-  })()}
   <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:14px">
     <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:12px">BIỂU ĐỒ KHỐI LƯỢNG THEO THÁNG</div>
     ${_bcBarChart(months.slice(-24), 'Theo tháng', d => {
@@ -10417,8 +10264,7 @@ function _bcRenderByMonth(conf) {
 
 // ── DROPDOWN HANDLER for by-month report ──────────────────────
 function _bcBmDropdown(btn, key) {
-  // Read items from global store (avoids JSON-in-HTML issues with Vietnamese chars)
-  const stored = (window._bcDdStore||{})[key] || {items:[], dflt:''};
+  const stored = (window._bcDdStore || {})[key] || { items: [], dflt: '' };
   const items = stored.items, dflt = stored.dflt;
   const ex = document.getElementById('_bcBmDdList');
   if (ex) { if (ex.dataset.key===key) { ex.remove(); return; } ex.remove(); }
@@ -10611,11 +10457,12 @@ function _bcRenderEarlyPlan(conf) {
 function _bcStatClick(key, data) {
   const fmt = n => Number(n).toLocaleString('vi-VN');
   const fmtD = v => { if(!v) return '—'; const d=new Date(v); return isNaN(d)?v:d.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'}); };
-  const capLbl={'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
-  const capCol={'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
+  const _capLbl={'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+  const _capCol={'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
   const rawAll = _tnRawData.length ? _tnRawData : (_tnAllData.length ? _tnAllData : []);
   let title='', totalLine='', bodyHtml='', col='var(--accent)';
 
+  // ── Tháng này / Tháng tới ──
   if (key === 'thismon' || key === 'nextmon') {
     const now=new Date(); const nowY=now.getFullYear(); const nowM=now.getMonth()+1;
     const tM=key==='thismon'?nowM:(nowM===12?1:nowM+1);
@@ -10624,26 +10471,43 @@ function _bcStatClick(key, data) {
     title=`📅 Phải TN tháng ${tM}/${tY}`;
     const filtered=rawAll.filter(r=>{
       const ds=r.Thoi_gian_thi_nghiem_tiep_theo; if(!ds)return false;
-      const d=new Date(ds); return d.getFullYear()===tY&&d.getMonth()+1===tM;
+      const d=new Date(ds);
+      return d.getFullYear()===tY&&d.getMonth()+1===tM;
     });
-    const byTram={};
-    filtered.forEach(r=>{const t=(r.Tram||'—').trim();if(!byTram[t])byTram[t]=[];byTram[t].push(r);});
-    const tKeys=Object.keys(byTram).sort((a,b)=>a.localeCompare(b,'vi'));
-    totalLine=`${fmt(filtered.length)} thiết bị · ${tKeys.length} trạm`;
-    bodyHtml=tKeys.map(t=>{
-      const arr=byTram[t]; const cap=String(arr[0]?.Cap_dien_ap??'');
-      return `<div style="border-bottom:1px solid rgba(255,255,255,.06)">
-        <div style="padding:7px 16px 3px;display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:10px;font-weight:700">${t}</span>
-          <div style="display:flex;gap:5px;align-items:center">
-            ${cap&&cap!=='null'?`<span style="font-size:8px;color:${capCol[cap]};background:${capCol[cap]}18;padding:1px 5px;border-radius:6px;font-weight:700">${capLbl[cap]}</span>`:''}
-            <span style="font-size:9px;color:var(--text-muted);background:rgba(255,255,255,.05);padding:1px 6px;border-radius:6px">${arr.length}</span>
-          </div>
+    // Group by type first, then by tram
+    const byType={};
+    filtered.forEach(r=>{
+      const tp=(r.Phan_loai_thiet_bi||'Khác').trim();
+      const t=(r.Tram||'—').trim();
+      if(!byType[tp])byType[tp]={total:0,trams:{}};
+      byType[tp].total++;
+      if(!byType[tp].trams[t])byType[tp].trams[t]=[];
+      byType[tp].trams[t].push(r);
+    });
+    const typeList=Object.keys(byType).sort((a,b)=>byType[b].total-byType[a].total);
+    totalLine=`${fmt(filtered.length)} thiết bị · ${typeList.length} loại · ${new Set(filtered.map(r=>(r.Tram||'').trim())).size} trạm`;
+    bodyHtml=typeList.map(tp=>{
+      const tInfo=byType[tp];
+      const tramList=Object.keys(tInfo.trams).sort((a,b)=>a.localeCompare(b,'vi'));
+      return `<div style="border-bottom:1px solid rgba(255,255,255,.07)">
+        <div style="padding:8px 16px 3px;display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.02)">
+          <span style="font-size:10px;font-weight:700;color:${col}">${tp}</span>
+          <span style="font-size:10px;font-weight:700;color:${col};font-family:var(--font-mono)">${fmt(tInfo.total)}</span>
         </div>
-        ${arr.map(r=>`<div style="padding:3px 24px;font-size:9px;color:var(--text-secondary);display:flex;justify-content:space-between;gap:8px">
-          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${r.Phan_loai_thiet_bi||'—'} · ${r.Ten_thiet_bi||r.Ngan_thiet_bi||'—'}</span>
-          <span style="color:${col};font-family:var(--font-mono);flex-shrink:0">${fmtD(r.Thoi_gian_thi_nghiem_tiep_theo)}</span>
-        </div>`).join('')}
+        ${tramList.map(t=>{
+          const rows=tInfo.trams[t]; const cap=String(rows[0]?.Cap_dien_ap??'');
+          return `<div style="border-bottom:1px solid rgba(255,255,255,.04)">
+            <div style="padding:5px 24px;display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:9.5px;color:var(--text-primary)">${t}${cap&&cap!=='null'?' <span style="color:'+_capCol[cap]+';font-size:8px">'+_capLbl[cap]+'</span>':''}</span>
+              <span style="font-size:9px;color:var(--text-muted);font-family:var(--font-mono)">${rows.length}</span>
+            </div>
+            ${rows.slice(0,5).map(r=>`<div style="padding:2px 36px;font-size:8.5px;color:var(--text-muted);display:flex;justify-content:space-between">
+              <span>${r.Ten_thiet_bi||r.Ngan_thiet_bi||'—'}</span>
+              <span style="color:${col};font-family:var(--font-mono)">${fmtD(r.Thoi_gian_thi_nghiem_tiep_theo)}</span>
+            </div>`).join('')}
+            ${rows.length>5?`<div style="padding:2px 36px 5px;font-size:8px;color:var(--text-muted)">...và ${rows.length-5} TB khác</div>`:''}
+          </div>`;
+        }).join('')}
       </div>`;
     }).join('')||'<div style="padding:24px;text-align:center;color:var(--text-muted)">Không có dữ liệu</div>';
     let p=document.getElementById('hm-detail-panel');
@@ -10875,6 +10739,19 @@ async function _authLogin(){
     _authInitUserMenu();
     _authApplyRoleUI(role);
     showChangeNotif('success','Dang nhap thanh cong','Xin chao '+name+'!');
+    // Tự động xóa cache và tải lại dữ liệu từ Supabase sau khi đăng nhập
+    try {
+      [LYT_DATA_CACHE_KEY, LYT_DATA_CACHE_META_KEY, _TN_CACHE_KEY].forEach(k=>{
+        try{localStorage.removeItem(k);}catch(_){}
+      });
+      _chipAllData=[]; _chipFiltered=[];
+      if(typeof _tnRawData!=='undefined') _tnRawData=[];
+      if(typeof _tnAllData!=='undefined') _tnAllData=[];
+      setTimeout(()=>{
+        if(typeof loadStatsFromSupabase==='function') loadStatsFromSupabase();
+        showChangeNotif('info','Đang tải dữ liệu...','Cache đã xóa, kết nối Supabase...');
+      }, 600);
+    } catch(cacheErr){ console.warn('Cache clear:', cacheErr); }
   }catch(err){
     errEl.textContent='Loi ket noi: '+err.message;
   }finally{
@@ -10924,7 +10801,7 @@ function _authInitUserMenu(){
   const sess=_authCurrentUser();if(!sess)return;
   const tb=document.querySelector('.topbar-actions');if(!tb)return;
   const old=document.getElementById('_userMenuWrap');if(old)old.remove();
-  const wrap=document.createElement('div');wrap.id='_userMenuWrap';wrap.style.cssText='position:relative;';
+  const wrap=document.createElement('div');wrap.id='_userMenuWrap';wrap.style.cssText='position:relative;z-index:300;';
   const adminBtn=sess.role==='admin'?'<div class="um-item" onclick="_openAdminPanel()"><i class="fas fa-shield-alt"></i> Bang Admin</div>':'';
   wrap.innerHTML=`<button id="userMenuBtn" onclick="_toggleUserMenu()">
     <i class="fas fa-user-circle"></i>
