@@ -1383,9 +1383,9 @@ body { font-size: var(--fs-base); }
 }
 /* Cap header (220-110kV / 22kV) */
 .ic-tech-cap {
-  font-size: 9.5px; font-family: var(--font-mono); font-weight: 700; letter-spacing:.06em;
-  color: rgba(180,205,225,.8); margin: 8px 0 6px; padding-bottom: 4px;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  font-size: 10px; font-family: var(--font-mono); font-weight: 700; letter-spacing:.06em;
+  color: var(--text-secondary); margin: 6px 0 8px; padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
   text-transform: uppercase;
 }
 .ic-tech-cap:first-child { margin-top: 0; }
@@ -1408,11 +1408,10 @@ body { font-size: var(--fs-base); }
   align-items: baseline;
 }
 .ic-tech-bar-label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   font-family: var(--font-mono);
-  letter-spacing: 0.03em;
-  color: rgba(200,220,240,.85);
+  letter-spacing: 0.04em;
 }
 .ic-tech-bar-label.ais    { color: #00c8ff; }
 .ic-tech-bar-label.gis    { color: #b388ff; }
@@ -1420,13 +1419,10 @@ body { font-size: var(--fs-base); }
 .ic-tech-bar-label.honhop { color: #ff9100; }
 .ic-tech-bar-label.kck    { color: #00e676; }
 .ic-tech-bar-number {
-  font-size: clamp(20px, 2.2vw, 32px);
-  font-weight: 900;
+  font-size: 20px;
+  font-weight: 800;
   font-family: var(--font-mono);
   line-height: 1;
-  filter: brightness(1.3);
-  letter-spacing: -0.02em;
-  text-shadow: 0 0 16px currentColor;
 }
 .ic-tech-bar-number.ais    { color: #00c8ff; }
 .ic-tech-bar-number.gis    { color: #b388ff; }
@@ -1503,15 +1499,16 @@ body { font-size: var(--fs-base); }
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 14px 16px 12px;
+  padding: 14px 14px 12px;
   overflow: hidden;
   position: relative;
   transition: border-color var(--transition), box-shadow var(--transition);
   cursor: default;
-  min-height: 118px;
+  min-height: 108px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  /* top colored accent strip */
   border-top: 3px solid var(--card-color, var(--border));
 }
 
@@ -1564,10 +1561,9 @@ body { font-size: var(--fs-base); }
 
 /* Icon — small, top-left, dimmed */
 .ic-icon {
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1;
-  margin-bottom: 8px;
-  filter: brightness(1.2);
+  margin-bottom: 6px;
   outline: none;
   border-radius: 3px;
   display: inline-block;
@@ -1602,30 +1598,28 @@ body { font-size: var(--fs-base); }
 /* BIG number */
 .ic-val {
   font-family: var(--font-mono);
-  font-size: clamp(24px, 2.8vw, 38px);
-  font-weight: 800;
+  font-size: clamp(20px, 2.2vw, 30px);
+  font-weight: 700;
   line-height: 1;
   outline: none;
   border-bottom: 2px solid transparent;
   cursor: text;
-  transition: border-color var(--transition), font-size .1s;
+  transition: border-color var(--transition);
   min-width: 0;
   display: block;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.03em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  filter: brightness(1.25);
-  text-shadow: 0 0 30px color-mix(in srgb, var(--card-color, #00c8ff) 65%, transparent),
-               0 0 60px color-mix(in srgb, var(--card-color, #00c8ff) 30%, transparent);
+  text-shadow: 0 0 24px color-mix(in srgb, var(--card-color, #00c8ff) 50%, transparent);
 }
 .ic-val:focus { border-bottom-color: var(--card-color, var(--accent)); }
 
 /* Label below number */
 .ic-lbl {
-  font-size: clamp(10px, 0.9vw, 12px);
-  font-weight: 500;
-  color: rgba(180,200,220,0.85);
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--text-secondary);
   margin-top: 5px;
   outline: none;
   border-bottom: 1px solid transparent;
@@ -1900,15 +1894,6 @@ body { font-size: var(--fs-base); }
 }
 
 .hm-detail-hd { padding:12px 16px 10px; font-size:13px; font-weight:700; color:var(--accent); border-bottom:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center; flex-shrink:0; user-select:none; cursor:move; }
-/* Panel text brightness overrides */
-.hm-detail-panel .hm-dr-name,
-.hm-detail-panel [class*="hm-dr-name"] { color: rgba(215,232,245,.92) !important; font-size:12px; font-weight:500; }
-.hm-detail-panel .hm-detail-sub-item,
-.hm-detail-panel [class*="sub-item"] { color: rgba(175,200,218,.82) !important; font-size:10.5px; }
-.hm-detail-panel .hm-detail-group { color: inherit; opacity:.88 !important; }
-.hm-detail-panel .hm-dr-badge { font-size:9.5px !important; font-weight:700 !important; }
-.hm-detail-row:hover { background: rgba(255,255,255,.04) !important; }
-
 /* Đảm bảo scroll div bên trong panel luôn hoạt động */
 
 /* Header và toolbar không co lại */
@@ -4122,22 +4107,6 @@ let _canvasRenderRAF = 0;
 let _canvasNeedsFull = false;
 const _canvasDirtyUids = new Set();
 
-// Auto-fit: shrink ic-val if overflows card width
-function _icAutoFit() {
-  document.querySelectorAll('[data-computed="true"]').forEach(el => {
-    const card = el.closest('.ic-card'); if (!card) return;
-    const autoSize = parseInt(el.dataset.autosize) || 42;
-    el.style.fontSize = autoSize + 'px';
-    const maxW = card.clientWidth - 32;
-    let fs = autoSize, iter = 0;
-    while (el.scrollWidth > maxW && fs > 18 && iter++ < 25) {
-      fs -= 2; el.style.fontSize = fs + 'px';
-    }
-  });
-}
-let _icFitTimer;
-window.addEventListener('resize', () => { clearTimeout(_icFitTimer); _icFitTimer = setTimeout(_icAutoFit, 120); });
-
 function scheduleCanvasRender(uid = null) {
   if (uid) _canvasDirtyUids.add(uid);
   else _canvasNeedsFull = true;
@@ -4973,21 +4942,30 @@ function getPreview(type, props) {
           ${extraHtml}
         </div>
       ` : `
-        <div class="ic-body">
+                <div class="ic-body" style="${isComputed?'flex-direction:row;align-items:stretch;gap:10px;':''}">
           ${isComputed ? (()=>{
             const digits=String(c.value||'').replace(/[^0-9]/g,'').length;
-            const autoFs=digits<=2?60:digits<=3?50:digits<=4?42:digits<=5?34:28;
+            const autoFs=digits<=2?58:digits<=3?48:digits<=4?40:digits<=5?32:26;
             const fs=c.valSize?Math.max(c.valSize,autoFs):autoFs;
-            return `<div class="ic-icon" style="font-size:${c.iconSize||20}px;margin-bottom:6px">${c.icon||'▣'}</div>
+            return `
+            <div style="display:flex;flex-direction:column;justify-content:space-between;flex:1;min-width:0">
+              <div class="ic-icon" style="font-size:${c.iconSize||20}px;filter:brightness(1.2);cursor:pointer"
+                onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\'")}','${c.color}')"
+              >${c.icon||'▣'}</div>
+              <div class="ic-lbl" style="cursor:pointer;user-select:none;color:rgba(195,215,235,.88);font-size:clamp(9px,.85vw,11.5px);font-weight:500;line-height:1.3;white-space:normal"
+                data-uid="${uid}" data-ci="${ci}" data-field="label"
+                onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\'")}','${c.color}')"
+              >${c.label}</div>
+            </div>
             <div class="ic-val" data-computed="true" data-autosize="${autoFs}"
-              style="color:${c.color};font-size:${fs}px;cursor:pointer;user-select:none;flex:1;display:flex;align-items:center"
+              style="color:${c.color};font-size:${fs}px;cursor:pointer;user-select:none;
+                     font-weight:900;letter-spacing:-0.05em;line-height:1;
+                     align-self:center;flex-shrink:0;text-align:right;
+                     filter:brightness(1.3);
+                     text-shadow:0 0 28px ${c.color}99,0 0 55px ${c.color}44"
               data-uid="${uid}" data-ci="${ci}" data-field="value"
               onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\'")}','${c.color}')"
-            >${c.value}</div>
-            <div class="ic-lbl" style="cursor:pointer;user-select:none"
-              data-uid="${uid}" data-ci="${ci}" data-field="label"
-              onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\'")}','${c.color}')"
-            >${c.label}</div>`;
+            >${c.value}</div>`;
           })() : `
           <div class="ic-icon" contenteditable="true" spellcheck="false"
             data-uid="${uid}" data-ci="${ci}" data-field="icon"
@@ -7134,28 +7112,16 @@ function _lytShowDetailPanel(title, color, totalLine, items, mbaSection) {
     p.className = 'hm-detail-panel';
     document.body.appendChild(p);
   }
-  // Collapsible panel items with +/- toggle
-  const bodyHtml = items.map((item, idx) => {
-    if (item.isGroup) return `<div style="font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:10px 16px 5px;color:${item.color};opacity:.9;border-bottom:1px solid rgba(255,255,255,.06)">${item.text}</div>`;
+  const bodyHtml = items.map(item => {
+    if (item.isGroup) return `<div class="hm-detail-group" style="color:${item.color}">${item.text}</div>`;
+    const detHtml = item.detail
+      ? `<div class="hm-detail-sub-list">${item.detail.map(n=>`<div class="hm-detail-sub-item">• ${n}</div>`).join('')}</div>`
+      : '';
     const badge = item.badge || item.sub || '';
-    const hasDetail = item.detail && item.detail.length > 0;
-    const detId = 'hmd_'+idx;
-    const detHtml = hasDetail
-      ? `<div id="${detId}" style="display:none;background:rgba(0,0,0,.15);border-bottom:1px solid rgba(255,255,255,.06)">
-          ${item.detail.map(n=>`<div style="padding:4px 16px 4px 28px;font-size:10.5px;color:rgba(175,200,220,.85);display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(255,255,255,.03)"><span style="color:${item.color};opacity:.6;flex-shrink:0">•</span>${n}</div>`).join('')}
-        </div>`
-      : '';
-    const toggleBtn = hasDetail
-      ? `<button onclick="event.stopPropagation();const el=document.getElementById('${detId}');if(el){const open=el.style.display!=='none';el.style.display=open?'none':'block';this.textContent=open?'+':'-';}" style="width:18px;height:18px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(255,255,255,.7);font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;line-height:1;padding:0;display:flex;align-items:center;justify-content:center">+</button>`
-      : '';
-    return `<div style="border-bottom:1px solid rgba(255,255,255,.06)">
-      <div class="hm-detail-row" style="display:flex;align-items:center;gap:8px;padding:7px 16px;cursor:pointer" onclick="event.stopPropagation()" data-search="${(item.text||'').toLowerCase()}">
-        ${toggleBtn}
-        <span style="font-size:12px;color:rgba(215,230,245,.92);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${item.text}</span>
-        <span style="background:${item.color}22;color:${item.color};font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0">${badge}</span>
-      </div>
-      ${detHtml}
-    </div>`;
+    return `<div class="hm-detail-row" data-search="${(item.text||'').toLowerCase()}">
+      <span class="hm-dr-name">${item.text}</span>
+      <span class="hm-dr-badge" style="background:${item.color}22;color:${item.color}">${badge}</span>
+    </div>${detHtml}`;
   }).join('');
 
   p.innerHTML = `
@@ -7775,17 +7741,8 @@ function lytStatsCardClick(label, color) {
       });
       ['2','1','3','4','9','6','0'].forEach(cap => {
         const arr = byMaxCap[cap]; if (!arr||!arr.length) return;
-        // Group item with tram list as expandable detail
-        const tramDetails = arr.map(t => {
-          const tbCount = rows.filter(r=>(r.Tram||'').trim()===t).length;
-          return `${t} (${tbCount} TB)`;
-        });
-        items.push({
-          text: `${capLbl[cap]||cap}`,
-          sub: `${arr.length} trạm`,
-          color: LYT_CAP_COLORS[cap]||'#888',
-          detail: tramDetails
-        });
+        items.push({ text: `── ${capLbl[cap]||cap} (${arr.length} trạm) ──`, isGroup: true, color: LYT_CAP_COLORS[cap]||'#888' });
+        arr.forEach(t => items.push({ text: t, sub: capLbl[cap]||cap, color: LYT_CAP_COLORS[cap]||'#888' }));
       });
       totalLine = `${filteredTrams.length} trạm`;
       break;
@@ -7793,20 +7750,14 @@ function lytStatsCardClick(label, color) {
     case 'TBA 220kV': {
       title = '⚡ TBA 220kV';
       const list = filteredTrams.filter(t => tramMaxCap[t] === '2');
-      list.forEach(t => {
-        const ngans = [...new Set(rows.filter(r=>(r.Tram||'').trim()===t).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))].sort();
-        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS['2'], detail: ngans });
-      });
+      list.forEach(t => items.push({ text: t, sub: '220kV', color: LYT_CAP_COLORS['2'] }));
       totalLine = `${list.length} trạm`;
       break;
     }
     case 'TBA 110kV': {
       title = '⚡ TBA 110kV';
       const list = filteredTrams.filter(t => tramMaxCap[t] === '1');
-      list.forEach(t => {
-        const ngans = [...new Set(rows.filter(r=>(r.Tram||'').trim()===t).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))].sort();
-        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS['1'], detail: ngans });
-      });
+      list.forEach(t => items.push({ text: t, sub: '110kV', color: LYT_CAP_COLORS['1'] }));
       totalLine = `${list.length} trạm`;
       break;
     }
@@ -7957,32 +7908,16 @@ function lytStatsCardClick(label, color) {
     case 'Tổng số thiết bị': {
       title = '📦 Tổng số thiết bị';
       const byType = {};
-      const nowY2 = new Date().getFullYear();
       rows.forEach(r => {
         const pl = (r.Phan_loai_thiet_bi||'Khác').trim();
-        if (!byType[pl]) byType[pl] = { qty: 0, trams: {} };
+        if (!byType[pl]) byType[pl] = { qty: 0, trams: new Set() };
         byType[pl].qty += Number(r.So_luong)||1;
-        const t = (r.Tram||'').trim();
-        if (t) {
-          if (!byType[pl].trams[t]) byType[pl].trams[t] = { qty:0, ngans:new Set() };
-          byType[pl].trams[t].qty += Number(r.So_luong)||1;
-          if (r.Ngan_thiet_bi) byType[pl].trams[t].ngans.add(r.Ngan_thiet_bi);
-        }
+        if (r.Tram) byType[pl].trams.add((r.Tram||'').trim());
       });
       const sorted = Object.entries(byType).sort((a,b) => b[1].qty - a[1].qty);
       const total = sorted.reduce((s,[,v]) => s + v.qty, 0);
       sorted.forEach(([pl, v]) => {
-        const tramCount = Object.keys(v.trams).length;
-        // Detail: each tram with its equipment count
-        const detail = Object.entries(v.trams)
-          .sort((a,b) => b[1].qty - a[1].qty)
-          .map(([t,info]) => `${t}: ${info.qty} TB${info.ngans.size?', '+info.ngans.size+' ngăn':''}`);
-        items.push({
-          text: pl,
-          sub: `${v.qty.toLocaleString('vi-VN')} TB · ${tramCount} trạm`,
-          color: LYT_CAP_COLORS['1']||'#18ffff',
-          detail
-        });
+        items.push({ text: pl, sub: `${v.qty.toLocaleString('vi-VN')} TB / ${v.trams.size} trạm`, color: LYT_CAP_COLORS['1']||'#18ffff' });
       });
       totalLine = `${total.toLocaleString('vi-VN')} thiết bị · ${sorted.length} loại`;
       break;
@@ -8577,7 +8512,7 @@ async function loadStatsFromSupabase() {
     renderCanvas();
     renderQuickNav();
     // Sau khi canvas render xong, render chips + charts với dữ liệu thực
-    setTimeout(() => { renderChipsSection(); renderChartsSection(); renderTimelineSection(); renderLiveFilterSection(); _icAutoFit(); }, 100);
+    setTimeout(() => { renderChipsSection(); renderChartsSection(); renderTimelineSection(); renderLiveFilterSection(); }, 80);
     showToast('✓ Đã cập nhật dữ liệu từ Supabase (' + allRows.length.toLocaleString('vi-VN') + ' dòng)');
   } catch (err) {
     console.error('[Supabase Stats Error]', err);
