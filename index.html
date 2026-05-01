@@ -115,6 +115,12 @@ body.user-mode #canvas,
 body.user-mode #tbPageOverlay {
   padding: 16px 24px !important;
 }
+body.user-mode #tbPageOverlay {
+  top: calc(var(--topbar-h, 56px) + 36px) !important; /* topbar + tab strip */
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+}
 /* Section cards: ẩn drag handle, card actions, card-act-btn */
 body.user-mode .card-drag,
 body.user-mode .card-actions,
@@ -3135,12 +3141,6 @@ body.preview-mode .section-card {
       <span>Quản lý BBTN</span>
     </a>
 
-    <!-- Cảnh báo thông minh -->
-    <a href="#" class="nav-item" onclick="navActivate(this)">
-      <i class="fas fa-bell" style="color:#ff9100"></i>
-      <span>Cảnh báo thông minh</span>
-    </a>
-
     <!-- ══ BÁO CÁO ══ -->
     <span class="nav-label">BÁO CÁO</span>
 
@@ -3181,12 +3181,6 @@ body.preview-mode .section-card {
       </a>
       <a href="#" class="nav-sub-item" onclick="navActivate(this)">
         <i class="fas fa-forward"></i><span>Đặt sớm kế hoạch</span>
-      </a>
-      <a href="#" class="nav-sub-item" onclick="navActivate(this)">
-        <i class="fas fa-tasks"></i><span>Tiến độ kế hoạch</span>
-      </a>
-      <a href="#" class="nav-sub-item" onclick="navActivate(this)">
-        <i class="fas fa-map-marked-alt"></i><span>Bản đồ trạm</span>
       </a>
     </div>
 
@@ -6974,7 +6968,7 @@ function renderTimelineSection() {
     </div>
     <div style="background:rgba(255,215,64,.07);border:1px solid rgba(255,215,64,.2);border-radius:8px;padding:10px 14px">
       <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-clock" style="margin-right:4px"></i>Thiết bị lâu nhất</div>
-      <div style="font-size:20px;font-weight:800;font-family:var(--font-mono);color:#ffd740">${oldestY < nowY ? oldestY + ' (' + (nowY-oldestY) + ' năm)' : '—'}</div>
+      <div style="font-size:20px;font-weight:800;font-family:var(--font-mono);color:#ffd740">${oldestY < nowY ? oldestY + ' (' + (nowY-oldestY) + 'n)' : '—'}</div>
     </div>
     <div style="background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.2);border-radius:8px;padding:10px 14px">
       <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-percent" style="margin-right:4px"></i>Tỷ lệ > 15 năm</div>
@@ -6983,7 +6977,7 @@ function renderTimelineSection() {
   </div>
 
   <div style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.08em;margin-bottom:8px">
-    PHÂN TÍCH THỜI GIAN VẬN HÀNH THEO LOẠI THIẾT BỊ
+    PHÂN TÍCH THÂM NIÊN VẬN HÀNH THEO LOẠI THIẾT BỊ
     <span style="margin-left:12px;font-weight:400">
       ${TL_BUCKETS.map(b=>`<span style="color:${b.color};margin-right:10px">■ ${b.label}</span>`).join('')}
     </span>
@@ -7086,7 +7080,7 @@ function lytTLBucketClick(type, bucketKey, bucketLabel, color) {
       const yrs=[...info.years].sort();
       const yrStr=yrs.length?(yrs[0]===yrs[yrs.length-1]?`${yrs[0]}`:`${yrs[0]}–${yrs[yrs.length-1]}`):'—';
       const ages=yrs.map(y=>nowY-y);
-      const ageStr=ages.length?`~${Math.round(ages.reduce((s,a)=>s+a,0)/ages.length)} năm`:'';
+      const ageStr=ages.length?`~${Math.round(ages.reduce((s,a)=>s+a,0)/ages.length)}n`:'';
       items.push({text:t,badge:`${info.qty}TB · ${yrStr}${ageStr?' · '+ageStr:''}`,color:capColor[cap]||'#888'});
     });
   });
@@ -8939,7 +8933,7 @@ function _tbTable() {
     {k:'Hang_san_xuat',      l:'Hãng SX',     w:'90px' },
     {k:'Nam_san_xuat',       l:'Năm SX',      w:'58px', cls:'tb-num'},
     {k:'Nam_van_hanh',       l:'Năm VH',      w:'58px', cls:'tb-num'},
-    {k:'_age',               l:'Thời gian VH',   w:'70px', cls:'tb-num'},
+    {k:'_age',               l:'Thâm niên',   w:'70px', cls:'tb-num'},
     {k:'Cong_suat',          l:'CS (MVA)',    w:'68px', cls:'tb-num'},
     {k:'Ly_lich',            l:'Lý lịch',     w:'80px' },
     {k:'Thong_so',           l:'Thông số',    w:'100px'},
@@ -9032,7 +9026,7 @@ function _tbShowLyLich(idx) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
         ${[['Loại thiết bị',r.Phan_loai_thiet_bi,'#00c8ff'],['Số lượng',r.So_luong??'—','#00e676'],
            ['Hãng sản xuất',r.Hang_san_xuat,'#ffd740'],['Năm sản xuất',r.Nam_san_xuat,'#ffd740'],
-           ['Năm vận hành',r.Nam_van_hanh,'#00c8ff'],['Thời gian VH',age>=0?age+' năm VH':'—',age>=15?'#ff5252':age>=10?'#ffd740':'#00e676'],
+           ['Năm vận hành',r.Nam_van_hanh,'#00c8ff'],['Thâm niên',age>=0?age+' năm':'—',age>=15?'#ff5252':age>=10?'#ffd740':'#00e676'],
            ['Công suất (MVA)',r.Cong_suat,'#b388ff'],['Đội quản lý',r.Doi,'#888']
         ].map(([l,v,col])=>`<div style="background:rgba(255,255,255,.04);border-radius:7px;padding:8px 10px;border:1px solid rgba(255,255,255,.07)">
           <div style="font-size:8.5px;color:var(--text-muted);margin-bottom:3px">${l}</div>
@@ -9055,7 +9049,7 @@ function _tbShowLyLich(idx) {
 function _tbExportCSV() {
   const rows = _tbFiltered;
   if (!rows.length) return;
-  const hdr = ['Trạm','Cấp ĐA','Loại TB','Tên/Ký hiệu','Ngăn TB','Số lượng','Hãng SX','Năm SX','Năm VH','Thời gian VH','CS(MVA)','Lý lịch','Thông số','Đội'].join(',');
+  const hdr = ['Trạm','Cấp ĐA','Loại TB','Tên/Ký hiệu','Ngăn TB','Số lượng','Hãng SX','Năm SX','Năm VH','Thâm niên','CS(MVA)','Lý lịch','Thông số','Đội'].join(',');
   const body = rows.map(r=>{
     const age=_tbAge(r);
     return [r.Tram,_tbCapLbl[String(r.Cap_dien_ap??'')]||r.Cap_dien_ap,r.Phan_loai_thiet_bi,r.Ten_thiet_bi,r.Ngan_thiet_bi,r.So_luong,r.Hang_san_xuat,r.Nam_san_xuat,r.Nam_van_hanh,age>=0?age:'',r.Cong_suat,r.Ly_lich,r.Thong_so,r.Doi]
@@ -9068,7 +9062,7 @@ function _tbExportCSV() {
 
 function _tbExportOne(idx) {
   const r=_tbFiltered[idx]; if(!r) return;
-  const fields=[['Trạm',r.Tram],['Cấp ĐA',_tbCapLbl[String(r.Cap_dien_ap??'')]||r.Cap_dien_ap],['Loại TB',r.Phan_loai_thiet_bi],['Tên/Ký hiệu',r.Ten_thiet_bi],['Ngăn TB',r.Ngan_thiet_bi],['Số lượng',r.So_luong],['Hãng SX',r.Hang_san_xuat],['Năm SX',r.Nam_san_xuat],['Năm VH',r.Nam_van_hanh],['Thời gian VH',_tbAge(r)>=0?_tbAge(r):''],['CS(MVA)',r.Cong_suat],['Thông số',r.Thong_so],['Lý lịch',r.Ly_lich],['Đội',r.Doi]];
+  const fields=[['Trạm',r.Tram],['Cấp ĐA',_tbCapLbl[String(r.Cap_dien_ap??'')]||r.Cap_dien_ap],['Loại TB',r.Phan_loai_thiet_bi],['Tên/Ký hiệu',r.Ten_thiet_bi],['Ngăn TB',r.Ngan_thiet_bi],['Số lượng',r.So_luong],['Hãng SX',r.Hang_san_xuat],['Năm SX',r.Nam_san_xuat],['Năm VH',r.Nam_van_hanh],['Thâm niên',_tbAge(r)>=0?_tbAge(r):''],['CS(MVA)',r.Cong_suat],['Thông số',r.Thong_so],['Lý lịch',r.Ly_lich],['Đội',r.Doi]];
   const csv='\uFEFF'+fields.map(([k,v])=>`"${k}","${String(v||'').replace(/"/g,'""')}"`).join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
@@ -10190,15 +10184,11 @@ function _bcRenderByMonth(conf) {
 
   // Helper: build styled dropdown
   function mkBcDd(key, dflt, val, items, labelFn) {
-    if (!window._bcDdStore) window._bcDdStore = {};
-    window._bcDdStore[key] = { items, dflt };
     const active = !!val;
+    const ddStyle = `display:inline-flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;border-radius:7px;border:1px solid ${active?'var(--accent)':'rgba(0,200,255,.4)'};background:${active?'rgba(0,200,255,.1)':'var(--bg-elevated)'};color:${active?'var(--accent)':'var(--text-primary)'};font-family:var(--font-mono);font-size:11px;cursor:pointer;outline:none;min-width:120px;white-space:nowrap;position:relative`;
     const lbl = val ? (labelFn ? labelFn(val) : val) : dflt;
-    const brd = active ? 'var(--accent)' : 'rgba(0,200,255,.4)';
-    const bg  = active ? 'rgba(0,200,255,.1)' : 'var(--bg-elevated)';
-    const col = active ? 'var(--accent)' : 'var(--text-primary)';
-    return `<button data-bckey="${key}" style="display:inline-flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;border-radius:7px;border:1px solid ${brd};background:${bg};color:${col};font-family:var(--font-mono);font-size:11px;cursor:pointer;outline:none;min-width:115px;white-space:nowrap" onclick="event.stopPropagation();_bcBmDropdown(this,'${key}')">
-      <span>${lbl}</span><i class="fas fa-chevron-down" style="font-size:8px;opacity:.6;flex-shrink:0"></i>
+    return `<button style="${ddStyle}" onclick="_bcBmDropdown(this,'${key}',${JSON.stringify(items)},${JSON.stringify(dflt)})">
+      <span>${lbl}</span><i class="fas fa-chevron-down" style="font-size:8px;opacity:.6"></i>
     </button>`;
   }
 
@@ -10217,22 +10207,26 @@ function _bcRenderByMonth(conf) {
     <span style="margin-left:auto;font-size:10px;font-family:var(--font-mono);color:var(--text-muted)">${fmt(data.length)} bản ghi</span>
   </div>
 
-  ${(()=>{
-    const _n=new Date(),_y=_n.getFullYear(),_m=_n.getMonth()+1;
-    const _xm=_m===12?1:_m+1,_xy=_m===12?_y+1:_y;
-    const _tc=rawData.filter(r=>{const ds=r.Thoi_gian_thi_nghiem_tiep_theo;if(!ds)return false;const d=new Date(ds);return d.getFullYear()===_y&&d.getMonth()+1===_m;}).length;
-    const _nc=rawData.filter(r=>{const ds=r.Thoi_gian_thi_nghiem_tiep_theo;if(!ds)return false;const d=new Date(ds);return d.getFullYear()===_xy&&d.getMonth()+1===_xm;}).length;
-    const _s=(icon,col,bgA,brd,lbl,val,pct,key)=>`<div style="background:${bgA};border:1px solid ${brd};border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s" onclick="_bcStatClick('${key}',rawData)" onmouseenter="this.style.borderColor='${col}'" onmouseleave="this.style.borderColor='${brd}'">
-      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas ${icon}" style="margin-right:4px;color:${col}"></i>${lbl}</div>
-      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:${col};margin-bottom:6px">${fmt(val)}</div>
-      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${Math.min(100,pct)}%;background:${col};border-radius:2px;transition:width .4s"></div></div>
-    </div>`;
-    return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
-      ${_s('fa-database','#00c8ff','rgba(0,200,255,.07)','rgba(0,200,255,.2)','Tổng số thiết bị',rawData.length,100,'total')}
-      ${_s('fa-calendar-check','#00e676','rgba(0,230,118,.07)','rgba(0,230,118,.2)',`Phải TN tháng ${_m}/${_y}`,_tc,Math.min(100,_tc/Math.max(rawData.length,1)*1000),'thismon')}
-      ${_s('fa-calendar-plus','#ffd740','rgba(255,215,64,.07)','rgba(255,215,64,.2)',`Phải TN tháng ${_xm}/${_xy}`,_nc,Math.min(100,_nc/Math.max(rawData.length,1)*1000),'nextmon')}
-    </div>`;
-  })()}
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+    <div style="background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
+      onclick="_bcStatClick('total',rawData)" onmouseenter="this.style.borderColor='rgba(0,200,255,.5)'" onmouseleave="this.style.borderColor='rgba(0,200,255,.2)'">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-list" style="margin-right:4px"></i>Tổng bản ghi</div>
+      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:var(--accent);margin-bottom:6px">${fmt(data.length)}</div>
+      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:100%;background:#00c8ff;border-radius:2px"></div></div>
+    </div>
+    <div style="background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
+      onclick="_bcStatClick('done',rawData)" onmouseenter="this.style.borderColor='rgba(0,230,118,.5)'" onmouseleave="this.style.borderColor='rgba(0,230,118,.2)'">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-check-circle" style="margin-right:4px"></i>Đã thí nghiệm (có ngày TN)</div>
+      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:#00e676;margin-bottom:6px">${fmt(totalDone)}</div>
+      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${data.length>0?Math.round(totalDone/data.length*100):0}%;background:#00e676;border-radius:2px;transition:width .4s"></div></div>
+    </div>
+    <div style="background:rgba(255,215,64,.07);border:1px solid rgba(255,215,64,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
+      onclick="_bcStatClick('months',rawData)" onmouseenter="this.style.borderColor='rgba(255,215,64,.5)'" onmouseleave="this.style.borderColor='rgba(255,215,64,.2)'">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-calendar" style="margin-right:4px"></i>Số tháng có TN</div>
+      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:#ffd740;margin-bottom:6px">${months.length}</div>
+      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${Math.min(100,months.length*8)}%;background:#ffd740;border-radius:2px"></div></div>
+    </div>
+  </div>
 
   <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:14px">
     <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:12px">BIỂU ĐỒ KHỐI LƯỢNG THEO THÁNG</div>
@@ -10275,9 +10269,7 @@ function _bcRenderByMonth(conf) {
 }
 
 // ── DROPDOWN HANDLER for by-month report ──────────────────────
-function _bcBmDropdown(btn, key) {
-  const stored = (window._bcDdStore || {})[key] || { items: [], dflt: '' };
-  const items = stored.items, dflt = stored.dflt;
+function _bcBmDropdown(btn, key, items, dflt) {
   const ex = document.getElementById('_bcBmDdList');
   if (ex) { if (ex.dataset.key===key) { ex.remove(); return; } ex.remove(); }
   const list = document.createElement('div');
@@ -10469,45 +10461,7 @@ function _bcRenderEarlyPlan(conf) {
 function _bcStatClick(key, data) {
   const fmt = n => Number(n).toLocaleString('vi-VN');
   const fmtD = v => { if(!v) return '—'; const d=new Date(v); return isNaN(d)?v:d.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'}); };
-  const _cL={'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
-  const _cC={'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
-  const rawAll=_tnRawData.length?_tnRawData:(_tnAllData.length?_tnAllData:[]);
   let title='', totalLine='', bodyHtml='', col='var(--accent)';
-
-  if (key==='thismon'||key==='nextmon') {
-    const now=new Date(),nowY=now.getFullYear(),nowM=now.getMonth()+1;
-    const tM=key==='thismon'?nowM:(nowM===12?1:nowM+1),tY=key==='thismon'?nowY:(nowM===12?nowY+1:nowY);
-    col=key==='thismon'?'#00e676':'#ffd740';
-    title=`📅 Phải TN tháng ${tM}/${tY}`;
-    const filtered=rawAll.filter(r=>{const ds=r.Thoi_gian_thi_nghiem_tiep_theo;if(!ds)return false;const d=new Date(ds);return d.getFullYear()===tY&&d.getMonth()+1===tM;});
-    const byType={};
-    filtered.forEach(r=>{const tp=(r.Phan_loai_thiet_bi||'Khác').trim(),t=(r.Tram||'—').trim();if(!byType[tp])byType[tp]={total:0,trams:{}};byType[tp].total++;if(!byType[tp].trams[t])byType[tp].trams[t]=[];byType[tp].trams[t].push(r);});
-    const types=Object.keys(byType).sort((a,b)=>byType[b].total-byType[a].total);
-    totalLine=`${fmt(filtered.length)} thiết bị · ${types.length} loại · ${new Set(filtered.map(r=>(r.Tram||'').trim())).size} trạm`;
-    bodyHtml=types.map(tp=>{
-      const ti=byType[tp],trams=Object.keys(ti.trams).sort((a,b)=>a.localeCompare(b,'vi'));
-      return `<div style="border-bottom:1px solid rgba(255,255,255,.07)">
-        <div style="padding:8px 16px 3px;display:flex;justify-content:space-between;background:rgba(255,255,255,.02)">
-          <span style="font-size:10px;font-weight:700;color:${col}">${tp}</span>
-          <span style="font-size:10px;font-weight:700;color:${col};font-family:var(--font-mono)">${fmt(ti.total)}</span>
-        </div>
-        ${trams.map(t=>{const rows=ti.trams[t],cap=String(rows[0]?.Cap_dien_ap??'');
-          return `<div style="border-bottom:1px solid rgba(255,255,255,.04)">
-            <div style="padding:5px 24px;display:flex;justify-content:space-between">
-              <span style="font-size:9.5px;color:var(--text-primary)">${t}${cap&&cap!=='null'?` <span style="color:${_cC[cap]};font-size:8px">${_cL[cap]}</span>`:''}</span>
-              <span style="font-size:9px;color:var(--text-muted)">${rows.length}</span>
-            </div>
-            ${rows.slice(0,5).map(r=>`<div style="padding:2px 36px;font-size:8.5px;color:var(--text-muted);display:flex;justify-content:space-between"><span>${r.Ten_thiet_bi||r.Ngan_thiet_bi||'—'}</span><span style="color:${col};font-family:var(--font-mono)">${fmtD(r.Thoi_gian_thi_nghiem_tiep_theo)}</span></div>`).join('')}
-            ${rows.length>5?`<div style="padding:2px 36px 5px;font-size:8px;color:var(--text-muted)">...+${rows.length-5}</div>`:''}
-          </div>`;
-        }).join('')}
-      </div>`;
-    }).join('')||'<div style="padding:24px;text-align:center;color:var(--text-muted)">Không có dữ liệu</div>';
-    let p=document.getElementById('hm-detail-panel');
-    if(!p){p=document.createElement('div');p.id='hm-detail-panel';p.className='hm-detail-panel';document.body.appendChild(p);}
-    p.innerHTML=`<div class="hm-resize-grip"></div><div class="hm-detail-hd" style="border-left:3px solid ${col}"><span style="color:${col}">${title}</span><span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span></div><div style="padding:8px 16px;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">${totalLine}</div><div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;overscroll-behavior:contain">${bodyHtml}</div>`;
-    p.classList.add('open'); _hmOpenPanel(p); return;
-  }
 
   if (key === 'total') {
     col='#00c8ff'; title='📋 Tổng bản ghi thí nghiệm';
@@ -10988,509 +10942,6 @@ function showChangeNotif(type,title,msg,duration){
   setTimeout(()=>{if(notif.parentNode)notif.remove();},duration||5000);
 }
 document.getElementById('adminPanel').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
-
-// ══════════════════════════════════════════════════════
-// MODULE: QUẢN LÝ BBTN
-// ══════════════════════════════════════════════════════
-function _bbtnRenderPage() {
-  const overlay = document.getElementById('tbPageOverlay');
-  if (!overlay) return;
-  const rd = _tnRawData.length ? _tnRawData : (_tnAllData.length ? _tnAllData : []);
-  const fmt = n => Number(n).toLocaleString('vi-VN');
-  const fmtD = v => { if(!v)return'—';const d=new Date(v);return isNaN(d)?v:d.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'}); };
-  const capLbl={'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
-  const capCol={'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
-  const nowY = new Date().getFullYear();
-  const completed = rd.filter(r=>r.Ngay_thi_nghiem).sort((a,b)=>new Date(b.Ngay_thi_nghiem)-new Date(a.Ngay_thi_nghiem));
-  const byMonth={};
-  completed.forEach(r=>{
-    const d=new Date(r.Ngay_thi_nghiem);
-    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    const lbl=`Tháng ${d.getMonth()+1}/${d.getFullYear()}`;
-    if(!byMonth[key])byMonth[key]={label:lbl,rows:[]};
-    byMonth[key].rows.push(r);
-  });
-  const thisY=completed.filter(r=>new Date(r.Ngay_thi_nghiem).getFullYear()===nowY).length;
-  const tramsHaveDone=new Set(completed.map(r=>(r.Tram||'').trim()).filter(Boolean)).size;
-  const months=Object.keys(byMonth).sort().reverse();
-  window._bbtnByMonth=byMonth;
-  window._bbtnCompleted=completed;
-
-  const monthsHtml=months.slice(0,24).map(mk=>{
-    const m=byMonth[mk];
-    return `<div style="margin-bottom:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:rgba(255,255,255,.04);border-radius:8px;margin-bottom:8px;border-left:3px solid var(--accent)">
-        <span style="font-size:13px;font-weight:700;color:var(--accent)">${m.label}</span>
-        <div style="display:flex;gap:8px;align-items:center">
-          <span style="font-size:10px;font-family:var(--font-mono);color:var(--text-muted)">${fmt(m.rows.length)} BBTN</span>
-          <button onclick="_bbtnExportMonth('${mk}')" style="padding:3px 10px;border-radius:5px;border:1px solid rgba(0,200,255,.3);background:rgba(0,200,255,.08);color:var(--accent);font-size:9px;cursor:pointer"><i class="fas fa-download" style="margin-right:3px"></i>CSV</button>
-        </div>
-      </div>
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:10px">
-          <thead><tr style="border-bottom:1px solid rgba(255,255,255,.08)">
-            <th style="padding:5px 10px;text-align:left;font-size:9px;color:var(--text-muted)">Trạm</th>
-            <th style="padding:5px 10px;text-align:left;font-size:9px;color:var(--text-muted)">Cấp</th>
-            <th style="padding:5px 10px;text-align:left;font-size:9px;color:var(--text-muted)">Loại TB</th>
-            <th style="padding:5px 10px;text-align:left;font-size:9px;color:var(--text-muted)">Tên/Ngăn</th>
-            <th style="padding:5px 10px;text-align:right;font-size:9px;color:var(--text-muted)">Ngày TN</th>
-            <th style="padding:5px 10px;text-align:right;font-size:9px;color:var(--text-muted)">TN kế tiếp</th>
-          </tr></thead>
-          <tbody>${m.rows.map((r,i)=>{
-            const cap=String(r.Cap_dien_ap??'');
-            return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);${i%2?'background:rgba(255,255,255,.02)':''}">
-              <td style="padding:5px 10px;font-weight:600">${r.Tram||'—'}</td>
-              <td style="padding:5px 10px"><span style="color:${capCol[cap]||'#888'};font-size:9px;font-weight:700">${capLbl[cap]||'—'}</span></td>
-              <td style="padding:5px 10px;color:var(--text-secondary)">${r.Phan_loai_thiet_bi||'—'}</td>
-              <td style="padding:5px 10px;color:var(--text-secondary)">${r.Ten_thiet_bi||r.Ngan_thiet_bi||'—'}</td>
-              <td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);color:#00e676">${fmtD(r.Ngay_thi_nghiem)}</td>
-              <td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);color:var(--accent)">${fmtD(r.Thoi_gian_thi_nghiem_tiep_theo)}</td>
-            </tr>`;
-          }).join('')}</tbody>
-        </table>
-      </div>
-    </div>`;
-  }).join('');
-
-  overlay.innerHTML=`<div style="padding:0 0 32px">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-      <div style="width:34px;height:34px;border-radius:8px;background:rgba(255,215,64,.15);color:#ffd740;display:flex;align-items:center;justify-content:center"><i class="fas fa-file-signature" style="font-size:15px"></i></div>
-      <div><div style="font-size:16px;font-weight:800;color:var(--text-primary)">Quản lý Biên bản thí nghiệm (BBTN)</div>
-        <div style="font-size:10px;color:var(--text-muted)">Nguồn: CongTacThiNghiem</div></div>
-      <div style="margin-left:auto;display:flex;gap:8px">
-        <button onclick="_bbtnExportAll()" style="padding:6px 14px;border-radius:7px;border:1px solid rgba(0,230,118,.3);background:rgba(0,230,118,.08);color:#00e676;font-size:11px;cursor:pointer"><i class="fas fa-file-csv" style="margin-right:5px"></i>Xuất tất cả</button>
-        <button onclick="navActivate(document.querySelector('.nav-item'))" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:var(--text-primary);font-size:10px;cursor:pointer"><i class="fas fa-arrow-left" style="margin-right:5px"></i>Dashboard</button>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-      <input id="_bbtnSearch" type="text" placeholder="Tìm trạm, tên TB..." oninput="_bbtnFilter()" style="flex:1;min-width:180px;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:var(--bg-elevated);color:var(--text-primary);font-size:12px;outline:none">
-      <select id="_bbtnYear" onchange="_bbtnFilter()" style="padding:7px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:var(--bg-elevated);color:var(--text-primary);font-size:12px;cursor:pointer;outline:none">
-        <option value="">— Tất cả năm —</option>
-        ${[...new Set(completed.map(r=>new Date(r.Ngay_thi_nghiem).getFullYear()))].sort().reverse().map(y=>`<option value="${y}">${y}</option>`).join('')}
-      </select>
-      <select id="_bbtnType" onchange="_bbtnFilter()" style="padding:7px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:var(--bg-elevated);color:var(--text-primary);font-size:12px;cursor:pointer;outline:none">
-        <option value="">— Tất cả loại —</option>
-        ${[...new Set(completed.map(r=>(r.Phan_loai_thiet_bi||'').trim()).filter(Boolean))].sort().map(t=>`<option value="${t}">${t}</option>`).join('')}
-      </select>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px">
-      <div style="background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.2);border-radius:8px;padding:10px 14px">
-        <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px">Tổng BBTN</div>
-        <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:var(--accent)">${fmt(completed.length)}</div>
-      </div>
-      <div style="background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.2);border-radius:8px;padding:10px 14px">
-        <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px">Năm ${nowY}</div>
-        <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:#00e676">${fmt(thisY)}</div>
-      </div>
-      <div style="background:rgba(255,215,64,.07);border:1px solid rgba(255,215,64,.2);border-radius:8px;padding:10px 14px">
-        <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px">Số trạm</div>
-        <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:#ffd740">${fmt(tramsHaveDone)}</div>
-      </div>
-      <div style="background:rgba(224,64,251,.07);border:1px solid rgba(224,64,251,.2);border-radius:8px;padding:10px 14px">
-        <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px">Số tháng</div>
-        <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:#e040fb">${fmt(months.length)}</div>
-      </div>
-    </div>
-    <div id="_bbtnContent">${monthsHtml||'<div style="padding:30px;text-align:center;color:var(--text-muted)">Chưa có dữ liệu</div>'}</div>
-  </div>`;
-
-  window._bbtnFilter=function(){
-    const q=(document.getElementById('_bbtnSearch')?.value||'').toLowerCase();
-    const yr=document.getElementById('_bbtnYear')?.value||'';
-    const tp=document.getElementById('_bbtnType')?.value||'';
-    const filtered=(window._bbtnCompleted||[]).filter(r=>{
-      if(yr&&String(new Date(r.Ngay_thi_nghiem).getFullYear())!==yr)return false;
-      if(tp&&(r.Phan_loai_thiet_bi||'').trim()!==tp)return false;
-      if(q&&![(r.Tram||''),(r.Ten_thiet_bi||''),(r.Ngan_thiet_bi||'')].join(' ').toLowerCase().includes(q))return false;
-      return true;
-    });
-    const el=document.getElementById('_bbtnContent');
-    if(el&&(q||yr||tp)){
-      el.innerHTML=`<div style="padding:8px 0 12px;font-size:11px;color:var(--text-muted)">${fmt(filtered.length)} kết quả</div>`+
-        (filtered.length?`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:10px">
-          <thead><tr style="border-bottom:1px solid rgba(255,255,255,.08)"><th style="padding:5px 10px;font-size:9px;color:var(--text-muted);text-align:left">Trạm</th><th style="padding:5px 10px;font-size:9px;color:var(--text-muted);text-align:left">Loại TB</th><th style="padding:5px 10px;font-size:9px;color:var(--text-muted);text-align:left">Tên/Ngăn</th><th style="padding:5px 10px;font-size:9px;color:var(--text-muted);text-align:right">Ngày TN</th></tr></thead>
-          <tbody>${filtered.slice(0,200).map((r,i)=>`<tr style="border-bottom:1px solid rgba(255,255,255,.04);${i%2?'background:rgba(255,255,255,.02)':''}"><td style="padding:5px 10px;font-weight:600">${r.Tram||'—'}</td><td style="padding:5px 10px;color:var(--text-secondary)">${r.Phan_loai_thiet_bi||'—'}</td><td style="padding:5px 10px;color:var(--text-secondary)">${r.Ten_thiet_bi||r.Ngan_thiet_bi||'—'}</td><td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);color:#00e676">${fmtD(r.Ngay_thi_nghiem)}</td></tr>`).join('')}</tbody>
-        </table></div>`:'<div style="padding:20px;text-align:center;color:var(--text-muted)">Không có kết quả</div>');
-    } else if(el){
-      // restore monthly view
-      el.innerHTML=monthsHtml||'';
-    }
-  };
-}
-
-function _bbtnExportMonth(mk){
-  const m=(window._bbtnByMonth||{})[mk]; if(!m)return;
-  _bbtnDoExport(m.rows,'BBTN_'+mk);
-}
-function _bbtnExportAll(){
-  _bbtnDoExport(window._bbtnCompleted||[],'BBTN_ToanBo');
-}
-function _bbtnDoExport(rows,filename){
-  const capLbl={'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
-  const esc=v=>'"'+(String(v||'').replace(/"/g,'""'))+'"';
-  const fD=v=>{if(!v)return'';const d=new Date(v);return isNaN(d)?v:d.toLocaleDateString('vi-VN');};
-  const hdr='Trạm,Cấp ĐA,Loại TB,Tên/KH,Ngăn TB,Ngày TN,Hạn TN,TN tiếp theo,Hãng SX,Năm SX,Năm VH';
-  const body=rows.map(r=>[r.Tram,capLbl[String(r.Cap_dien_ap??'')]||r.Cap_dien_ap,r.Phan_loai_thiet_bi,r.Ten_thiet_bi,r.Ngan_thiet_bi,fD(r.Ngay_thi_nghiem),r.Han_thi_nghiem,fD(r.Thoi_gian_thi_nghiem_tiep_theo),r.Hang_san_xuat,r.Nam_san_xuat,r.Nam_van_hanh].map(esc).join(','));
-  const csv='\uFEFF'+[hdr,...body].join('\n');
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=filename+'.csv';a.click();
-}
-
-// ══════════════════════════════════════════════════════
-// MODULE: CẢNH BÁO THÔNG MINH
-// ══════════════════════════════════════════════════════
-function _alertRenderPage() {
-  const overlay=document.getElementById('tbPageOverlay'); if(!overlay)return;
-  const rd=_tnRawData.length?_tnRawData:(_tnAllData.length?_tnAllData:[]);
-  const fmt=n=>Number(n).toLocaleString('vi-VN');
-  const fmtD=v=>{if(!v)return'—';const d=new Date(v);return isNaN(d)?v:d.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'});};
-  const capCol={'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
-  const capLbl={'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
-  const today=new Date();today.setHours(0,0,0,0);
-  const in7=new Date(today);in7.setDate(in7.getDate()+7);
-  const in30=new Date(today);in30.setDate(in30.getDate()+30);
-
-  const overdue=rd.filter(r=>{const d=new Date(r.Thoi_gian_thi_nghiem_tiep_theo);return!isNaN(d)&&d<today;});
-  const urgent=rd.filter(r=>{const d=new Date(r.Thoi_gian_thi_nghiem_tiep_theo);return!isNaN(d)&&d>=today&&d<=in7;});
-  const soon=rd.filter(r=>{const d=new Date(r.Thoi_gian_thi_nghiem_tiep_theo);return!isNaN(d)&&d>in7&&d<=in30;});
-  const old15=rd.filter(r=>{const nvh=Number(r.Nam_van_hanh);return nvh>1970&&(new Date().getFullYear()-nvh)>=15;});
-
-  // Per-tram stats for heatmap
-  const ts={};
-  rd.forEach(r=>{const t=(r.Tram||'').trim();if(!t)return;if(!ts[t])ts[t]={ov:0,ur:0,so:0,cap:String(r.Cap_dien_ap??'')};});
-  overdue.forEach(r=>{const t=(r.Tram||'').trim();if(ts[t])ts[t].ov++;});
-  urgent.forEach(r=>{const t=(r.Tram||'').trim();if(ts[t])ts[t].ur++;});
-  soon.forEach(r=>{const t=(r.Tram||'').trim();if(ts[t])ts[t].so++;});
-
-  const tramsSorted=Object.keys(ts).sort((a,b)=>{
-    const pa={2:0,1:1,3:2,4:3,9:4,6:5,0:6}[parseInt(ts[a].cap)]??9;
-    const pb={2:0,1:1,3:2,4:3,9:4,6:5,0:6}[parseInt(ts[b].cap)]??9;
-    return pa!==pb?pa-pb:a.localeCompare(b,'vi');
-  });
-
-  const hmCells=tramsSorted.map(t=>{
-    const a=ts[t];const total=a.ov+a.ur+a.so;
-    const col=a.ov>0?'#ff5252':a.ur>0?'#ff9100':a.so>0?'#ffd740':'rgba(255,255,255,.06)';
-    return `<div title="${t}: ${a.ov} quá hạn · ${a.ur} sắp hạn 7n · ${a.so} trong 30n" style="background:${col}22;border:1px solid ${col}55;border-radius:6px;padding:5px 7px;cursor:pointer" onclick="_alertFilterTram('${t.replace(/'/g,"\\'")}')">
-      <div style="font-size:7.5px;font-weight:700;color:${capCol[a.cap]||'#888'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:1px">${t}</div>
-      <div style="font-size:10px;font-weight:800;color:${total?col:'rgba(255,255,255,.2)'};font-family:var(--font-mono)">${total||'✓'}</div>
-    </div>`;
-  }).join('');
-
-  function alertSection(rows,col,icon,label,key){
-    if(!rows.length)return'';
-    const byDoi={};rows.forEach(r=>{const d=(r.Doi||'Chưa phân').trim();if(!byDoi[d])byDoi[d]=[];byDoi[d].push(r);});
-    const dois=Object.keys(byDoi).sort();
-    return `<div style="margin-bottom:20px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <div style="width:30px;height:30px;border-radius:8px;background:${col}22;display:flex;align-items:center;justify-content:center"><i class="fas ${icon}" style="font-size:13px;color:${col}"></i></div>
-        <div><div style="font-size:13px;font-weight:700;color:${col}">${label}</div><div style="font-size:10px;color:var(--text-muted)">${fmt(rows.length)} thiết bị · ${dois.length} đội</div></div>
-        <button onclick="_alertShowDetail('${key}')" style="margin-left:auto;padding:5px 12px;border-radius:6px;border:1px solid ${col}44;background:${col}11;color:${col};font-size:10px;cursor:pointer">Xem chi tiết</button>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px">
-        ${dois.map(doi=>{
-          const dRows=byDoi[doi];
-          const tramCounts=dRows.reduce((m,r)=>{const t=(r.Tram||'—').trim();m[t]=(m[t]||0)+1;return m;},{});
-          return `<div style="background:${col}09;border:1px solid ${col}33;border-radius:8px;padding:10px 12px">
-            <div style="font-size:10px;font-weight:700;color:${col};margin-bottom:6px">${doi} <span style="font-family:var(--font-mono)">(${dRows.length})</span></div>
-            ${Object.entries(tramCounts).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([t,n])=>`<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-secondary)">${t}<span style="color:${col};font-family:var(--font-mono)">${n}</span></div>`).join('')}
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`;
-  }
-
-  window._alertData={overdue,urgent,soon,old15,rawData:rd};
-
-  overlay.innerHTML=`<div style="padding:0 0 32px">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-      <div style="width:34px;height:34px;border-radius:8px;background:rgba(255,145,0,.15);color:#ff9100;display:flex;align-items:center;justify-content:center"><i class="fas fa-bell" style="font-size:15px"></i></div>
-      <div><div style="font-size:16px;font-weight:800;color:var(--text-primary)">Cảnh báo thông minh</div>
-        <div style="font-size:10px;color:var(--text-muted)">${new Date().toLocaleString('vi-VN')}</div></div>
-      <button onclick="navActivate(document.querySelector('.nav-item'))" style="margin-left:auto;padding:6px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:var(--text-primary);font-size:10px;cursor:pointer"><i class="fas fa-arrow-left" style="margin-right:5px"></i>Dashboard</button>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px">
-      <div style="background:rgba(255,82,82,.1);border:1px solid rgba(255,82,82,.3);border-radius:8px;padding:10px 14px">
-        <div style="font-size:9px;color:rgba(255,82,82,.8);margin-bottom:3px"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>Quá hạn TN</div>
-        <div style="font-size:24px;font-weight:800;font-family:var(--font-mono);color:#ff5252">${fmt(overdue.length)}</div>
-        <div style="font-size:9px;color:rgba(255,82,82,.6);margin-top:3px">Xử lý ngay</div>
-      </div>
-      <div style="background:rgba(255,145,0,.08);border:1px solid rgba(255,145,0,.25);border-radius:8px;padding:10px 14px">
-        <div style="font-size:9px;color:rgba(255,145,0,.8);margin-bottom:3px"><i class="fas fa-clock" style="margin-right:4px"></i>Sắp hạn ≤7 ngày</div>
-        <div style="font-size:24px;font-weight:800;font-family:var(--font-mono);color:#ff9100">${fmt(urgent.length)}</div>
-        <div style="font-size:9px;color:rgba(255,145,0,.6);margin-top:3px">Ưu tiên cao</div>
-      </div>
-      <div style="background:rgba(255,215,64,.07);border:1px solid rgba(255,215,64,.2);border-radius:8px;padding:10px 14px">
-        <div style="font-size:9px;color:rgba(255,215,64,.8);margin-bottom:3px"><i class="fas fa-calendar-alt" style="margin-right:4px"></i>Sắp hạn ≤30 ngày</div>
-        <div style="font-size:24px;font-weight:800;font-family:var(--font-mono);color:#ffd740">${fmt(soon.length)}</div>
-        <div style="font-size:9px;color:rgba(255,215,64,.6);margin-top:3px">Lên kế hoạch</div>
-      </div>
-      <div style="background:rgba(179,136,255,.07);border:1px solid rgba(179,136,255,.2);border-radius:8px;padding:10px 14px">
-        <div style="font-size:9px;color:rgba(179,136,255,.8);margin-bottom:3px"><i class="fas fa-hourglass-half" style="margin-right:4px"></i>≥15 năm VH</div>
-        <div style="font-size:24px;font-weight:800;font-family:var(--font-mono);color:#b388ff">${fmt(old15.length)}</div>
-        <div style="font-size:9px;color:rgba(179,136,255,.6);margin-top:3px">Theo dõi đặc biệt</div>
-      </div>
-    </div>
-    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:20px">
-      <div style="font-size:10px;font-weight:700;color:var(--text-muted);margin-bottom:10px">HEAT-MAP RỦI RO THEO TRẠM
-        <span style="font-weight:400;margin-left:8px;font-size:9px"><span style="color:#ff5252">■</span> Quá hạn  <span style="color:#ff9100;margin-left:5px">■</span> Sắp 7n  <span style="color:#ffd740;margin-left:5px">■</span> Sắp 30n  <span style="color:rgba(255,255,255,.3);margin-left:5px">■</span> Bình thường</span>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:5px">${hmCells}</div>
-    </div>
-    ${alertSection(overdue,'#ff5252','fa-exclamation-triangle','Quá hạn thí nghiệm','overdue')}
-    ${alertSection(urgent,'#ff9100','fa-fire','Sắp hạn trong 7 ngày','urgent')}
-    ${alertSection(soon,'#ffd740','fa-clock','Sắp hạn trong 30 ngày','soon')}
-    ${alertSection(old15,'#b388ff','fa-hourglass-half','Thiết bị ≥ 15 năm vận hành','old15')}
-  </div>`;
-
-  window._alertShowDetail=function(key){
-    const rows=(window._alertData||{})[key]||[];
-    const titles={overdue:'Quá hạn TN',urgent:'Sắp hạn ≤7 ngày',soon:'Sắp hạn ≤30 ngày',old15:'≥15 năm VH'};
-    const colors={overdue:'#ff5252',urgent:'#ff9100',soon:'#ffd740',old15:'#b388ff'};
-    const col=colors[key]||'var(--accent)';
-    const fmtD2=v=>{if(!v)return'—';const d=new Date(v);return isNaN(d)?v:d.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'});};
-    const items=rows.slice(0,300).map(r=>{const cap=String(r.Cap_dien_ap??'');return{text:(r.Tram||'—'),sub:`${r.Phan_loai_thiet_bi||'—'} · ${r.Ten_thiet_bi||r.Ngan_thiet_bi||'—'} · ${fmtD2(r.Thoi_gian_thi_nghiem_tiep_theo)}`,color:capCol[cap]||col};});
-    _lytShowDetailPanel('⚠ '+titles[key],col,`${fmt(rows.length)} thiết bị`,items);
-  };
-  window._alertFilterTram=function(tram){
-    const al=(window._alertData?.rawData||[]).filter(r=>(r.Tram||'').trim()===tram);
-    const fmtD2=v=>{if(!v)return'—';const d=new Date(v);return isNaN(d)?v:d.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'});};
-    const items=al.map(r=>{const cap=String(r.Cap_dien_ap??'');const nextD=new Date(r.Thoi_gian_thi_nghiem_tiep_theo);const col2=!isNaN(nextD)&&nextD<today?'#ff5252':'var(--accent)';return{text:r.Phan_loai_thiet_bi||'—',sub:`${r.Ten_thiet_bi||r.Ngan_thiet_bi||'—'} · ${fmtD2(r.Thoi_gian_thi_nghiem_tiep_theo)}`,color:col2};});
-    if(items.length)_lytShowDetailPanel(`🏢 ${tram}`,'#ff9100',`${fmt(al.length)} thiết bị`,items);
-  };
-}
-
-// ══════════════════════════════════════════════════════
-// MODULE: TIẾN ĐỘ KẾ HOẠCH
-// ══════════════════════════════════════════════════════
-function _progressRenderPage() {
-  const overlay=document.getElementById('tbPageOverlay');if(!overlay)return;
-  const rd=_tnRawData.length?_tnRawData:(_tnAllData.length?_tnAllData:[]);
-  const fmt=n=>Number(n).toLocaleString('vi-VN');
-  const nowY=new Date().getFullYear(),nowM=new Date().getMonth()+1;
-
-  const planYear=rd.filter(r=>{const d=new Date(r.Thoi_gian_thi_nghiem_tiep_theo);return!isNaN(d)&&d.getFullYear()===nowY;});
-  const doneYear=rd.filter(r=>{const d=new Date(r.Ngay_thi_nghiem);return!isNaN(d)&&d.getFullYear()===nowY;});
-  const planByM=Array(13).fill(0),doneByM=Array(13).fill(0);
-  planYear.forEach(r=>planByM[new Date(r.Thoi_gian_thi_nghiem_tiep_theo).getMonth()+1]++);
-  doneYear.forEach(r=>doneByM[new Date(r.Ngay_thi_nghiem).getMonth()+1]++);
-  let cp=0,cd=0;const cumP=[],cumD=[];
-  for(let m=1;m<=12;m++){cp+=planByM[m];cd+=doneByM[m];cumP.push(cp);cumD.push(cd);}
-  const tp=planYear.length,td=doneYear.length;
-  const pct=tp>0?Math.round(td/tp*100):0;
-  const maxV=Math.max(...Array.from({length:12},(_,i)=>Math.max(planByM[i+1],doneByM[i+1])),1);
-  const maxC=Math.max(cp,cd,1);
-  const W=50,G=6,PL=32,BH=100,LH=60;
-  const TW=PL+12*(W+G)+PL;
-  const typeP={};
-  planYear.forEach(r=>{const tp2=(r.Phan_loai_thiet_bi||'Khác').trim();if(!typeP[tp2])typeP[tp2]={p:0,d:0};typeP[tp2].p++;});
-  doneYear.forEach(r=>{const tp2=(r.Phan_loai_thiet_bi||'Khác').trim();if(!typeP[tp2])typeP[tp2]={p:0,d:0};typeP[tp2].d++;});
-
-  const bars=Array.from({length:12},(_,i)=>{
-    const m=i+1,x=PL+i*(W+G);
-    const hp=Math.max(planByM[m]?1:0,Math.round(planByM[m]/maxV*BH));
-    const hd=Math.max(doneByM[m]?1:0,Math.round(doneByM[m]/maxV*BH));
-    const isCur=m===nowM;
-    return `<g transform="translate(${x},0)">
-      <rect y="${BH-hp}" width="${W*0.45}" height="${hp}" fill="${isCur?'rgba(255,215,64,.6)':'rgba(255,215,64,.25)'}" rx="2"/>
-      <rect x="${W*0.5}" y="${BH-hd}" width="${W*0.45}" height="${hd}" fill="${isCur?'#00e676':'#00c8ff'}" rx="2"/>
-      ${planByM[m]?`<text x="${W*0.22}" y="${BH-hp-3}" text-anchor="middle" fill="rgba(255,215,64,.7)" font-size="8">${planByM[m]}</text>`:''}
-      ${doneByM[m]?`<text x="${W*0.72}" y="${BH-hd-3}" text-anchor="middle" fill="${isCur?'#00e676':'#00c8ff'}" font-size="8">${doneByM[m]}</text>`:''}
-      <text x="${W/2}" y="${BH+12}" text-anchor="middle" fill="${isCur?'var(--accent)':'rgba(255,255,255,.4)'}" font-size="${isCur?9:8}" font-weight="${isCur?700:400}">T${m}</text>
-      ${isCur?`<line x1="0" y1="0" x2="0" y2="${BH}" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3,2" opacity=".4"/>`:''}
-    </g>`;
-  }).join('');
-
-  const planPts=cumP.map((v,i)=>`${PL+i*(W+G)+W/2},${BH+28+LH-Math.round(v/maxC*LH)}`).join(' ');
-  const donePts=cumD.map((v,i)=>`${PL+i*(W+G)+W/2},${BH+28+LH-Math.round(v/maxC*LH)}`).join(' ');
-
-  overlay.innerHTML=`<div style="padding:0 0 32px">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-      <div style="width:34px;height:34px;border-radius:8px;background:rgba(0,200,255,.15);color:var(--accent);display:flex;align-items:center;justify-content:center"><i class="fas fa-tasks" style="font-size:15px"></i></div>
-      <div><div style="font-size:16px;font-weight:800;color:var(--text-primary)">Tiến độ kế hoạch TN năm ${nowY}</div>
-        <div style="font-size:10px;color:var(--text-muted)">Kế hoạch = lịch TN tiếp theo trong năm · Thực hiện = đã có ngày TN</div></div>
-      <button onclick="navActivate(document.querySelector('.nav-item'))" style="margin-left:auto;padding:6px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:var(--text-primary);font-size:10px;cursor:pointer"><i class="fas fa-arrow-left" style="margin-right:5px"></i>Dashboard</button>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px">
-      <div style="background:rgba(255,215,64,.08);border:1px solid rgba(255,215,64,.2);border-radius:8px;padding:10px 14px">
-        <div style="font-size:9px;color:rgba(255,215,64,.8);margin-bottom:3px">Kế hoạch ${nowY}</div>
-        <div style="font-size:24px;font-weight:800;font-family:var(--font-mono);color:#ffd740">${fmt(tp)}</div>
-      </div>
-      <div style="background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.2);border-radius:8px;padding:10px 14px">
-        <div style="font-size:9px;color:rgba(0,230,118,.8);margin-bottom:3px">Đã thực hiện</div>
-        <div style="font-size:24px;font-weight:800;font-family:var(--font-mono);color:#00e676">${fmt(td)}</div>
-      </div>
-      <div style="background:${pct>=100?'rgba(0,230,118,.1)':pct>=80?'rgba(0,200,255,.08)':'rgba(255,82,82,.08)'};border:1px solid ${pct>=100?'rgba(0,230,118,.3)':pct>=80?'rgba(0,200,255,.2)':'rgba(255,82,82,.2)'};border-radius:8px;padding:10px 14px">
-        <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px">% Hoàn thành</div>
-        <div style="font-size:24px;font-weight:800;font-family:var(--font-mono);color:${pct>=100?'#00e676':pct>=80?'var(--accent)':'#ff5252'}">${pct}%</div>
-        <div style="height:3px;margin-top:6px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${Math.min(100,pct)}%;background:${pct>=100?'#00e676':pct>=80?'var(--accent)':'#ff5252'};border-radius:2px"></div></div>
-      </div>
-      <div style="background:rgba(179,136,255,.07);border:1px solid rgba(179,136,255,.2);border-radius:8px;padding:10px 14px">
-        <div style="font-size:9px;color:rgba(179,136,255,.8);margin-bottom:3px">Còn lại</div>
-        <div style="font-size:24px;font-weight:800;font-family:var(--font-mono);color:#b388ff">${fmt(Math.max(0,tp-td))}</div>
-      </div>
-    </div>
-    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:20px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="font-size:10px;font-weight:700;color:var(--text-muted)">BIỂU ĐỒ KẾ HOẠCH VS THỰC HIỆN NĂM ${nowY}</div>
-        <div style="font-size:9px;color:var(--text-muted);display:flex;gap:10px">
-          <span><span style="color:rgba(255,215,64,.6)">■</span> Kế hoạch</span>
-          <span><span style="color:#00c8ff">■</span> Thực hiện</span>
-          <span style="color:#ffd740">- - - Lũy kế KH</span>
-          <span style="color:#18ffff">— Lũy kế TH</span>
-        </div>
-      </div>
-      <div style="overflow-x:auto">
-        <svg width="${TW}" height="${BH+LH+50}" xmlns="http://www.w3.org/2000/svg" style="display:block">
-          <g transform="translate(0,8)">${bars}</g>
-          <line x1="${PL}" y1="${BH+25}" x2="${TW-PL}" y2="${BH+25}" stroke="rgba(255,255,255,.06)" stroke-width="0.5"/>
-          <text x="4" y="${BH+23}" fill="rgba(255,255,255,.2)" font-size="7">Lũy kế</text>
-          <polyline points="${planPts}" fill="none" stroke="#ffd740" stroke-width="1.5" stroke-dasharray="5,3" opacity=".7" transform="translate(0,24)"/>
-          <polyline points="${donePts}" fill="none" stroke="#18ffff" stroke-width="2" transform="translate(0,24)"/>
-          ${cumD.map((v,i)=>{const x=PL+i*(W+G)+W/2,y=BH+28+LH-Math.round(v/maxC*LH)+24;return `<circle cx="${x}" cy="${y}" r="2.5" fill="#18ffff"/>`;}).join('')}
-        </svg>
-      </div>
-    </div>
-    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px">
-      <div style="font-size:10px;font-weight:700;color:var(--text-muted);margin-bottom:12px">TIẾN ĐỘ THEO LOẠI THIẾT BỊ</div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        ${Object.entries(typeP).sort((a,b)=>b[1].p-a[1].p).map(([tp2,{p,d}])=>{
-          const pc=p>0?Math.round(d/p*100):0;
-          const col=pc>=100?'#00e676':pc>=80?'var(--accent)':pc>=50?'#ffd740':'#ff5252';
-          return `<div style="display:grid;grid-template-columns:110px 1fr 55px 50px;gap:10px;align-items:center">
-            <div style="font-size:10px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${tp2}</div>
-            <div style="height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden">
-              <div style="height:100%;width:${Math.min(100,pc)}%;background:${col};border-radius:3px"></div>
-            </div>
-            <div style="font-size:9px;text-align:right;font-family:var(--font-mono);color:${col}">${pc}%</div>
-            <div style="font-size:9px;text-align:right;color:var(--text-muted);font-family:var(--font-mono)">${fmt(d)}/${fmt(p)}</div>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>
-  </div>`;
-}
-
-// ══════════════════════════════════════════════════════
-// MODULE: BẢN ĐỒ TRẠM
-// ══════════════════════════════════════════════════════
-function _mapRenderPage() {
-  const overlay=document.getElementById('tbPageOverlay');if(!overlay)return;
-  const rd=_tnRawData.length?_tnRawData:(_tnAllData.length?_tnAllData:[]);
-  const fmt=n=>Number(n).toLocaleString('vi-VN');
-  const today=new Date();today.setHours(0,0,0,0);
-  const in30=new Date(today);in30.setDate(in30.getDate()+30);
-  const ts={};
-  rd.forEach(r=>{const t=(r.Tram||'').trim();if(!t)return;if(!ts[t])ts[t]={cap:String(r.Cap_dien_ap??''),total:0,overdue:0,soon:0,done:0};ts[t].total++;const nd=new Date(r.Thoi_gian_thi_nghiem_tiep_theo);if(!isNaN(nd)){if(nd<today)ts[t].overdue++;else if(nd<=in30)ts[t].soon++;}if(r.Ngay_thi_nghiem)ts[t].done++;});
-  const capLbl={'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
-  const capCol={'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
-  const tramsSorted=Object.entries(ts).sort((a,b)=>(b[1].overdue*10+b[1].soon)-(a[1].overdue*10+a[1].soon));
-
-  overlay.innerHTML=`<div style="padding:0 0 32px">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-      <div style="width:34px;height:34px;border-radius:8px;background:rgba(0,230,118,.15);color:#00e676;display:flex;align-items:center;justify-content:center"><i class="fas fa-map-marked-alt" style="font-size:15px"></i></div>
-      <div><div style="font-size:16px;font-weight:800;color:var(--text-primary)">Bản đồ & Danh sách trạm</div>
-        <div style="font-size:10px;color:var(--text-muted)">Màu sắc = mức độ cảnh báo TN</div></div>
-      <button onclick="navActivate(document.querySelector('.nav-item'))" style="margin-left:auto;padding:6px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:var(--text-primary);font-size:10px;cursor:pointer"><i class="fas fa-arrow-left" style="margin-right:5px"></i>Dashboard</button>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
-      <div style="background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.2);border-radius:8px;padding:8px 12px">
-        <div style="font-size:9px;color:var(--text-muted)">Tổng trạm</div>
-        <div style="font-size:20px;font-weight:800;color:var(--accent)">${fmt(Object.keys(ts).length)}</div>
-      </div>
-      <div style="background:rgba(255,82,82,.08);border:1px solid rgba(255,82,82,.2);border-radius:8px;padding:8px 12px">
-        <div style="font-size:9px;color:var(--text-muted)">Có TB quá hạn</div>
-        <div style="font-size:20px;font-weight:800;color:#ff5252">${fmt(Object.values(ts).filter(s=>s.overdue>0).length)}</div>
-      </div>
-      <div style="background:rgba(255,215,64,.07);border:1px solid rgba(255,215,64,.2);border-radius:8px;padding:8px 12px">
-        <div style="font-size:9px;color:var(--text-muted)">Sắp hạn 30n</div>
-        <div style="font-size:20px;font-weight:800;color:#ffd740">${fmt(Object.values(ts).filter(s=>s.soon>0).length)}</div>
-      </div>
-      <div style="background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.2);border-radius:8px;padding:8px 12px">
-        <div style="font-size:9px;color:var(--text-muted)">Bình thường</div>
-        <div style="font-size:20px;font-weight:800;color:#00e676">${fmt(Object.values(ts).filter(s=>s.overdue===0&&s.soon===0).length)}</div>
-      </div>
-    </div>
-    <div style="border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.1);margin-bottom:14px">
-      <div id="_mapEl" style="height:400px;background:#1a1f2e"></div>
-    </div>
-    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px">
-      <div style="font-size:10px;font-weight:700;color:var(--text-muted);margin-bottom:10px">DANH SÁCH TRẠM THEO MỨC ĐỘ CẢNH BÁO</div>
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:10px">
-          <thead><tr style="border-bottom:1px solid rgba(255,255,255,.08)">
-            <th style="padding:5px 10px;text-align:left;font-size:9px;color:var(--text-muted)">Trạm</th>
-            <th style="padding:5px 10px;text-align:left;font-size:9px;color:var(--text-muted)">Cấp ĐA</th>
-            <th style="padding:5px 10px;text-align:right;font-size:9px;color:var(--text-muted)">Tổng TB</th>
-            <th style="padding:5px 10px;text-align:right;font-size:9px;color:#ff5252">Quá hạn</th>
-            <th style="padding:5px 10px;text-align:right;font-size:9px;color:#ffd740">Sắp hạn</th>
-            <th style="padding:5px 10px;text-align:right;font-size:9px;color:#00e676">Đã TN</th>
-            <th style="padding:5px 10px;text-align:left;font-size:9px;color:var(--text-muted)">Trạng thái</th>
-          </tr></thead>
-          <tbody>${tramsSorted.map(([t,s],i)=>{
-            const status=s.overdue>0?`<span style="color:#ff5252;font-weight:700">⚠ ${s.overdue} quá hạn</span>`:s.soon>0?`<span style="color:#ffd740">⏰ ${s.soon} sắp hạn</span>`:`<span style="color:#00e676">✓ Bình thường</span>`;
-            return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);${i%2?'background:rgba(255,255,255,.02)':''}">
-              <td style="padding:5px 10px;font-weight:600">${t}</td>
-              <td style="padding:5px 10px"><span style="color:${capCol[s.cap]||'#888'};font-size:9px;font-weight:700">${capLbl[s.cap]||s.cap||'—'}</span></td>
-              <td style="padding:5px 10px;text-align:right;font-family:var(--font-mono)">${fmt(s.total)}</td>
-              <td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);color:${s.overdue>0?'#ff5252':'rgba(255,255,255,.2)'}">${s.overdue||'—'}</td>
-              <td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);color:${s.soon>0?'#ffd740':'rgba(255,255,255,.2)'}">${s.soon||'—'}</td>
-              <td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);color:#00e676">${fmt(s.done)}</td>
-              <td style="padding:5px 10px">${status}</td>
-            </tr>`;
-          }).join('')}</tbody>
-        </table>
-      </div>
-    </div>
-  </div>`;
-
-  // Load Leaflet
-  function initMap(){
-    const el=document.getElementById('_mapEl');if(!el||!window.L)return;
-    try{
-      const map=L.map(el,{center:[21.028,105.804],zoom:11});
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',maxZoom:19}).addTo(map);
-      Object.entries(ts).forEach(([t,s],i)=>{
-        const col=s.overdue>0?'#ff5252':s.soon>0?'#ffd740':'#00e676';
-        const r=s.total>50?14:s.total>20?10:7;
-        const lat=21.05-(i%8)*0.04+Math.sin(i*1.3)*0.008;
-        const lng=105.78+Math.floor(i/8)*0.045+Math.cos(i*1.3)*0.008;
-        L.circleMarker([lat,lng],{radius:r,color:col,fillColor:col,fillOpacity:0.75,weight:2}).bindPopup(`<b>${t}</b><br>TB: ${s.total}${s.overdue?`<br><span style='color:#e00'>⚠ Quá hạn: ${s.overdue}</span>`:''}${s.soon?`<br><span style='color:#fa0'>⏰ Sắp hạn: ${s.soon}</span>`:''}${!s.overdue&&!s.soon?`<br><span style='color:#0a0'>✓ Bình thường</span>`:''}`).addTo(map);
-      });
-    }catch(e){console.warn('Leaflet error:',e);}
-  }
-  if(!window.L){
-    const lk=document.createElement('link');lk.rel='stylesheet';lk.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';document.head.appendChild(lk);
-    const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';sc.onload=initMap;document.head.appendChild(sc);
-  } else {setTimeout(initMap,100);}
-}
-
-// ══════════════════════════════════════════════════════
-// ROUTE NEW PAGES via navActivate override
-// ══════════════════════════════════════════════════════
-const _navExtMap = {
-  'Quản lý BBTN': _bbtnRenderPage,
-  'Cảnh báo thông minh': _alertRenderPage,
-  'Tiến độ kế hoạch': _progressRenderPage,
-  'Bản đồ trạm': _mapRenderPage,
-};
-(function() {
-  const orig = window.navActivate;
-  window.navActivate = function(el) {
-    const text = (el.querySelector('span')?.textContent || el.textContent || '').trim();
-    if (_navExtMap[text]) {
-      document.querySelectorAll('.nav-item.active,.nav-sub-item.active').forEach(e=>e.classList.remove('active'));
-      el.classList.add('active');
-      const ov=document.getElementById('tbPageOverlay'),cv=document.getElementById('canvasArea'),rp=document.querySelector('.props-panel');
-      if(ov){if(cv)cv.style.display='none';if(rp)rp.style.display='none';ov.style.display='block';}
-      const fn = _navExtMap[text];
-      if(_tnRawData.length||_tnAllData.length){fn();}
-      else{if(ov)ov.innerHTML='<div style="padding:40px;text-align:center;color:var(--text-muted)"><i class="fas fa-spinner fa-spin" style="color:var(--accent);margin-right:8px"></i>Đang tải...</div>';_tnFetchData().then(rows=>{_tnRawData=rows;_tnAllData=rows;fn();});}
-      return;
-    }
-    if (orig) orig.call(this, el);
-  };
-})();
-
 
 </script>
 
