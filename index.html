@@ -3311,7 +3311,7 @@ const DEFS = {
     defaultProps: { visible: true, sticky: false, bgColor: '#111720', borderRadius: 8, padding: 12, layout: '50/50' }
   },
   timeline: {
-    label: 'Năm sản xuất', badgeClass: 'badge-timeline', badgeText: 'TIMELINE',
+    label: 'Năm vận hành', badgeClass: 'badge-timeline', badgeText: 'TIMELINE',
     dotColor: '#18ffff', headerColor: '#18ffff', icon: 'fas fa-stream', id: 'chartTN',
     defaultProps: { visible: true, sticky: false, bgColor: '#111720', borderRadius: 8, padding: 12, months: 24 }
   },
@@ -4942,29 +4942,19 @@ function getPreview(type, props) {
           ${extraHtml}
         </div>
       ` : `
-                <div class="ic-body" style="${isComputed?'flex-direction:row;align-items:stretch;gap:10px;':''}">
+                <div class="ic-body" style="${isComputed?'flex-direction:row;align-items:stretch;gap:10px':''}">
           ${isComputed ? (()=>{
-            const digits=String(c.value||'').replace(/[^0-9]/g,'').length;
-            const autoFs=digits<=2?58:digits<=3?48:digits<=4?40:digits<=5?32:26;
-            const fs=c.valSize?Math.max(c.valSize,autoFs):autoFs;
-            return `
-            <div style="display:flex;flex-direction:column;justify-content:space-between;flex:1;min-width:0">
-              <div class="ic-icon" style="font-size:${c.iconSize||20}px;filter:brightness(1.2);cursor:pointer"
-                onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\'")}','${c.color}')"
-              >${c.icon||'▣'}</div>
-              <div class="ic-lbl" style="cursor:pointer;user-select:none;color:rgba(195,215,235,.88);font-size:clamp(9px,.85vw,11.5px);font-weight:500;line-height:1.3;white-space:normal"
-                data-uid="${uid}" data-ci="${ci}" data-field="label"
-                onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\'")}','${c.color}')"
-              >${c.label}</div>
+            const vStr=String(c.value||'');
+            const digits=vStr.replace(/[^0-9]/g,'').length;
+            const fs=digits<=2?58:digits<=3?48:digits<=4?40:digits<=5?32:26;
+            return `<div style="display:flex;flex-direction:column;justify-content:space-between;flex:1;min-width:0;cursor:pointer"
+              onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\\'")}','${c.color}')">
+              <div style="font-size:${c.iconSize||20}px;filter:brightness(1.2)">${c.icon||'▣'}</div>
+              <div style="font-size:clamp(9px,.85vw,11.5px);font-weight:500;color:rgba(195,215,235,.9);white-space:normal;line-height:1.3">${c.label}</div>
             </div>
-            <div class="ic-val" data-computed="true" data-autosize="${autoFs}"
-              style="color:${c.color};font-size:${fs}px;cursor:pointer;user-select:none;
-                     font-weight:900;letter-spacing:-0.05em;line-height:1;
-                     align-self:center;flex-shrink:0;text-align:right;
-                     filter:brightness(1.3);
-                     text-shadow:0 0 28px ${c.color}99,0 0 55px ${c.color}44"
-              data-uid="${uid}" data-ci="${ci}" data-field="value"
-              onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\'")}','${c.color}')"
+            <div data-computed="true"
+              style="color:${c.color};font-size:${fs}px;font-weight:900;letter-spacing:-0.05em;line-height:1;align-self:center;flex-shrink:0;text-align:right;cursor:pointer;filter:brightness(1.3);text-shadow:0 0 28px ${c.color}88"
+              onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\\'")}','${c.color}')"
             >${c.value}</div>`;
           })() : `
           <div class="ic-icon" contenteditable="true" spellcheck="false"
@@ -7093,8 +7083,15 @@ function lytTLBucketClick(type, bucketKey, bucketLabel, color) {
       const yrs=[...info.years].sort();
       const yrStr=yrs.length?(yrs[0]===yrs[yrs.length-1]?`${yrs[0]}`:`${yrs[0]}–${yrs[yrs.length-1]}`):'—';
       const ages=yrs.map(y=>nowY-y);
-      const ageStr=ages.length?`~${Math.round(ages.reduce((s,a)=>s+a,0)/ages.length)}n`:'';
-      items.push({text:t,badge:`${info.qty}TB · ${yrStr}${ageStr?' · '+ageStr:''}`,color:capColor[cap]||'#888'});
+      const ageStr=ages.length?`~${Math.round(ages.reduce((s,a)=>s+a,0)/ages.length)} năm`:'';
+      const tDevices=matched.filter(d=>(d.Tram||'').trim()===t).map(d=>{
+        const nvh=Number(d.Nam_van_hanh)||0,nsx=Number(d.Nam_san_xuat)||0;
+        const refY=nvh>1970?nvh:(nsx>1970?nsx:0);
+        const dAge=refY>0?(nowY-refY):-1;
+        const dn=(d.Ten_thiet_bi||d.Ngan_thiet_bi||d.Phan_loai_thiet_bi||'—').trim();
+        return `${dn}${refY?' · '+refY:''}${dAge>=0?' · ~'+dAge+' năm':''}`;
+      });
+      items.push({text:t,badge:`${info.qty}TB · ${yrStr}${ageStr?' · '+ageStr:''}`,color:capColor[cap]||'#888',detail:tDevices});
     });
   });
   const totalQty = matched.reduce((s,d)=>s+(Number(d.So_luong)||1),0);
@@ -7112,16 +7109,31 @@ function _lytShowDetailPanel(title, color, totalLine, items, mbaSection) {
     p.className = 'hm-detail-panel';
     document.body.appendChild(p);
   }
+  let _pIdx=0;
   const bodyHtml = items.map(item => {
-    if (item.isGroup) return `<div class="hm-detail-group" style="color:${item.color}">${item.text}</div>`;
-    const detHtml = item.detail
-      ? `<div class="hm-detail-sub-list">${item.detail.map(n=>`<div class="hm-detail-sub-item">• ${n}</div>`).join('')}</div>`
-      : '';
+    if (item.isGroup) return `<div style="padding:9px 16px 4px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${item.color};border-bottom:1px solid rgba(255,255,255,.06);opacity:.9">${item.text}</div>`;
     const badge = item.badge || item.sub || '';
-    return `<div class="hm-detail-row" data-search="${(item.text||'').toLowerCase()}">
-      <span class="hm-dr-name">${item.text}</span>
-      <span class="hm-dr-badge" style="background:${item.color}22;color:${item.color}">${badge}</span>
-    </div>${detHtml}`;
+    const hasDetail = Array.isArray(item.detail) && item.detail.length > 0;
+    const uid = 'pd'+(++_pIdx);
+    const detHtml = hasDetail
+      ? `<div id="${uid}" style="display:none;border-bottom:1px solid rgba(255,255,255,.06)">${
+          item.detail.map(n=>`<div style="padding:4px 12px 4px 32px;font-size:10.5px;color:rgba(175,205,225,.85);display:flex;align-items:flex-start;gap:5px;border-bottom:1px solid rgba(255,255,255,.03)">
+            <span style="color:${item.color};opacity:.55;flex-shrink:0;margin-top:1px">▸</span>
+            <span>${n}</span>
+          </div>`).join('')
+        }</div>`
+      : '';
+    const togBtn = hasDetail
+      ? `<button onclick="event.stopPropagation();(function(btn,id){var el=document.getElementById(id);if(!el)return;var op=el.style.display!=='none';el.style.display=op?'none':'block';btn.textContent=op?'+':'-';btn.style.background=op?'rgba(255,255,255,.06)':'rgba(0,200,255,.15)';btn.style.color=op?'rgba(220,235,250,.8)':'var(--accent)';})(this,'${uid}')" style="width:20px;height:20px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(220,235,250,.8);font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;transition:all .15s">+</button>`
+      : `<span style="width:20px;flex-shrink:0;display:inline-block"></span>`;
+    return `<div style="border-bottom:1px solid rgba(255,255,255,.05)">
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 14px">
+        ${togBtn}
+        <span style="font-size:12px;color:rgba(215,232,248,.92);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${item.text}</span>
+        <span style="background:${item.color}25;color:${item.color};font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0">${badge}</span>
+      </div>
+      ${detHtml}
+    </div>`;
   }).join('');
 
   p.innerHTML = `
@@ -7750,14 +7762,20 @@ function lytStatsCardClick(label, color) {
     case 'TBA 220kV': {
       title = '⚡ TBA 220kV';
       const list = filteredTrams.filter(t => tramMaxCap[t] === '2');
-      list.forEach(t => items.push({ text: t, sub: '220kV', color: LYT_CAP_COLORS['2'] }));
+      list.forEach(t => {
+        const ngans=[...new Set(rows.filter(r=>(r.Tram||'').trim()===t).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))].sort();
+        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS['2'], detail: ngans });
+      });
       totalLine = `${list.length} trạm`;
       break;
     }
     case 'TBA 110kV': {
       title = '⚡ TBA 110kV';
       const list = filteredTrams.filter(t => tramMaxCap[t] === '1');
-      list.forEach(t => items.push({ text: t, sub: '110kV', color: LYT_CAP_COLORS['1'] }));
+      list.forEach(t => {
+        const ngans=[...new Set(rows.filter(r=>(r.Tram||'').trim()===t).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))].sort();
+        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS['1'], detail: ngans });
+      });
       totalLine = `${list.length} trạm`;
       break;
     }
@@ -7908,16 +7926,25 @@ function lytStatsCardClick(label, color) {
     case 'Tổng số thiết bị': {
       title = '📦 Tổng số thiết bị';
       const byType = {};
+      const nowY3=new Date().getFullYear();
       rows.forEach(r => {
         const pl = (r.Phan_loai_thiet_bi||'Khác').trim();
-        if (!byType[pl]) byType[pl] = { qty: 0, trams: new Set() };
+        if (!byType[pl]) byType[pl] = { qty: 0, trams: {} };
         byType[pl].qty += Number(r.So_luong)||1;
-        if (r.Tram) byType[pl].trams.add((r.Tram||'').trim());
+        const t=(r.Tram||'').trim();
+        if(t){if(!byType[pl].trams[t])byType[pl].trams[t]=[];byType[pl].trams[t].push(r);}
       });
       const sorted = Object.entries(byType).sort((a,b) => b[1].qty - a[1].qty);
       const total = sorted.reduce((s,[,v]) => s + v.qty, 0);
       sorted.forEach(([pl, v]) => {
-        items.push({ text: pl, sub: `${v.qty.toLocaleString('vi-VN')} TB / ${v.trams.size} trạm`, color: LYT_CAP_COLORS['1']||'#18ffff' });
+        const tramList=Object.entries(v.trams).sort((a,b)=>b[1].length-a[1].length);
+        const detail=tramList.map(([t,rs])=>{
+          const cap=tramMaxCap[t]||'';
+          const capTag=cap?` [${capLbl[cap]||cap}]`:'';
+          const devNames=[...new Set(rs.map(r=>(r.Ten_thiet_bi||r.Ngan_thiet_bi||'').trim()).filter(Boolean))].slice(0,4).join(', ');
+          return `${t}${capTag} — ${rs.length} TB${devNames?': '+devNames:''}`;
+        });
+        items.push({ text: pl, sub: `${v.qty.toLocaleString('vi-VN')} TB · ${tramList.length} trạm`, color: LYT_CAP_COLORS['1']||'#18ffff', detail });
       });
       totalLine = `${total.toLocaleString('vi-VN')} thiết bị · ${sorted.length} loại`;
       break;
@@ -8819,12 +8846,15 @@ function _tbStats(rows) {
 function _tbStatCardClick(key) {
   const rows = _tbFiltered.length ? _tbFiltered : _tbData;
   const capPrio = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
+  const capLbl2 = {'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+  const capCol2 = {'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
   const tramMaxCap = {};
   rows.forEach(d => {
     const t=(d.Tram||'').trim(); if(!t) return;
     const c=String(d.Cap_dien_ap??''); if(!c||c==='null') return;
     if(!tramMaxCap[t]||(capPrio[c]??99)<(capPrio[tramMaxCap[t]]??99)) tramMaxCap[t]=c;
   });
+  const nowY=new Date().getFullYear();
   const fmt = n => Number(n).toLocaleString('vi-VN');
 
   let title='', totalLine='', bodyHtml='';
@@ -8881,7 +8911,7 @@ function _tbStatCardClick(key) {
           <div style="font-size:10px;color:var(--text-secondary)">${r.Ten_thiet_bi||r.Phan_loai_thiet_bi||'—'}</div>
           <div style="font-size:9px;color:var(--text-muted);margin-top:1px">${r.Tram||'—'} ${cap?'· <span style="color:'+capCol[cap]+'">'+capLbl[cap]+'</span>':''}</div>
         </div>
-        <span style="font-size:11px;font-weight:700;color:${age>=25?'#ff5252':'#ffd740'};font-family:var(--font-mono)">${age}n</span>
+        <span style="font-size:11px;font-weight:700;color:${age>=25?'#ff5252':'#ffd740'};font-family:var(--font-mono)">${age} năm</span>
       </div>`;
     }).join('')+(old15.length>200?`<div style="padding:10px 16px;text-align:center;font-size:9px;color:var(--text-muted)">...và ${old15.length-200} thiết bị khác</div>`:'');
 
@@ -8906,21 +8936,72 @@ function _tbStatCardClick(key) {
     }).join('');
   }
 
-  // Show detail panel (reuse hm-detail-panel)
+  // Build items array and delegate to _lytShowDetailPanel
   const colorMap={'total':'#00c8ff','trams':'#00e676','gt15':'#ff5252','hangs':'#ffd740'};
   const col=colorMap[key]||'var(--accent)';
-  let p=document.getElementById('hm-detail-panel');
-  if(!p){p=document.createElement('div');p.id='hm-detail-panel';p.className='hm-detail-panel';document.body.appendChild(p);}
-  p.innerHTML=`
-    <div class="hm-resize-grip"></div>
-    <div class="hm-detail-hd" style="border-left:3px solid ${col}">
-      <span style="color:${col}">${title}</span>
-      <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span>
-    </div>
-    <div style="padding:8px 16px;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">${totalLine}</div>
-    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">${bodyHtml||'<div style=\'padding:24px;text-align:center;color:var(--text-muted)\'>Không có dữ liệu</div>'}</div>`;
-  p.classList.add('open');
-  _hmOpenPanel(p);
+  const items=[];
+
+  if(key==='total'){
+    const byType={};
+    rows.forEach(r=>{
+      const pl=(r.Phan_loai_thiet_bi||'Khác').trim();
+      if(!byType[pl])byType[pl]={qty:0,trams:{}};
+      byType[pl].qty+=(Number(r.So_luong)||1);
+      const t=(r.Tram||'').trim();
+      if(t){if(!byType[pl].trams[t])byType[pl].trams[t]=[];byType[pl].trams[t].push(r);}
+    });
+    Object.entries(byType).sort((a,b)=>b[1].qty-a[1].qty).forEach(([pl,v])=>{
+      const tList=Object.entries(v.trams).sort((a,b)=>b[1].length-a[1].length);
+      const detail=tList.map(([t,rs])=>{
+        const cap=tramMaxCap[t]||'';
+        const devNames=rs.slice(0,5).map(r=>(r.Ten_thiet_bi||r.Ngan_thiet_bi||'—').trim()).filter((x,i,a)=>a.indexOf(x)===i);
+        return `${t}${cap?` [${capLbl2[cap]||cap}]`:''} — ${rs.length} TB: ${devNames.join(', ')}${rs.length>5?'…':''}`;
+      });
+      items.push({text:pl,badge:`${fmt(v.qty)} TB · ${tList.length} trạm`,color:'#00c8ff',detail});
+    });
+  } else if(key==='trams'){
+    const byTram={};
+    rows.forEach(r=>{const t=(r.Tram||'').trim();if(!t)return;if(!byTram[t])byTram[t]=[];byTram[t].push(r);});
+    // Group by cap
+    const byCap={};
+    Object.entries(byTram).forEach(([t,rs])=>{const cap=tramMaxCap[t]||'?';if(!byCap[cap])byCap[cap]=[];byCap[cap].push([t,rs]);});
+    ['2','1','3','4','9','6','0'].forEach(cap=>{
+      const arr=byCap[cap];if(!arr||!arr.length)return;
+      items.push({isGroup:true,text:`── ${capLbl2[cap]||cap} (${arr.length} trạm) ──`,color:capCol2[cap]||'#888'});
+      arr.sort((a,b)=>a[0].localeCompare(b[0],'vi')).forEach(([t,rs])=>{
+        const byType2={};rs.forEach(r=>{const pl=(r.Phan_loai_thiet_bi||'?').trim();if(!byType2[pl])byType2[pl]=0;byType2[pl]+=(Number(r.So_luong)||1);});
+        const detail=Object.entries(byType2).sort((a,b)=>b[1]-a[1]).map(([pl,n])=>`${pl}: ${fmt(n)} TB`);
+        items.push({text:t,badge:`${fmt(rs.length)} TB`,color:capCol2[cap]||'#00e676',detail});
+      });
+    });
+  } else if(key==='gt15'){
+    const old15=rows.filter(r=>_tbAge(r)>=15).sort((a,b)=>_tbAge(b)-_tbAge(a));
+    const byTram={};
+    old15.forEach(r=>{const t=(r.Tram||'').trim();if(!byTram[t])byTram[t]=[];byTram[t].push(r);});
+    Object.entries(byTram).sort((a,b)=>{
+      const pa=capPrio[tramMaxCap[a[0]]]??9,pb=capPrio[tramMaxCap[b[0]]]??9;
+      return pa!==pb?pa-pb:a[0].localeCompare(b[0],'vi');
+    }).forEach(([t,rs])=>{
+      const cap=tramMaxCap[t]||'';
+      const detail=rs.slice(0,20).map(r=>{
+        const age=_tbAge(r),nvh=Number(r.Nam_van_hanh)||0;
+        return `${(r.Ten_thiet_bi||r.Phan_loai_thiet_bi||'—').trim()}${nvh>1970?' · '+nvh:''} · ${age} năm VH`;
+      });
+      items.push({text:t,badge:`${rs.length} TB · max ${_tbAge(rs[0])} năm`,color:cap?capCol2[cap]:'#ff5252',detail});
+    });
+  } else if(key==='hangs'){
+    const byHang={};
+    rows.forEach(r=>{const h=(r.Hang_san_xuat||'').trim();if(!h)return;if(!byHang[h])byHang[h]={qty:0,years:new Set(),trams:new Set()};byHang[h].qty+=(Number(r.So_luong)||1);const y=Number(r.Nam_san_xuat);if(y>1970)byHang[h].years.add(y);const t=(r.Tram||'').trim();if(t)byHang[h].trams.add(t);});
+    Object.entries(byHang).sort((a,b)=>b[1].qty-a[1].qty).forEach(([h,v])=>{
+      const ys=[...v.years].sort((a,b)=>a-b);
+      const yrStr=ys.length?`${ys[0]}${ys.length>1?'–'+ys[ys.length-1]:''}`:'-';
+      const detail=[...v.trams].sort().map(t=>`Trạm ${t}`);
+      items.push({text:`${h} (${yrStr})`,badge:`${fmt(v.qty)} TB · ${v.trams.size} trạm`,color:'#ffd740',detail});
+    });
+  }
+
+  if(!items.length) items.push({text:'Không có dữ liệu',badge:'',color:'#ff5252'});
+  _lytShowDetailPanel(title,col,totalLine,items);
 }
 
 // ── TABLE ─────────────────────────────────────────────────────
@@ -9038,7 +9119,7 @@ function _tbShowLyLich(idx) {
     <div style="padding:14px 20px;flex:1;overflow-y:auto">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
         ${[['Loại thiết bị',r.Phan_loai_thiet_bi,'#00c8ff'],['Số lượng',r.So_luong??'—','#00e676'],
-           ['Hãng sản xuất',r.Hang_san_xuat,'#ffd740'],['Năm sản xuất',r.Nam_san_xuat,'#ffd740'],
+           ['Hãng sản xuất',r.Hang_san_xuat,'#ffd740'],['Năm vận hành',r.Nam_van_hanh,'#00c8ff'],
            ['Năm vận hành',r.Nam_van_hanh,'#00c8ff'],['Thâm niên',age>=0?age+' năm':'—',age>=15?'#ff5252':age>=10?'#ffd740':'#00e676'],
            ['Công suất (MVA)',r.Cong_suat,'#b388ff'],['Đội quản lý',r.Doi,'#888']
         ].map(([l,v,col])=>`<div style="background:rgba(255,255,255,.04);border-radius:7px;padding:8px 10px;border:1px solid rgba(255,255,255,.07)">
@@ -10197,11 +10278,15 @@ function _bcRenderByMonth(conf) {
 
   // Helper: build styled dropdown
   function mkBcDd(key, dflt, val, items, labelFn) {
-    const active = !!val;
-    const ddStyle = `display:inline-flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;border-radius:7px;border:1px solid ${active?'var(--accent)':'rgba(0,200,255,.4)'};background:${active?'rgba(0,200,255,.1)':'var(--bg-elevated)'};color:${active?'var(--accent)':'var(--text-primary)'};font-family:var(--font-mono);font-size:11px;cursor:pointer;outline:none;min-width:120px;white-space:nowrap;position:relative`;
-    const lbl = val ? (labelFn ? labelFn(val) : val) : dflt;
-    return `<button style="${ddStyle}" onclick="_bcBmDropdown(this,'${key}',${JSON.stringify(items)},${JSON.stringify(dflt)})">
-      <span>${lbl}</span><i class="fas fa-chevron-down" style="font-size:8px;opacity:.6"></i>
+    if(!window._bcDdStore)window._bcDdStore={};
+    window._bcDdStore[key]={items,dflt};
+    const active=!!val;
+    const lbl=val?(labelFn?labelFn(val):val):dflt;
+    const brd=active?'var(--accent)':'rgba(0,200,255,.4)';
+    const bg=active?'rgba(0,200,255,.1)':'var(--bg-elevated)';
+    const col=active?'var(--accent)':'var(--text-primary)';
+    return `<button data-bckey="${key}" style="display:inline-flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;border-radius:7px;border:1px solid ${brd};background:${bg};color:${col};font-family:var(--font-mono);font-size:11px;cursor:pointer;outline:none;min-width:115px;white-space:nowrap" onclick="event.stopPropagation();_bcBmDropdown(this,'${key}')">
+      <span>${lbl}</span><i class="fas fa-chevron-down" style="font-size:8px;opacity:.6;flex-shrink:0"></i>
     </button>`;
   }
 
@@ -10220,26 +10305,22 @@ function _bcRenderByMonth(conf) {
     <span style="margin-left:auto;font-size:10px;font-family:var(--font-mono);color:var(--text-muted)">${fmt(data.length)} bản ghi</span>
   </div>
 
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
-    <div style="background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
-      onclick="_bcStatClick('total',rawData)" onmouseenter="this.style.borderColor='rgba(0,200,255,.5)'" onmouseleave="this.style.borderColor='rgba(0,200,255,.2)'">
-      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-list" style="margin-right:4px"></i>Tổng bản ghi</div>
-      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:var(--accent);margin-bottom:6px">${fmt(data.length)}</div>
-      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:100%;background:#00c8ff;border-radius:2px"></div></div>
-    </div>
-    <div style="background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
-      onclick="_bcStatClick('done',rawData)" onmouseenter="this.style.borderColor='rgba(0,230,118,.5)'" onmouseleave="this.style.borderColor='rgba(0,230,118,.2)'">
-      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-check-circle" style="margin-right:4px"></i>Đã thí nghiệm (có ngày TN)</div>
-      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:#00e676;margin-bottom:6px">${fmt(totalDone)}</div>
-      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${data.length>0?Math.round(totalDone/data.length*100):0}%;background:#00e676;border-radius:2px;transition:width .4s"></div></div>
-    </div>
-    <div style="background:rgba(255,215,64,.07);border:1px solid rgba(255,215,64,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
-      onclick="_bcStatClick('months',rawData)" onmouseenter="this.style.borderColor='rgba(255,215,64,.5)'" onmouseleave="this.style.borderColor='rgba(255,215,64,.2)'">
-      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-calendar" style="margin-right:4px"></i>Số tháng có TN</div>
-      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:#ffd740;margin-bottom:6px">${months.length}</div>
-      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${Math.min(100,months.length*8)}%;background:#ffd740;border-radius:2px"></div></div>
-    </div>
-  </div>
+  ${(()=>{
+    const _nd=new Date(),_ny=_nd.getFullYear(),_nm=_nd.getMonth()+1;
+    const _xm=_nm===12?1:_nm+1,_xy=_nm===12?_ny+1:_ny;
+    const _tc=rawData.filter(r=>{const ds=r.Thoi_gian_thi_nghiem_tiep_theo;if(!ds)return false;const d=new Date(ds);return d.getFullYear()===_ny&&d.getMonth()+1===_nm;}).length;
+    const _nc=rawData.filter(r=>{const ds=r.Thoi_gian_thi_nghiem_tiep_theo;if(!ds)return false;const d=new Date(ds);return d.getFullYear()===_xy&&d.getMonth()+1===_xm;}).length;
+    const _sc=(icon,col,bg,brd,lbl,val,pct,key)=>`<div style="background:${bg};border:1px solid ${brd};border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s" onclick="_bcStatClick('${key}',rawData)" onmouseenter="this.style.borderColor='${col}'" onmouseleave="this.style.borderColor='${brd}'">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas ${icon}" style="margin-right:4px;color:${col}"></i>${lbl}</div>
+      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:${col};margin-bottom:6px">${fmt(val)}</div>
+      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${Math.min(100,pct)}%;background:${col};border-radius:2px;transition:width .4s"></div></div>
+    </div>`;
+    return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+      ${_sc('fa-database','#00c8ff','rgba(0,200,255,.07)','rgba(0,200,255,.2)','Tổng số thiết bị',rawData.length,100,'total')}
+      ${_sc('fa-calendar-check','#00e676','rgba(0,230,118,.07)','rgba(0,230,118,.2)',`Phải TN tháng ${_nm}/${_ny}`,_tc,Math.min(100,_tc/Math.max(rawData.length,1)*1000),'thismon')}
+      ${_sc('fa-calendar-plus','#ffd740','rgba(255,215,64,.07)','rgba(255,215,64,.2)',`Phải TN tháng ${_xm}/${_xy}`,_nc,Math.min(100,_nc/Math.max(rawData.length,1)*1000),'nextmon')}
+    </div>`;
+  })()}
 
   <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:14px">
     <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:12px">BIỂU ĐỒ KHỐI LƯỢNG THEO THÁNG</div>
@@ -10282,7 +10363,9 @@ function _bcRenderByMonth(conf) {
 }
 
 // ── DROPDOWN HANDLER for by-month report ──────────────────────
-function _bcBmDropdown(btn, key, items, dflt) {
+function _bcBmDropdown(btn, key) {
+  const _s=(window._bcDdStore||{})[key]||{items:[],dflt:''};
+  const items=_s.items, dflt=_s.dflt;
   const ex = document.getElementById('_bcBmDdList');
   if (ex) { if (ex.dataset.key===key) { ex.remove(); return; } ex.remove(); }
   const list = document.createElement('div');
@@ -10474,7 +10557,28 @@ function _bcRenderEarlyPlan(conf) {
 function _bcStatClick(key, data) {
   const fmt = n => Number(n).toLocaleString('vi-VN');
   const fmtD = v => { if(!v) return '—'; const d=new Date(v); return isNaN(d)?v:d.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'}); };
+  const rawAll=_tnRawData.length?_tnRawData:(_tnAllData.length?_tnAllData:[]);
+  const _cL={'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+  const _cC={'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
   let title='', totalLine='', bodyHtml='', col='var(--accent)';
+
+  if(key==='thismon'||key==='nextmon'){
+    const now=new Date(),nowY=now.getFullYear(),nowM=now.getMonth()+1;
+    const tM=key==='thismon'?nowM:(nowM===12?1:nowM+1),tY=key==='thismon'?nowY:(nowM===12?nowY+1:nowY);
+    col=key==='thismon'?'#00e676':'#ffd740';
+    title=`📅 Phải TN tháng ${tM}/${tY}`;
+    const filtered=rawAll.filter(r=>{const ds=r.Thoi_gian_thi_nghiem_tiep_theo;if(!ds)return false;const d=new Date(ds);return d.getFullYear()===tY&&d.getMonth()+1===tM;});
+    const byType={};
+    filtered.forEach(r=>{const tp=(r.Phan_loai_thiet_bi||'Khác').trim(),t=(r.Tram||'—').trim();if(!byType[tp])byType[tp]={total:0,trams:{}};byType[tp].total++;if(!byType[tp].trams[t])byType[tp].trams[t]=[];byType[tp].trams[t].push(r);});
+    const types=Object.keys(byType).sort((a,b)=>byType[b].total-byType[a].total);
+    totalLine=`${fmt(filtered.length)} thiết bị · ${types.length} loại · ${new Set(filtered.map(r=>(r.Tram||'').trim())).size} trạm`;
+    const items2=types.map(tp=>{
+      const ti=byType[tp],trams=Object.keys(ti.trams).sort((a,b)=>a.localeCompare(b,'vi'));
+      const detail=trams.map(t=>{const rs=ti.trams[t];return `${t} [${_cL[String(rs[0]?.Cap_dien_ap??'')] ||''}] — ${rs.length} TB: ${rs.slice(0,3).map(r=>r.Ten_thiet_bi||r.Ngan_thiet_bi||'—').join(', ')}${rs.length>3?'…':''}`;});
+      return {text:tp,badge:`${fmt(ti.total)}`,color:col,detail};
+    });
+    _lytShowDetailPanel(title,col,totalLine,items2); return;
+  }
 
   if (key === 'total') {
     col='#00c8ff'; title='📋 Tổng bản ghi thí nghiệm';
