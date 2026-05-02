@@ -3311,7 +3311,7 @@ const DEFS = {
     defaultProps: { visible: true, sticky: false, bgColor: '#111720', borderRadius: 8, padding: 12, layout: '50/50' }
   },
   timeline: {
-    label: 'Năm sản xuất', badgeClass: 'badge-timeline', badgeText: 'TIMELINE',
+    label: 'Năm vận hành', badgeClass: 'badge-timeline', badgeText: 'TIMELINE',
     dotColor: '#18ffff', headerColor: '#18ffff', icon: 'fas fa-stream', id: 'chartTN',
     defaultProps: { visible: true, sticky: false, bgColor: '#111720', borderRadius: 8, padding: 12, months: 24 }
   },
@@ -4942,25 +4942,35 @@ function getPreview(type, props) {
           ${extraHtml}
         </div>
       ` : `
-        <div class="ic-body">
-          <div class="ic-icon" ${isComputed ? '' : 'contenteditable="true" spellcheck="false"'}
+                <div class="ic-body" style="${isComputed?'flex-direction:row;align-items:stretch;gap:10px':''}">
+          ${isComputed ? (()=>{
+            const vStr=String(c.value||'');
+            const digits=vStr.replace(/[^0-9]/g,'').length;
+            const fs=digits<=2?58:digits<=3?48:digits<=4?40:digits<=5?32:26;
+            return `<div style="display:flex;flex-direction:column;justify-content:space-between;flex:1;min-width:0;cursor:pointer"
+              onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\\'")}','${c.color}')">
+              <div style="font-size:${c.iconSize||20}px;filter:brightness(1.2)">${c.icon||'▣'}</div>
+              <div style="font-size:clamp(9px,.85vw,11.5px);font-weight:500;color:rgba(195,215,235,.9);white-space:normal;line-height:1.3">${c.label}</div>
+            </div>
+            <div data-computed="true"
+              style="color:${c.color};font-size:${fs}px;font-weight:900;letter-spacing:-0.05em;line-height:1;align-self:center;flex-shrink:0;text-align:right;cursor:pointer;filter:brightness(1.3);text-shadow:0 0 28px ${c.color}88"
+              onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\\'")}','${c.color}')"
+            >${c.value}</div>`;
+          })() : `
+          <div class="ic-icon" contenteditable="true" spellcheck="false"
             data-uid="${uid}" data-ci="${ci}" data-field="icon"
             style="font-size:${c.iconSize||18}px"
-            ${isComputed ? '' : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'||event.key===\'Tab\'){event.preventDefault();this.closest(\'.ic-card\').querySelector(\'.ic-val\').focus()}"'}
+            onblur="icSave(this)" onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();this.closest('.ic-card').querySelector('.ic-val').focus()}"
           >${c.icon||'▣'}</div>
-          <div class="ic-val" ${isComputed ? 'data-computed="true"' : 'contenteditable="true" spellcheck="false"'}
-            style="color:${c.color};font-size:${c.valSize||26}px;${isComputed?'cursor:pointer;user-select:none':''}"
+          <div class="ic-val" contenteditable="true" spellcheck="false"
+            style="color:${c.color};font-size:${c.valSize||26}px"
             data-uid="${uid}" data-ci="${ci}" data-field="value"
-            ${isComputed
-              ? `onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\\'")}','${c.color}')"`
-              : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'||event.key===\'Tab\'){event.preventDefault();this.closest(\'.ic-card\').querySelector(\'.ic-lbl\').focus()}"'}
+            onblur="icSave(this)" onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();this.closest('.ic-card').querySelector('.ic-lbl').focus()}"
           >${c.value}</div>
-          <div class="${isComputed ? 'ic-lbl' : 'ic-lbl'}" ${isComputed ? 'style="cursor:pointer;user-select:none"' : 'contenteditable="true" spellcheck="false"'}
+          <div class="ic-lbl" contenteditable="true" spellcheck="false"
             data-uid="${uid}" data-ci="${ci}" data-field="label"
-            ${isComputed
-              ? `onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\\'")}','${c.color}')"`
-              : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}"'}
-          >${c.label}</div>
+            onblur="icSave(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"
+          >${c.label}</div>`}
         </div>
       `;
 
@@ -6939,72 +6949,38 @@ function renderTimelineSection() {
   const fmt = n => Number(n).toLocaleString('vi-VN');
 
   // Summary stats
-  let totalAll=0, total15=0, totalLt10=0, totalB1015=0;
-  TL_DEVICE_TYPES.forEach(t => {
-    totalAll  += typeData[t].total;
-    total15   += typeData[t].gt15;
-    totalLt10 += typeData[t].lt10;
-    totalB1015+= typeData[t].b1015;
-  });
+  let totalAll=0, total15=0;
+  TL_DEVICE_TYPES.forEach(t => { totalAll += typeData[t].total; total15 += typeData[t].gt15; });
   const pct15 = totalAll > 0 ? ((total15/totalAll)*100).toFixed(1) : '0.0';
 
-  // Find oldest by Nam_san_xuat (NSX) and Nam_van_hanh (NVH) separately
-  let oldestNSX = nowY, oldestNSXType = '', oldestNSXName = '';
-  let oldestNVH = nowY, oldestNVHType = '', oldestNVHName = '';
-  baseRows.forEach(d => {
-    const nsx = Number(d.Nam_san_xuat);
-    const nvh = Number(d.Nam_van_hanh);
-    if (nsx > 1970 && nsx < oldestNSX) {
-      oldestNSX = nsx; oldestNSXType = (d.Phan_loai_thiet_bi||'').trim();
-      oldestNSXName = (d.Ten_thiet_bi||d.Ngan_thiet_bi||'').trim();
-    }
-    if (nvh > 1970 && nvh < oldestNVH) {
-      oldestNVH = nvh; oldestNVHType = (d.Phan_loai_thiet_bi||'').trim();
-      oldestNVHName = (d.Ten_thiet_bi||d.Ngan_thiet_bi||'').trim();
-    }
+  // Find oldest device
+  let oldestY = nowY, oldestType = '';
+  TL_DEVICE_TYPES.forEach(t => {
+    typeData[t].years.forEach(({y}) => { if(y < oldestY){ oldestY=y; oldestType=t; } });
   });
 
   let html = `
-  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px">
-    <div style="background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:border-color .15s"
-      onclick="lytTLStatClick('lt10',${JSON.stringify(Object.fromEntries(TL_DEVICE_TYPES.map(t=>[t,typeData[t]])))})"
-      onmouseenter="this.style.borderColor='#00c8ff'" onmouseleave="this.style.borderColor='rgba(0,200,255,.2)'">
-      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-leaf" style="margin-right:4px;color:#00c8ff"></i>Thiết bị &lt;10 năm VH</div>
-      <div style="font-size:20px;font-weight:800;font-family:var(--font-mono);color:var(--accent)">${fmt(totalLt10)}</div>
-      <div style="font-size:9px;color:rgba(0,200,255,.6);margin-top:3px">${totalAll>0?((totalLt10/totalAll*100).toFixed(0))+'%':'-'} tổng số</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
+    <div style="background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.2);border-radius:8px;padding:10px 14px">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-calculator" style="margin-right:4px"></i>Tổng phân tích</div>
+      <div style="font-size:20px;font-weight:800;font-family:var(--font-mono);color:var(--accent)">${fmt(totalAll)}</div>
     </div>
-    <div style="background:rgba(255,215,64,.07);border:1px solid rgba(255,215,64,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:border-color .15s"
-      onclick="lytTLStatClick('b1015',${JSON.stringify(Object.fromEntries(TL_DEVICE_TYPES.map(t=>[t,typeData[t]])))})"
-      onmouseenter="this.style.borderColor='#ffd740'" onmouseleave="this.style.borderColor='rgba(255,215,64,.2)'">
-      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-hourglass-half" style="margin-right:4px;color:#ffd740"></i>Thiết bị 10-15 năm VH</div>
-      <div style="font-size:20px;font-weight:800;font-family:var(--font-mono);color:#ffd740">${fmt(totalB1015)}</div>
-      <div style="font-size:9px;color:rgba(255,215,64,.6);margin-top:3px">${totalAll>0?((totalB1015/totalAll*100).toFixed(0))+'%':'-'} tổng số</div>
-    </div>
-    <div style="background:rgba(255,82,82,.07);border:1px solid rgba(255,82,82,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:border-color .15s"
-      onclick="lytTLStatClick('gt15',${JSON.stringify(Object.fromEntries(TL_DEVICE_TYPES.map(t=>[t,typeData[t]])))})"
-      onmouseenter="this.style.borderColor='#ff5252'" onmouseleave="this.style.borderColor='rgba(255,82,82,.2)'">
-      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-exclamation-triangle" style="margin-right:4px;color:#ff5252"></i>Thiết bị &gt;15 năm VH</div>
+    <div style="background:rgba(255,82,82,.07);border:1px solid rgba(255,82,82,.2);border-radius:8px;padding:10px 14px">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>Thiết bị > 15 năm</div>
       <div style="font-size:20px;font-weight:800;font-family:var(--font-mono);color:#ff5252">${fmt(total15)}</div>
-      <div style="font-size:9px;color:rgba(255,82,82,.6);margin-top:3px">${pct15}% tổng số</div>
     </div>
-    <div style="background:rgba(255,145,0,.07);border:1px solid rgba(255,145,0,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:border-color .15s"
-      onclick="lytTLStatClick('oldestNSX',null,baseRows)"
-      onmouseenter="this.style.borderColor='#ff9100'" onmouseleave="this.style.borderColor='rgba(255,145,0,.2)'">
-      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-industry" style="margin-right:4px;color:#ff9100"></i>TB có Năm sản xuất lâu nhất</div>
-      <div style="font-size:17px;font-weight:800;font-family:var(--font-mono);color:#ff9100">${oldestNSX<nowY?oldestNSX+' (~'+(nowY-oldestNSX)+' năm)':'—'}</div>
-      <div style="font-size:9px;color:rgba(255,145,0,.6);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${oldestNSXType}${oldestNSXName?' · '+oldestNSXName:''}">${oldestNSXType||'—'}${oldestNSXName?' · '+oldestNSXName:''}</div>
+    <div style="background:rgba(255,215,64,.07);border:1px solid rgba(255,215,64,.2);border-radius:8px;padding:10px 14px">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-clock" style="margin-right:4px"></i>Thiết bị lâu nhất</div>
+      <div style="font-size:20px;font-weight:800;font-family:var(--font-mono);color:#ffd740">${oldestY < nowY ? oldestY + ' (' + (nowY-oldestY) + 'n)' : '—'}</div>
     </div>
-    <div style="background:rgba(179,136,255,.07);border:1px solid rgba(179,136,255,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:border-color .15s"
-      onclick="lytTLStatClick('oldestNVH',null,baseRows)"
-      onmouseenter="this.style.borderColor='#b388ff'" onmouseleave="this.style.borderColor='rgba(179,136,255,.2)'">
-      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-calendar-alt" style="margin-right:4px;color:#b388ff"></i>TB có Năm vận hành lâu nhất</div>
-      <div style="font-size:17px;font-weight:800;font-family:var(--font-mono);color:#b388ff">${oldestNVH<nowY?oldestNVH+' (~'+(nowY-oldestNVH)+' năm)':'—'}</div>
-      <div style="font-size:9px;color:rgba(179,136,255,.6);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${oldestNVHType}${oldestNVHName?' · '+oldestNVHName:''}">${oldestNVHType||'—'}${oldestNVHName?' · '+oldestNVHName:''}</div>
+    <div style="background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.2);border-radius:8px;padding:10px 14px">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-percent" style="margin-right:4px"></i>Tỷ lệ > 15 năm</div>
+      <div style="font-size:20px;font-weight:800;font-family:var(--font-mono);color:#00e676">${pct15}%</div>
     </div>
   </div>
 
   <div style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.08em;margin-bottom:8px">
-    PHÂN TÍCH THÂM NIÊN VẬN HÀNH THEO LOẠI THIẾT BỊ
+    PHÂN TÍCH THỜI GIAN VẬN HÀNH THEO LOẠI THIẾT BỊ
     <span style="margin-left:12px;font-weight:400">
       ${TL_BUCKETS.map(b=>`<span style="color:${b.color};margin-right:10px">■ ${b.label}</span>`).join('')}
     </span>
@@ -7107,112 +7083,20 @@ function lytTLBucketClick(type, bucketKey, bucketLabel, color) {
       const yrs=[...info.years].sort();
       const yrStr=yrs.length?(yrs[0]===yrs[yrs.length-1]?`${yrs[0]}`:`${yrs[0]}–${yrs[yrs.length-1]}`):'—';
       const ages=yrs.map(y=>nowY-y);
-      const ageStr=ages.length?`~${Math.round(ages.reduce((s,a)=>s+a,0)/ages.length)}n`:'';
-      items.push({text:t,badge:`${info.qty}TB · ${yrStr}${ageStr?' · '+ageStr:''}`,color:capColor[cap]||'#888'});
+      const ageStr=ages.length?`~${Math.round(ages.reduce((s,a)=>s+a,0)/ages.length)} năm`:'';
+      const tDevices=matched.filter(d=>(d.Tram||'').trim()===t).map(d=>{
+        const nvh=Number(d.Nam_van_hanh)||0,nsx=Number(d.Nam_san_xuat)||0;
+        const refY=nvh>1970?nvh:(nsx>1970?nsx:0);
+        const dAge=refY>0?(nowY-refY):-1;
+        const dn=(d.Ten_thiet_bi||d.Ngan_thiet_bi||d.Phan_loai_thiet_bi||'—').trim();
+        return `${dn}${refY?' · '+refY:''}${dAge>=0?' · ~'+dAge+' năm':''}`;
+      });
+      items.push({text:t,badge:`${info.qty}TB · ${yrStr}${ageStr?' · '+ageStr:''}`,color:capColor[cap]||'#888',detail:tDevices});
     });
   });
   const totalQty = matched.reduce((s,d)=>s+(Number(d.So_luong)||1),0);
   _lytShowDetailPanel(`${type} · ${bucketLabel}`, color||'#00c8ff',
     `${totalQty.toLocaleString('vi-VN')} thiết bị · ${tramList.length} trạm`, items);
-}
-
-// ── Timeline stat card click handler ───────────────────────────
-function lytTLStatClick(bucket, typeDataMap, rawRows) {
-  const nowY = new Date().getFullYear();
-  const fmt = n => Number(n).toLocaleString('vi-VN');
-  const capLbl = {'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
-  const capCol = {'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
-  const baseRows = rawRows || (_chipFiltered.length ? _chipFiltered : _chipAllData);
-
-  let title='', color='#00c8ff', items=[], totalLine='';
-
-  if (bucket === 'lt10' || bucket === 'b1015' || bucket === 'gt15') {
-    const labels = {lt10:'< 10 năm VH', b1015:'10–15 năm VH', gt15:'> 15 năm VH'};
-    const colors = {lt10:'#00c8ff', b1015:'#ffd740', gt15:'#ff5252'};
-    title = '⏱ Thiết bị ' + labels[bucket];
-    color = colors[bucket];
-
-    // Filter devices by age bucket
-    const matched = baseRows.filter(d => {
-      const nvh = Number(d.Nam_van_hanh), nsx = Number(d.Nam_san_xuat);
-      const refY = nvh>1970?nvh:(nsx>1970?nsx:0);
-      const age = refY>0?(nowY-refY):-1;
-      if (bucket==='lt10') return age>=0&&age<10;
-      if (bucket==='b1015') return age>=10&&age<15;
-      if (bucket==='gt15') return age>=15;
-      return false;
-    });
-
-    // Group by type → tram
-    const byType = {};
-    matched.forEach(d => {
-      const pl=(d.Phan_loai_thiet_bi||'Khác').trim();
-      const t=(d.Tram||'—').trim();
-      if(!byType[pl])byType[pl]={total:0,trams:{}};
-      byType[pl].total+=(Number(d.So_luong)||1);
-      if(!byType[pl].trams[t])byType[pl].trams[t]=[];
-      byType[pl].trams[t].push(d);
-    });
-
-    const sortedTypes = Object.entries(byType).sort((a,b)=>b[1].total-a[1].total);
-    totalLine = `${fmt(matched.length)} thiết bị · ${sortedTypes.length} loại`;
-
-    sortedTypes.forEach(([pl, v]) => {
-      const tramList = Object.entries(v.trams).sort((a,b)=>b[1].length-a[1].length);
-      const detail = tramList.map(([t, rs]) => {
-        const cap = String(rs[0]?.Cap_dien_ap??'');
-        const devStr = rs.slice(0,4).map(d => {
-          const nvh=Number(d.Nam_van_hanh)||0, nsx=Number(d.Nam_san_xuat)||0;
-          const refY=nvh>1970?nvh:(nsx>1970?nsx:0);
-          const age=refY>0?(nowY-refY):-1;
-          const dn=(d.Ten_thiet_bi||d.Ngan_thiet_bi||'—').trim();
-          return `${dn}${refY?' · '+refY:''}${age>=0?' · ~'+age+' năm':''}`;
-        }).join(' | ');
-        return `${t}${cap&&cap!=='null'?' ['+capLbl[cap]+']':''} — ${rs.length} TB: ${devStr}${rs.length>4?'…':''}`;
-      });
-      items.push({text:pl, badge:`${fmt(v.total)} TB · ${tramList.length} trạm`, color, detail});
-    });
-
-  } else if (bucket === 'oldestNSX' || bucket === 'oldestNVH') {
-    const isNSX = bucket==='oldestNSX';
-    title = isNSX ? '🏭 TB có Năm sản xuất lâu nhất' : '📅 TB có Năm vận hành lâu nhất';
-    color = isNSX ? '#ff9100' : '#b388ff';
-
-    // Find the oldest year
-    let minY = nowY;
-    baseRows.forEach(d => {
-      const y = isNSX ? Number(d.Nam_san_xuat) : Number(d.Nam_van_hanh);
-      if(y>1970&&y<minY) minY=y;
-    });
-
-    // Get all devices from that year
-    const oldest = baseRows.filter(d => {
-      const y = isNSX ? Number(d.Nam_san_xuat) : Number(d.Nam_van_hanh);
-      return y===minY;
-    });
-
-    // Group by tram
-    const byTram = {};
-    oldest.forEach(d => {
-      const t=(d.Tram||'—').trim();
-      if(!byTram[t])byTram[t]=[];
-      byTram[t].push(d);
-    });
-
-    totalLine = `${minY} (~${nowY-minY} năm) · ${fmt(oldest.length)} thiết bị`;
-    Object.entries(byTram).sort((a,b)=>a[0].localeCompare(b[0],'vi')).forEach(([t,rs])=>{
-      const cap=String(rs[0]?.Cap_dien_ap??'');
-      const detail=rs.map(d=>{
-        const dn=(d.Ten_thiet_bi||d.Ngan_thiet_bi||d.Phan_loai_thiet_bi||'—').trim();
-        const nsx=Number(d.Nam_san_xuat), nvh=Number(d.Nam_van_hanh);
-        return `${dn} · NSX:${nsx>1970?nsx:'?'} · NVH:${nvh>1970?nvh:'?'}`;
-      });
-      items.push({text:t+(cap&&cap!=='null'?' ['+capLbl[cap]+']':''), badge:`${rs.length} TB`, color, detail});
-    });
-  }
-
-  if(!items.length) items.push({text:'Không có dữ liệu',badge:'',color:'#ff5252'});
-  _lytShowDetailPanel(title, color, totalLine, items);
 }
 
 // ── Shared detail panel (reused by all sections) ──────────────
@@ -7225,16 +7109,31 @@ function _lytShowDetailPanel(title, color, totalLine, items, mbaSection) {
     p.className = 'hm-detail-panel';
     document.body.appendChild(p);
   }
+  let _pIdx=0;
   const bodyHtml = items.map(item => {
-    if (item.isGroup) return `<div class="hm-detail-group" style="color:${item.color}">${item.text}</div>`;
-    const detHtml = item.detail
-      ? `<div class="hm-detail-sub-list">${item.detail.map(n=>`<div class="hm-detail-sub-item">• ${n}</div>`).join('')}</div>`
-      : '';
+    if (item.isGroup) return `<div style="padding:9px 16px 4px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${item.color};border-bottom:1px solid rgba(255,255,255,.06);opacity:.9">${item.text}</div>`;
     const badge = item.badge || item.sub || '';
-    return `<div class="hm-detail-row" data-search="${(item.text||'').toLowerCase()}">
-      <span class="hm-dr-name">${item.text}</span>
-      <span class="hm-dr-badge" style="background:${item.color}22;color:${item.color}">${badge}</span>
-    </div>${detHtml}`;
+    const hasDetail = Array.isArray(item.detail) && item.detail.length > 0;
+    const uid = 'pd'+(++_pIdx);
+    const detHtml = hasDetail
+      ? `<div id="${uid}" style="display:none;border-bottom:1px solid rgba(255,255,255,.06)">${
+          item.detail.map(n=>`<div style="padding:4px 12px 4px 32px;font-size:10.5px;color:rgba(175,205,225,.85);display:flex;align-items:flex-start;gap:5px;border-bottom:1px solid rgba(255,255,255,.03)">
+            <span style="color:${item.color};opacity:.55;flex-shrink:0;margin-top:1px">▸</span>
+            <span>${n}</span>
+          </div>`).join('')
+        }</div>`
+      : '';
+    const togBtn = hasDetail
+      ? `<button onclick="event.stopPropagation();(function(btn,id){var el=document.getElementById(id);if(!el)return;var op=el.style.display!=='none';el.style.display=op?'none':'block';btn.textContent=op?'+':'-';btn.style.background=op?'rgba(255,255,255,.06)':'rgba(0,200,255,.15)';btn.style.color=op?'rgba(220,235,250,.8)':'var(--accent)';})(this,'${uid}')" style="width:20px;height:20px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(220,235,250,.8);font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;transition:all .15s">+</button>`
+      : `<span style="width:20px;flex-shrink:0;display:inline-block"></span>`;
+    return `<div style="border-bottom:1px solid rgba(255,255,255,.05)">
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 14px">
+        ${togBtn}
+        <span style="font-size:12px;color:rgba(215,232,248,.92);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${item.text}</span>
+        <span style="background:${item.color}25;color:${item.color};font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0">${badge}</span>
+      </div>
+      ${detHtml}
+    </div>`;
   }).join('');
 
   p.innerHTML = `
@@ -7863,14 +7762,20 @@ function lytStatsCardClick(label, color) {
     case 'TBA 220kV': {
       title = '⚡ TBA 220kV';
       const list = filteredTrams.filter(t => tramMaxCap[t] === '2');
-      list.forEach(t => items.push({ text: t, sub: '220kV', color: LYT_CAP_COLORS['2'] }));
+      list.forEach(t => {
+        const ngans=[...new Set(rows.filter(r=>(r.Tram||'').trim()===t).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))].sort();
+        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS['2'], detail: ngans });
+      });
       totalLine = `${list.length} trạm`;
       break;
     }
     case 'TBA 110kV': {
       title = '⚡ TBA 110kV';
       const list = filteredTrams.filter(t => tramMaxCap[t] === '1');
-      list.forEach(t => items.push({ text: t, sub: '110kV', color: LYT_CAP_COLORS['1'] }));
+      list.forEach(t => {
+        const ngans=[...new Set(rows.filter(r=>(r.Tram||'').trim()===t).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))].sort();
+        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS['1'], detail: ngans });
+      });
       totalLine = `${list.length} trạm`;
       break;
     }
@@ -8021,16 +7926,25 @@ function lytStatsCardClick(label, color) {
     case 'Tổng số thiết bị': {
       title = '📦 Tổng số thiết bị';
       const byType = {};
+      const nowY3=new Date().getFullYear();
       rows.forEach(r => {
         const pl = (r.Phan_loai_thiet_bi||'Khác').trim();
-        if (!byType[pl]) byType[pl] = { qty: 0, trams: new Set() };
+        if (!byType[pl]) byType[pl] = { qty: 0, trams: {} };
         byType[pl].qty += Number(r.So_luong)||1;
-        if (r.Tram) byType[pl].trams.add((r.Tram||'').trim());
+        const t=(r.Tram||'').trim();
+        if(t){if(!byType[pl].trams[t])byType[pl].trams[t]=[];byType[pl].trams[t].push(r);}
       });
       const sorted = Object.entries(byType).sort((a,b) => b[1].qty - a[1].qty);
       const total = sorted.reduce((s,[,v]) => s + v.qty, 0);
       sorted.forEach(([pl, v]) => {
-        items.push({ text: pl, sub: `${v.qty.toLocaleString('vi-VN')} TB / ${v.trams.size} trạm`, color: LYT_CAP_COLORS['1']||'#18ffff' });
+        const tramList=Object.entries(v.trams).sort((a,b)=>b[1].length-a[1].length);
+        const detail=tramList.map(([t,rs])=>{
+          const cap=tramMaxCap[t]||'';
+          const capTag=cap?` [${capLbl[cap]||cap}]`:'';
+          const devNames=[...new Set(rs.map(r=>(r.Ten_thiet_bi||r.Ngan_thiet_bi||'').trim()).filter(Boolean))].slice(0,4).join(', ');
+          return `${t}${capTag} — ${rs.length} TB${devNames?': '+devNames:''}`;
+        });
+        items.push({ text: pl, sub: `${v.qty.toLocaleString('vi-VN')} TB · ${tramList.length} trạm`, color: LYT_CAP_COLORS['1']||'#18ffff', detail });
       });
       totalLine = `${total.toLocaleString('vi-VN')} thiết bị · ${sorted.length} loại`;
       break;
@@ -8932,12 +8846,15 @@ function _tbStats(rows) {
 function _tbStatCardClick(key) {
   const rows = _tbFiltered.length ? _tbFiltered : _tbData;
   const capPrio = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
+  const capLbl2 = {'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+  const capCol2 = {'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
   const tramMaxCap = {};
   rows.forEach(d => {
     const t=(d.Tram||'').trim(); if(!t) return;
     const c=String(d.Cap_dien_ap??''); if(!c||c==='null') return;
     if(!tramMaxCap[t]||(capPrio[c]??99)<(capPrio[tramMaxCap[t]]??99)) tramMaxCap[t]=c;
   });
+  const nowY=new Date().getFullYear();
   const fmt = n => Number(n).toLocaleString('vi-VN');
 
   let title='', totalLine='', bodyHtml='';
@@ -8994,7 +8911,7 @@ function _tbStatCardClick(key) {
           <div style="font-size:10px;color:var(--text-secondary)">${r.Ten_thiet_bi||r.Phan_loai_thiet_bi||'—'}</div>
           <div style="font-size:9px;color:var(--text-muted);margin-top:1px">${r.Tram||'—'} ${cap?'· <span style="color:'+capCol[cap]+'">'+capLbl[cap]+'</span>':''}</div>
         </div>
-        <span style="font-size:11px;font-weight:700;color:${age>=25?'#ff5252':'#ffd740'};font-family:var(--font-mono)">${age}n</span>
+        <span style="font-size:11px;font-weight:700;color:${age>=25?'#ff5252':'#ffd740'};font-family:var(--font-mono)">${age} năm</span>
       </div>`;
     }).join('')+(old15.length>200?`<div style="padding:10px 16px;text-align:center;font-size:9px;color:var(--text-muted)">...và ${old15.length-200} thiết bị khác</div>`:'');
 
@@ -9019,21 +8936,72 @@ function _tbStatCardClick(key) {
     }).join('');
   }
 
-  // Show detail panel (reuse hm-detail-panel)
+  // Build items array and delegate to _lytShowDetailPanel
   const colorMap={'total':'#00c8ff','trams':'#00e676','gt15':'#ff5252','hangs':'#ffd740'};
   const col=colorMap[key]||'var(--accent)';
-  let p=document.getElementById('hm-detail-panel');
-  if(!p){p=document.createElement('div');p.id='hm-detail-panel';p.className='hm-detail-panel';document.body.appendChild(p);}
-  p.innerHTML=`
-    <div class="hm-resize-grip"></div>
-    <div class="hm-detail-hd" style="border-left:3px solid ${col}">
-      <span style="color:${col}">${title}</span>
-      <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span>
-    </div>
-    <div style="padding:8px 16px;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">${totalLine}</div>
-    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">${bodyHtml||'<div style=\'padding:24px;text-align:center;color:var(--text-muted)\'>Không có dữ liệu</div>'}</div>`;
-  p.classList.add('open');
-  _hmOpenPanel(p);
+  const items=[];
+
+  if(key==='total'){
+    const byType={};
+    rows.forEach(r=>{
+      const pl=(r.Phan_loai_thiet_bi||'Khác').trim();
+      if(!byType[pl])byType[pl]={qty:0,trams:{}};
+      byType[pl].qty+=(Number(r.So_luong)||1);
+      const t=(r.Tram||'').trim();
+      if(t){if(!byType[pl].trams[t])byType[pl].trams[t]=[];byType[pl].trams[t].push(r);}
+    });
+    Object.entries(byType).sort((a,b)=>b[1].qty-a[1].qty).forEach(([pl,v])=>{
+      const tList=Object.entries(v.trams).sort((a,b)=>b[1].length-a[1].length);
+      const detail=tList.map(([t,rs])=>{
+        const cap=tramMaxCap[t]||'';
+        const devNames=rs.slice(0,5).map(r=>(r.Ten_thiet_bi||r.Ngan_thiet_bi||'—').trim()).filter((x,i,a)=>a.indexOf(x)===i);
+        return `${t}${cap?` [${capLbl2[cap]||cap}]`:''} — ${rs.length} TB: ${devNames.join(', ')}${rs.length>5?'…':''}`;
+      });
+      items.push({text:pl,badge:`${fmt(v.qty)} TB · ${tList.length} trạm`,color:'#00c8ff',detail});
+    });
+  } else if(key==='trams'){
+    const byTram={};
+    rows.forEach(r=>{const t=(r.Tram||'').trim();if(!t)return;if(!byTram[t])byTram[t]=[];byTram[t].push(r);});
+    // Group by cap
+    const byCap={};
+    Object.entries(byTram).forEach(([t,rs])=>{const cap=tramMaxCap[t]||'?';if(!byCap[cap])byCap[cap]=[];byCap[cap].push([t,rs]);});
+    ['2','1','3','4','9','6','0'].forEach(cap=>{
+      const arr=byCap[cap];if(!arr||!arr.length)return;
+      items.push({isGroup:true,text:`── ${capLbl2[cap]||cap} (${arr.length} trạm) ──`,color:capCol2[cap]||'#888'});
+      arr.sort((a,b)=>a[0].localeCompare(b[0],'vi')).forEach(([t,rs])=>{
+        const byType2={};rs.forEach(r=>{const pl=(r.Phan_loai_thiet_bi||'?').trim();if(!byType2[pl])byType2[pl]=0;byType2[pl]+=(Number(r.So_luong)||1);});
+        const detail=Object.entries(byType2).sort((a,b)=>b[1]-a[1]).map(([pl,n])=>`${pl}: ${fmt(n)} TB`);
+        items.push({text:t,badge:`${fmt(rs.length)} TB`,color:capCol2[cap]||'#00e676',detail});
+      });
+    });
+  } else if(key==='gt15'){
+    const old15=rows.filter(r=>_tbAge(r)>=15).sort((a,b)=>_tbAge(b)-_tbAge(a));
+    const byTram={};
+    old15.forEach(r=>{const t=(r.Tram||'').trim();if(!byTram[t])byTram[t]=[];byTram[t].push(r);});
+    Object.entries(byTram).sort((a,b)=>{
+      const pa=capPrio[tramMaxCap[a[0]]]??9,pb=capPrio[tramMaxCap[b[0]]]??9;
+      return pa!==pb?pa-pb:a[0].localeCompare(b[0],'vi');
+    }).forEach(([t,rs])=>{
+      const cap=tramMaxCap[t]||'';
+      const detail=rs.slice(0,20).map(r=>{
+        const age=_tbAge(r),nvh=Number(r.Nam_van_hanh)||0;
+        return `${(r.Ten_thiet_bi||r.Phan_loai_thiet_bi||'—').trim()}${nvh>1970?' · '+nvh:''} · ${age} năm VH`;
+      });
+      items.push({text:t,badge:`${rs.length} TB · max ${_tbAge(rs[0])} năm`,color:cap?capCol2[cap]:'#ff5252',detail});
+    });
+  } else if(key==='hangs'){
+    const byHang={};
+    rows.forEach(r=>{const h=(r.Hang_san_xuat||'').trim();if(!h)return;if(!byHang[h])byHang[h]={qty:0,years:new Set(),trams:new Set()};byHang[h].qty+=(Number(r.So_luong)||1);const y=Number(r.Nam_san_xuat);if(y>1970)byHang[h].years.add(y);const t=(r.Tram||'').trim();if(t)byHang[h].trams.add(t);});
+    Object.entries(byHang).sort((a,b)=>b[1].qty-a[1].qty).forEach(([h,v])=>{
+      const ys=[...v.years].sort((a,b)=>a-b);
+      const yrStr=ys.length?`${ys[0]}${ys.length>1?'–'+ys[ys.length-1]:''}`:'-';
+      const detail=[...v.trams].sort().map(t=>`Trạm ${t}`);
+      items.push({text:`${h} (${yrStr})`,badge:`${fmt(v.qty)} TB · ${v.trams.size} trạm`,color:'#ffd740',detail});
+    });
+  }
+
+  if(!items.length) items.push({text:'Không có dữ liệu',badge:'',color:'#ff5252'});
+  _lytShowDetailPanel(title,col,totalLine,items);
 }
 
 // ── TABLE ─────────────────────────────────────────────────────
@@ -9059,7 +9027,7 @@ function _tbTable() {
     {k:'Hang_san_xuat',      l:'Hãng SX',     w:'90px' },
     {k:'Nam_san_xuat',       l:'Năm SX',      w:'58px', cls:'tb-num'},
     {k:'Nam_van_hanh',       l:'Năm VH',      w:'58px', cls:'tb-num'},
-    {k:'_age',               l:'Thâm niên',   w:'70px', cls:'tb-num'},
+    {k:'_age',               l:'Thời gian VH',   w:'70px', cls:'tb-num'},
     {k:'Cong_suat',          l:'CS (MVA)',    w:'68px', cls:'tb-num'},
     {k:'Ly_lich',            l:'Lý lịch',     w:'80px' },
     {k:'Thong_so',           l:'Thông số',    w:'100px'},
@@ -9151,8 +9119,8 @@ function _tbShowLyLich(idx) {
     <div style="padding:14px 20px;flex:1;overflow-y:auto">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
         ${[['Loại thiết bị',r.Phan_loai_thiet_bi,'#00c8ff'],['Số lượng',r.So_luong??'—','#00e676'],
-           ['Hãng sản xuất',r.Hang_san_xuat,'#ffd740'],['Năm sản xuất',r.Nam_san_xuat,'#ffd740'],
-           ['Năm vận hành',r.Nam_van_hanh,'#00c8ff'],['Thâm niên',age>=0?age+' năm':'—',age>=15?'#ff5252':age>=10?'#ffd740':'#00e676'],
+           ['Hãng sản xuất',r.Hang_san_xuat,'#ffd740'],['Năm vận hành',r.Nam_van_hanh,'#00c8ff'],
+           ['Năm vận hành',r.Nam_van_hanh,'#00c8ff'],['Thời gian VH',age>=0?age+' năm VH':'—',age>=15?'#ff5252':age>=10?'#ffd740':'#00e676'],
            ['Công suất (MVA)',r.Cong_suat,'#b388ff'],['Đội quản lý',r.Doi,'#888']
         ].map(([l,v,col])=>`<div style="background:rgba(255,255,255,.04);border-radius:7px;padding:8px 10px;border:1px solid rgba(255,255,255,.07)">
           <div style="font-size:8.5px;color:var(--text-muted);margin-bottom:3px">${l}</div>
@@ -9175,7 +9143,7 @@ function _tbShowLyLich(idx) {
 function _tbExportCSV() {
   const rows = _tbFiltered;
   if (!rows.length) return;
-  const hdr = ['Trạm','Cấp ĐA','Loại TB','Tên/Ký hiệu','Ngăn TB','Số lượng','Hãng SX','Năm SX','Năm VH','Thâm niên','CS(MVA)','Lý lịch','Thông số','Đội'].join(',');
+  const hdr = ['Trạm','Cấp ĐA','Loại TB','Tên/Ký hiệu','Ngăn TB','Số lượng','Hãng SX','Năm SX','Năm VH','Thời gian VH','CS(MVA)','Lý lịch','Thông số','Đội'].join(',');
   const body = rows.map(r=>{
     const age=_tbAge(r);
     return [r.Tram,_tbCapLbl[String(r.Cap_dien_ap??'')]||r.Cap_dien_ap,r.Phan_loai_thiet_bi,r.Ten_thiet_bi,r.Ngan_thiet_bi,r.So_luong,r.Hang_san_xuat,r.Nam_san_xuat,r.Nam_van_hanh,age>=0?age:'',r.Cong_suat,r.Ly_lich,r.Thong_so,r.Doi]
@@ -9188,7 +9156,7 @@ function _tbExportCSV() {
 
 function _tbExportOne(idx) {
   const r=_tbFiltered[idx]; if(!r) return;
-  const fields=[['Trạm',r.Tram],['Cấp ĐA',_tbCapLbl[String(r.Cap_dien_ap??'')]||r.Cap_dien_ap],['Loại TB',r.Phan_loai_thiet_bi],['Tên/Ký hiệu',r.Ten_thiet_bi],['Ngăn TB',r.Ngan_thiet_bi],['Số lượng',r.So_luong],['Hãng SX',r.Hang_san_xuat],['Năm SX',r.Nam_san_xuat],['Năm VH',r.Nam_van_hanh],['Thâm niên',_tbAge(r)>=0?_tbAge(r):''],['CS(MVA)',r.Cong_suat],['Thông số',r.Thong_so],['Lý lịch',r.Ly_lich],['Đội',r.Doi]];
+  const fields=[['Trạm',r.Tram],['Cấp ĐA',_tbCapLbl[String(r.Cap_dien_ap??'')]||r.Cap_dien_ap],['Loại TB',r.Phan_loai_thiet_bi],['Tên/Ký hiệu',r.Ten_thiet_bi],['Ngăn TB',r.Ngan_thiet_bi],['Số lượng',r.So_luong],['Hãng SX',r.Hang_san_xuat],['Năm SX',r.Nam_san_xuat],['Năm VH',r.Nam_van_hanh],['Thời gian VH',_tbAge(r)>=0?_tbAge(r):''],['CS(MVA)',r.Cong_suat],['Thông số',r.Thong_so],['Lý lịch',r.Ly_lich],['Đội',r.Doi]];
   const csv='\uFEFF'+fields.map(([k,v])=>`"${k}","${String(v||'').replace(/"/g,'""')}"`).join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
@@ -10256,13 +10224,7 @@ function _bcRenderByMonth(conf) {
 
   // Build filter option lists from full dataset
   const allDois  = [...new Set(rawData.map(r=>(r.Doi||'').trim()).filter(Boolean))].sort(sortVi);
-  // Cascade: if Đội selected, only show trạm of that Đội
-  const tramsForDoi = _bcFDoi
-    ? [...new Set(rawData.filter(r=>(r.Doi||'').trim()===_bcFDoi).map(r=>(r.Tram||'').trim()).filter(Boolean))].sort(sortVi)
-    : [...new Set(rawData.map(r=>(r.Tram||'').trim()).filter(Boolean))].sort(sortVi);
-  const allTrams = tramsForDoi;
-  // If current _bcFTram not in new trams list, reset it
-  if(_bcFTram && !allTrams.includes(_bcFTram)) { _bcFTram=''; }
+  const allTrams = [...new Set(rawData.map(r=>(r.Tram||'').trim()).filter(Boolean))].sort(sortVi);
   const allTypes = [...new Set(rawData.map(r=>(r.Phan_loai_thiet_bi||'').trim()).filter(Boolean))].sort(sortVi);
   // Collect all years/months from dates
   const allYears = new Set(), allMonths = new Set();
@@ -10343,31 +10305,22 @@ function _bcRenderByMonth(conf) {
     <span style="margin-left:auto;font-size:10px;font-family:var(--font-mono);color:var(--text-muted)">${fmt(data.length)} bản ghi</span>
   </div>
 
-  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px">
-    ${(()=>{
-      const _nd=new Date(),_ny=_nd.getFullYear(),_nm=_nd.getMonth()+1;
-      const _xm=_nm===12?1:_nm+1,_xy=_nm===12?_ny+1:_ny;
-      // KH: Thoi_gian_thi_nghiem_tiep_theo trong năm
-      const _kh=rawData.filter(r=>{const ds=r.Thoi_gian_thi_nghiem_tiep_theo;if(!ds)return false;const d=new Date(ds);return d.getFullYear()===_ny;}).length;
-      // TH lũy kế: Ngay_thi_nghiem trong năm đến tháng hiện tại
-      const _th=rawData.filter(r=>{const ds=r.Ngay_thi_nghiem;if(!ds)return false;const d=new Date(ds);return d.getFullYear()===_ny&&d.getMonth()+1<=_nm;}).length;
-      // KH tháng này / tháng tới
-      const _tc=rawData.filter(r=>{const ds=r.Thoi_gian_thi_nghiem_tiep_theo;if(!ds)return false;const d=new Date(ds);return d.getFullYear()===_ny&&d.getMonth()+1===_nm;}).length;
-      const _nc=rawData.filter(r=>{const ds=r.Thoi_gian_thi_nghiem_tiep_theo;if(!ds)return false;const d=new Date(ds);return d.getFullYear()===_xy&&d.getMonth()+1===_xm;}).length;
-      const _pct=_kh>0?Math.round(_th/_kh*100):0;
-      const _pcol=_pct>=100?'#00e676':_pct>=80?'var(--accent)':_pct>=50?'#ffd740':'#ff5252';
-      const _s=(ic,col,bg,brd,lbl,val,pct,key)=>`<div style="background:${bg};border:1px solid ${brd};border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s" onclick="_bcStatClick('${key}',rawData)" onmouseenter="this.style.borderColor='${col}'" onmouseleave="this.style.borderColor='${brd}'">
-        <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas ${ic}" style="margin-right:4px;color:${col}"></i>${lbl}</div>
-        <div style="font-size:20px;font-weight:800;font-family:var(--font-mono);color:${col};margin-bottom:4px">${fmt(val)}</div>
-        <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${Math.min(100,pct)}%;background:${col};border-radius:2px;transition:width .4s"></div></div>
-      </div>`;
-      return _s('fa-list-check','#00c8ff','rgba(0,200,255,.07)','rgba(0,200,255,.2)',`Tổng số dự kiến TN năm ${_ny}`,_kh,100,'kh_year')
-        +_s('fa-check-double','#00e676','rgba(0,230,118,.07)','rgba(0,230,118,.2)',`Lũy kế TH đến T${_nm}/${_ny}`,_th,Math.min(100,_kh>0?_th/_kh*100:0),'th_luytke')
-        +_s('fa-percent',_pcol,'rgba(255,255,255,.03)','rgba(255,255,255,.1)',`Tỷ lệ hoàn thành`,_pct+'%',_pct,'pct_hoanh')
-        +_s('fa-calendar-check','#ffd740','rgba(255,215,64,.07)','rgba(255,215,64,.2)',`KH TN tháng ${_nm}/${_ny}`,_tc,Math.min(100,_tc/Math.max(_kh/12,1)*100),'thismon')
-        +_s('fa-calendar-plus','#e040fb','rgba(224,64,251,.07)','rgba(224,64,251,.2)',`KH TN tháng ${_xm}/${_xy}`,_nc,Math.min(100,_nc/Math.max(_kh/12,1)*100),'nextmon');
-    })()}
-  </div>
+  ${(()=>{
+    const _nd=new Date(),_ny=_nd.getFullYear(),_nm=_nd.getMonth()+1;
+    const _xm=_nm===12?1:_nm+1,_xy=_nm===12?_ny+1:_ny;
+    const _tc=rawData.filter(r=>{const ds=r.Thoi_gian_thi_nghiem_tiep_theo;if(!ds)return false;const d=new Date(ds);return d.getFullYear()===_ny&&d.getMonth()+1===_nm;}).length;
+    const _nc=rawData.filter(r=>{const ds=r.Thoi_gian_thi_nghiem_tiep_theo;if(!ds)return false;const d=new Date(ds);return d.getFullYear()===_xy&&d.getMonth()+1===_xm;}).length;
+    const _sc=(icon,col,bg,brd,lbl,val,pct,key)=>`<div style="background:${bg};border:1px solid ${brd};border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s" onclick="_bcStatClick('${key}',rawData)" onmouseenter="this.style.borderColor='${col}'" onmouseleave="this.style.borderColor='${brd}'">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas ${icon}" style="margin-right:4px;color:${col}"></i>${lbl}</div>
+      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:${col};margin-bottom:6px">${fmt(val)}</div>
+      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${Math.min(100,pct)}%;background:${col};border-radius:2px;transition:width .4s"></div></div>
+    </div>`;
+    return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+      ${_sc('fa-database','#00c8ff','rgba(0,200,255,.07)','rgba(0,200,255,.2)','Tổng số thiết bị',rawData.length,100,'total')}
+      ${_sc('fa-calendar-check','#00e676','rgba(0,230,118,.07)','rgba(0,230,118,.2)',`Phải TN tháng ${_nm}/${_ny}`,_tc,Math.min(100,_tc/Math.max(rawData.length,1)*1000),'thismon')}
+      ${_sc('fa-calendar-plus','#ffd740','rgba(255,215,64,.07)','rgba(255,215,64,.2)',`Phải TN tháng ${_xm}/${_xy}`,_nc,Math.min(100,_nc/Math.max(rawData.length,1)*1000),'nextmon')}
+    </div>`;
+  })()}
 
   <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:14px">
     <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:12px">BIỂU ĐỒ KHỐI LƯỢNG THEO THÁNG</div>
@@ -10431,7 +10384,7 @@ function _bcBmDropdown(btn, key) {
     d.textContent=l;
     d.onmouseenter=()=>{d.style.background='rgba(255,255,255,.07)';}; d.onmouseleave=()=>{d.style.background='';};
     d.onclick = () => {
-      if (key==='doi')   { const _prev=_bcFDoi; _bcFDoi=v; if(v!==_prev) _bcFTram=''; }
+      if (key==='doi')   _bcFDoi=v;
       else if(key==='tram') _bcFTram=v;
       else if(key==='year') _bcFYear=v;
       else if(key==='month') _bcFMonth=v;
@@ -10575,7 +10528,7 @@ function _bcRenderEarlyPlan(conf) {
         const tiep  = r.Thoi_gian_thi_nghiem_tiep_theo ? new Date(r.Thoi_gian_thi_nghiem_tiep_theo) : null;
         const han   = (Number(r.Han_thi_nghiem)||0)*365;
         const interval = truoc && tiep ? Math.round((tiep-truoc)/86400000) : null;
-        const ratioStr = interval && han ? `${(interval/365).toFixed(1)}n / ${r.Han_thi_nghiem}n` : '';
+        const ratioStr = interval && han ? `${(interval/365).toFixed(1)} năm / ${r.Han_thi_nghiem} năm` : '';
         return `<span style="font-family:var(--font-mono);font-size:10px">${_bcFmtD(r.Thoi_gian_thi_nghiem_tiep_theo)}</span>
           ${ratioStr?`<span style="font-size:8px;color:#00c8ff;margin-left:4px">↑${ratioStr}</span>`:''}`;
       }
@@ -10605,30 +10558,27 @@ function _bcStatClick(key, data) {
   const fmt = n => Number(n).toLocaleString('vi-VN');
   const fmtD = v => { if(!v) return '—'; const d=new Date(v); return isNaN(d)?v:d.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'}); };
   const rawAll=_tnRawData.length?_tnRawData:(_tnAllData.length?_tnAllData:[]);
-  // KH / Lũy kế / % handlers
-  if(key==='kh_year'||key==='th_luytke'||key==='pct_hoanh'){
-    const _nd2=new Date(),_ny2=_nd2.getFullYear(),_nm2=_nd2.getMonth()+1;
-    const lbls={kh_year:`Tổng số dự kiến TN năm ${_ny2}`,th_luytke:`Lũy kế thực hiện đến T${_nm2}/${_ny2}`,pct_hoanh:'Tỷ lệ hoàn thành'};
-    const cols={kh_year:'#00c8ff',th_luytke:'#00e676',pct_hoanh:'var(--accent)'};
-    const isKH=key==='kh_year',isTH=key==='th_luytke';
-    const matched=rawAll.filter(r=>{
-      const ds=isTH?r.Ngay_thi_nghiem:r.Thoi_gian_thi_nghiem_tiep_theo;
-      if(!ds)return false; const d=new Date(ds);
-      if(isTH) return d.getFullYear()===_ny2&&d.getMonth()+1<=_nm2;
-      return d.getFullYear()===_ny2;
-    });
-    const col2=cols[key]||'var(--accent)';
+  const _cL={'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+  const _cC={'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
+  let title='', totalLine='', bodyHtml='', col='var(--accent)';
+
+  if(key==='thismon'||key==='nextmon'){
+    const now=new Date(),nowY=now.getFullYear(),nowM=now.getMonth()+1;
+    const tM=key==='thismon'?nowM:(nowM===12?1:nowM+1),tY=key==='thismon'?nowY:(nowM===12?nowY+1:nowY);
+    col=key==='thismon'?'#00e676':'#ffd740';
+    title=`📅 Phải TN tháng ${tM}/${tY}`;
+    const filtered=rawAll.filter(r=>{const ds=r.Thoi_gian_thi_nghiem_tiep_theo;if(!ds)return false;const d=new Date(ds);return d.getFullYear()===tY&&d.getMonth()+1===tM;});
     const byType={};
-    matched.forEach(r=>{const tp=(r.Phan_loai_thiet_bi||'Khác').trim(),t=(r.Tram||'—').trim();if(!byType[tp])byType[tp]={total:0,trams:{}};byType[tp].total++;if(!byType[tp].trams[t])byType[tp].trams[t]=[];byType[tp].trams[t].push(r);});
+    filtered.forEach(r=>{const tp=(r.Phan_loai_thiet_bi||'Khác').trim(),t=(r.Tram||'—').trim();if(!byType[tp])byType[tp]={total:0,trams:{}};byType[tp].total++;if(!byType[tp].trams[t])byType[tp].trams[t]=[];byType[tp].trams[t].push(r);});
     const types=Object.keys(byType).sort((a,b)=>byType[b].total-byType[a].total);
+    totalLine=`${fmt(filtered.length)} thiết bị · ${types.length} loại · ${new Set(filtered.map(r=>(r.Tram||'').trim())).size} trạm`;
     const items2=types.map(tp=>{
       const ti=byType[tp],trams=Object.keys(ti.trams).sort((a,b)=>a.localeCompare(b,'vi'));
-      const detail=trams.map(t=>{const rs=ti.trams[t];return `${t} — ${rs.length} TB: ${rs.slice(0,3).map(r=>r.Ten_thiet_bi||r.Ngan_thiet_bi||'—').join(', ')}${rs.length>3?'…':''}`;});
-      return {text:tp,badge:`${fmt(ti.total)}`,color:col2,detail};
+      const detail=trams.map(t=>{const rs=ti.trams[t];return `${t} [${_cL[String(rs[0]?.Cap_dien_ap??'')] ||''}] — ${rs.length} TB: ${rs.slice(0,3).map(r=>r.Ten_thiet_bi||r.Ngan_thiet_bi||'—').join(', ')}${rs.length>3?'…':''}`;});
+      return {text:tp,badge:`${fmt(ti.total)}`,color:col,detail};
     });
-    _lytShowDetailPanel(`📊 ${lbls[key]}`,col2,`${fmt(matched.length)} thiết bị · ${types.length} loại`,items2); return;
+    _lytShowDetailPanel(title,col,totalLine,items2); return;
   }
-  let title='', totalLine='', bodyHtml='', col='var(--accent)';
 
   if (key === 'total') {
     col='#00c8ff'; title='📋 Tổng bản ghi thí nghiệm';
