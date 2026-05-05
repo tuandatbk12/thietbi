@@ -1893,7 +1893,7 @@ body { font-size: var(--fs-base); }
   background: rgba(0,200,255,0.35);
 }
 
-.hm-detail-hd { padding:12px 16px 10px; font-size:13px; font-weight:700; color:var(--accent); border-bottom:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center; flex-shrink:0; user-select:none; cursor:move; }
+.hm-detail-hd { padding:12px 16px 10px; font-size:13px; font-weight:700; color:rgba(255,255,255,.97); border-bottom:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center; flex-shrink:0; user-select:none; cursor:move; }
 /* Đảm bảo scroll div bên trong panel luôn hoạt động */
 
 /* Header và toolbar không co lại */
@@ -6306,16 +6306,7 @@ function renderChartsSection() {
       </div>
       <div class="hm-sub-bar">${subFast}</div>
       <div class="chart-preview-note"><i class="fas fa-bolt" style="color:var(--accent);margin-right:6px"></i>Đang dùng chế độ xem nhanh để mở layout mượt hơn. Heatmap đầy đủ hiện có <b>${viewSt.length.toLocaleString('vi-VN')}</b> trạm và khoảng <b>${NGAN_DEFS.length * Math.max(1, capsUsedFast.length)}</b> cột dữ liệu. Chỉ dựng bảng heatmap khi bạn bấm <b>Xem bảng chi tiết</b>.</div>
-      <div style="display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start;margin-top:10px">
-        <div>${buildChartMiniPreview(viewSt, nganMap)}</div>
-        <div>
-          <div style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.08em;margin-bottom:8px">TỶ LỆ PHÂN LOẠI THIẾT BỊ <span id="lytPieTramLbl_${uid}" style="color:var(--accent);font-weight:400;margin-left:4px"></span></div>
-          <div style="display:grid;grid-template-columns:160px 1fr;gap:10px;align-items:start">
-            <div style="position:relative;height:180px"><canvas id="lytPieChart_${uid}"></canvas></div>
-            <div id="lytPieLegend_${uid}" style="display:grid;gap:4px;align-content:start;padding-top:2px;max-height:180px;overflow-y:auto;font-size:9.5px"></div>
-          </div>
-        </div>
-      </div>`;
+      <div style="margin-top:10px;width:100%">${buildChartMiniPreview(viewSt, nganMap)}</div>>`;
     lytRenderPieChart(uid, baseRows, selTram);
     // Lưu signature cho fast mode
     if (mainElFast) mainElFast._renderSig = currentSig;
@@ -6514,8 +6505,8 @@ function renderChartsSection() {
 
       </div>
     <div class="hm-sub-bar">${sub}</div>
-    <div style="display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start;margin-top:10px">
-      <div>
+    
+      <div style="margin-top:10px"><div>
         ${detailOpen ? `
           <div class="hm-filter-bar" style="padding:0"></div>
           <div class="hm-wrap" id="lytHW_${uid}">
@@ -6526,18 +6517,8 @@ function renderChartsSection() {
             </table>
           </div>
         ` : `<div class="chart-preview-note"><i class="fas fa-eye-slash" style="color:var(--accent);margin-right:6px"></i>Bảng chi tiết theo trạm/cấp đang được ẩn để màn hình dễ đọc hơn. Chỉ mở khi cần rà soát từng cột hoặc xuất CSV.</div>`}
-      </div>
-      <div>
-        <div style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.08em;margin-bottom:8px">
-          TỶ LỆ PHÂN LOẠI THIẾT BỊ
-          <span id="lytPieTramLbl_${uid}" style="color:var(--accent);font-weight:400;margin-left:4px"></span>
-        </div>
-        <div style="display:grid;grid-template-columns:160px 1fr;gap:10px;align-items:start">
-          <div style="position:relative;height:180px"><canvas id="lytPieChart_${uid}"></canvas></div>
-          <div id="lytPieLegend_${uid}" style="display:grid;gap:4px;align-content:start;padding-top:2px;max-height:180px;overflow-y:auto;font-size:9.5px"></div>
-        </div>
-      </div>
-    </div>`;
+      </div
+      </div>>`;
 
 
   if (ddListEl.parentElement !== ddRoot) ddRoot.appendChild(ddListEl);
@@ -6881,9 +6862,14 @@ function lytFddReset(uid) {
   Object.assign(_lf, {tram:'',cap:'',type:'',year:'',opyr:'',search:''});
   const si = document.getElementById(`lf_search_${uid||_lfUid()}`);
   if (si) si.value = '';
-  _chipFiltered = [..._chipAllData];
   _selectedChips.clear();
   _lytNganCache = null; _lytNganSig = '';
+  if (!_chipAllData.length) {
+    showChangeNotif('info','Đang tải lại dữ liệu...','');
+    if (typeof loadStatsFromSupabase === 'function') loadStatsFromSupabase();
+    return;
+  }
+  _chipFiltered = [..._chipAllData];
   renderLiveFilterSection();
   _recomputeStatsWithFilter();
   renderChipsSection();
@@ -7111,15 +7097,15 @@ function _lytShowDetailPanel(title, color, totalLine, items, mbaSection) {
   }
   let _pIdx=0;
   const bodyHtml = items.map(item => {
-    if (item.isGroup) return `<div style="padding:9px 16px 4px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${item.color};border-bottom:1px solid rgba(255,255,255,.06);opacity:.9">${item.text}</div>`;
+    if (item.isGroup) return `<div style="padding:9px 16px 4px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${item.color};border-bottom:1px solid rgba(255,255,255,.1);opacity:1">${item.text}</div>`;
     const badge = item.badge || item.sub || '';
     const hasDetail = Array.isArray(item.detail) && item.detail.length > 0;
     const uid = 'pd'+(++_pIdx);
     const detHtml = hasDetail
       ? `<div id="${uid}" style="display:none;border-bottom:1px solid rgba(255,255,255,.06)">${
           item.detail.map(n=>`<div style="padding:4px 12px 4px 32px;font-size:10.5px;color:rgba(175,205,225,.85);display:flex;align-items:flex-start;gap:5px;border-bottom:1px solid rgba(255,255,255,.03)">
-            <span style="color:${item.color};opacity:.55;flex-shrink:0;margin-top:1px">▸</span>
-            <span>${n}</span>
+            <span style="color:${item.color};opacity:.7;flex-shrink:0;margin-top:1px">▸</span>
+            <span style="color:rgba(235,248,255,.9)">${n}</span>
           </div>`).join('')
         }</div>`
       : '';
@@ -7129,7 +7115,7 @@ function _lytShowDetailPanel(title, color, totalLine, items, mbaSection) {
     return `<div style="border-bottom:1px solid rgba(255,255,255,.05)">
       <div style="display:flex;align-items:center;gap:8px;padding:7px 14px">
         ${togBtn}
-        <span style="font-size:12px;color:rgba(215,232,248,.92);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${item.text}</span>
+        <span style="font-size:12px;color:rgba(240,248,255,.97);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${item.text}</span>
         <span style="background:${item.color}25;color:${item.color};font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0">${badge}</span>
       </div>
       ${detHtml}
@@ -7712,6 +7698,30 @@ function lytChipReset() {
   _recomputeStatsWithFilter();
 }
 
+// ── Helper: build grouped ngăn by type for a tram ──────────────
+function _buildTramNganGroups(tramName, tRows, allNgans) {
+  const NGAN_GROUPS = [
+    { label:'Ngăn ĐZ',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn ĐZ' },
+    { label:'Ngăn MBA',          fn: r=>lytIsMBARow(r) },
+    { label:'Ngăn XT',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn XT' },
+    { label:'Ngăn LL',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn LL' },
+    { label:'Ngăn Tụ bù (TBN)', fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn TBN'||((r.Phan_loai_thiet_bi||'').trim().toUpperCase().includes('TBN')) },
+    { label:'Ngăn Tự dùng (TD)',fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='NgănTD'||((r.Phan_loai_thiet_bi||'').trim().toUpperCase()==='MBATD') },
+    { label:'Ngăn Kháng',        fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn Kháng' },
+  ];
+  const catSet = new Set();
+  const result = [];
+  NGAN_GROUPS.forEach(g => {
+    const gNgans = [...new Set(tRows.filter(g.fn).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))].sort();
+    if (!gNgans.length) return;
+    gNgans.forEach(n=>catSet.add(n));
+    result.push(`${g.label}: ${gNgans.length} ngăn → ${gNgans.join(', ')}`);
+  });
+  const uncat = allNgans.filter(n=>!catSet.has(n)).sort();
+  if (uncat.length) result.push(`Ngăn khác: ${uncat.length} → ${uncat.join(', ')}`);
+  return result;
+}
+
 // ── Stats card click — hiện detail panel bên phải ──────────────
 function lytStatsCardClick(label, color) {
   // Guard: data chưa load
@@ -7762,22 +7772,28 @@ function lytStatsCardClick(label, color) {
     }
     case 'TBA 220kV': {
       title = '⚡ TBA 220kV';
-      const list = filteredTrams.filter(t => tramMaxCap[t] === '2');
-      list.forEach(t => {
-        const ngans=[...new Set(rows.filter(r=>(r.Tram||'').trim()===t).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))].sort();
-        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS['2'], detail: ngans });
+      const list220 = filteredTrams.filter(t => tramMaxCap[t] === '2');
+      const scope220 = lytBuildScopedNganSets(rows, _chipAllData);
+      list220.forEach(t => {
+        const tRows220 = scope220.scopedRows.filter(r=>(r.Tram||'').trim()===t);
+        const allNgans220 = [...new Set(tRows220.map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))];
+        items.push({ text: t, sub: `${allNgans220.length} ngăn`, color: LYT_CAP_COLORS['2'],
+          detail: _buildTramNganGroups(t, tRows220, allNgans220) });
       });
-      totalLine = `${list.length} trạm`;
+      totalLine = `${list220.length} trạm`;
       break;
     }
     case 'TBA 110kV': {
       title = '⚡ TBA 110kV';
-      const list = filteredTrams.filter(t => tramMaxCap[t] === '1');
-      list.forEach(t => {
-        const ngans=[...new Set(rows.filter(r=>(r.Tram||'').trim()===t).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))].sort();
-        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS['1'], detail: ngans });
+      const list110 = filteredTrams.filter(t => tramMaxCap[t] === '1');
+      const scope110 = lytBuildScopedNganSets(rows, _chipAllData);
+      list110.forEach(t => {
+        const tRows110 = scope110.scopedRows.filter(r=>(r.Tram||'').trim()===t);
+        const allNgans110 = [...new Set(tRows110.map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))];
+        items.push({ text: t, sub: `${allNgans110.length} ngăn`, color: LYT_CAP_COLORS['1'],
+          detail: _buildTramNganGroups(t, tRows110, allNgans110) });
       });
-      totalLine = `${list.length} trạm`;
+      totalLine = `${list110.length} trạm`;
       break;
     }
     case 'Tổng số ngăn': {
@@ -7996,7 +8012,6 @@ function lytStatsCardClick(label, color) {
     case 'Tổng số thiết bị': {
       title = '📦 Tổng số thiết bị';
       const byType = {};
-      const nowY3=new Date().getFullYear();
       rows.forEach(r => {
         const pl = (r.Phan_loai_thiet_bi||'Khác').trim();
         if (!byType[pl]) byType[pl] = { qty: 0, trams: {} };
@@ -8004,17 +8019,19 @@ function lytStatsCardClick(label, color) {
         const t=(r.Tram||'').trim();
         if(t){if(!byType[pl].trams[t])byType[pl].trams[t]=[];byType[pl].trams[t].push(r);}
       });
-      const sorted = Object.entries(byType).sort((a,b) => b[1].qty - a[1].qty);
+      const sorted = Object.entries(byType).sort((a,b)=>a[0].localeCompare(b[0],'vi'));
       const total = sorted.reduce((s,[,v]) => s + v.qty, 0);
       sorted.forEach(([pl, v]) => {
-        const tramList=Object.entries(v.trams).sort((a,b)=>b[1].length-a[1].length);
-        const detail=tramList.map(([t,rs])=>{
-          const cap=tramMaxCap[t]||'';
-          const capTag=cap?` [${capLbl[cap]||cap}]`:'';
-          const devNames=[...new Set(rs.map(r=>(r.Ten_thiet_bi||r.Ngan_thiet_bi||'').trim()).filter(Boolean))].slice(0,4).join(', ');
-          return `${t}${capTag} — ${rs.length} TB${devNames?': '+devNames:''}`;
+        const tramList = Object.entries(v.trams).sort((a,b)=>a[0].localeCompare(b[0],'vi'));
+        const detail = tramList.map(([t,rs]) => {
+          const cap = tramMaxCap[t]||'';
+          const capTag = cap ? ` [${capLbl[cap]||cap}]` : '';
+          const devNames = [...new Set(rs.map(r=>(r.Ten_thiet_bi||r.Ngan_thiet_bi||r.Phan_loai_thiet_bi||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
+          const devStr = devNames.length ? ': ' + devNames.slice(0,6).join(', ') + (devNames.length>6?` …+${devNames.length-6}`:'') : '';
+          return `${pl} ${t}${capTag} — ${rs.length} TB${devStr}`;
         });
-        items.push({ text: pl, sub: `${v.qty.toLocaleString('vi-VN')} TB · ${tramList.length} trạm`, color: LYT_CAP_COLORS['1']||'#18ffff', detail });
+        const typeColor = LYT_CAP_COLORS[tramList.length?tramMaxCap[tramList[0][0]]||'1':'1']||'#18ffff';
+        items.push({ text: pl, sub: `${v.qty.toLocaleString('vi-VN')} TB · ${tramList.length} trạm`, color: typeColor, detail });
       });
       totalLine = `${total.toLocaleString('vi-VN')} thiết bị · ${sorted.length} loại`;
       break;
@@ -10525,14 +10542,14 @@ function _bcRenderByMonth(conf) {
         }
         return true;
       };
-      const planRows = rawData.filter(r => {
+      const planRows = data.filter(r => {
         if (!match(r)) return false;
         const ds = r.Thoi_gian_thi_nghiem_tiep_theo;
         if (!ds) return false;
         const d = new Date(ds);
         return d.getFullYear() === yearFilter;
       });
-      const doneRows = rawData.filter(r => {
+      const doneRows = data.filter(r => {
         if (!match(r)) return false;
         const ds = r.Ngay_thi_nghiem;
         if (!ds) return false;
@@ -10589,7 +10606,7 @@ function _bcRenderByMonth(conf) {
     return `<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em">
-          MẪU KHỐI LƯỢNG TN ĐỊNH KỲ NĂM ${yearFilter2}
+          MẪU KHỐI LƯỢNG TN ĐỊNH KỲ NĂM ${_bcFYear || yearFilter2}
         </div>
         <span style="font-size:9px;color:rgba(0,200,255,.6)">Cập nhật: ${new Date().toLocaleDateString('vi-VN')}</span>
       </div>
@@ -10617,37 +10634,7 @@ function _bcRenderByMonth(conf) {
       </div>
     </div>`;
   })()}
-
-  <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px">
-    <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:10px">CHI TIẾT THEO THÁNG × LOẠI THIẾT BỊ</div>
-    <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:10px">
-        <thead><tr style="background:rgba(255,255,255,.03)">
-          <th style="padding:6px 10px;font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:left;position:sticky;top:0;min-width:100px">Tháng</th>
-          ${filteredTypes.slice(0,12).map((t,i)=>`<th style="padding:6px 10px;font-size:9px;font-weight:700;color:${COLORS[i%COLORS.length]};text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:right;position:sticky;top:0;white-space:nowrap">${t}</th>`).join('')}
-          <th style="padding:6px 10px;font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:right;position:sticky;top:0">Tổng</th>
-        </tr></thead>
-        <tbody>${Object.keys(monthMap).sort().reverse().map(k=>{
-          const tMap = monthTypeMap[k]||{};
-          const total = monthMap[k].v;
-          const maxVal = Math.max(...filteredTypes.map(t=>tMap[t]||0),1);
-          return `<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
-            <td style="padding:5px 10px;font-weight:600;font-family:var(--font-mono)">${monthMap[k].label}</td>
-            ${filteredTypes.slice(0,12).map((t,i)=>{
-              const v = tMap[t]||0;
-              const barW = v > 0 ? Math.max(2,Math.round((v/maxVal)*60)) : 0;
-              return `<td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);color:${v?COLORS[i%COLORS.length]:'rgba(255,255,255,.15)'}">
-                ${v ? `<span style="display:inline-flex;align-items:center;gap:5px">
-                  <span style="display:inline-block;height:3px;width:${barW}px;background:${COLORS[i%COLORS.length]};border-radius:2px;opacity:.6;vertical-align:middle"></span>${v}
-                </span>` : '—'}
-              </td>`;
-            }).join('')}
-            <td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);font-weight:700;color:var(--accent)">${total}</td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table>
-    </div>
-  </div>`;
+>`;
 }
 
 // ── DROPDOWN HANDLER for by-month report ──────────────────────
