@@ -7095,28 +7095,65 @@ function _lytShowDetailPanel(title, color, totalLine, items, mbaSection) {
     p.className = 'hm-detail-panel';
     document.body.appendChild(p);
   }
-  let _pIdx=0;
+
+  let _pIdx = 0;
+  const mkTogBtn = (uid, col) =>
+    `<button onclick="event.stopPropagation();(function(btn,id){var el=document.getElementById(id);if(!el)return;var op=el.style.display!=='none';el.style.display=op?'none':'block';btn.textContent=op?'+':'-';btn.style.background=op?'rgba(255,255,255,.06)':'rgba(0,200,255,.15)';btn.style.color=op?'rgba(220,235,250,.8)':'var(--accent)';})(this,'${uid}')"
+       style="width:20px;height:20px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(220,235,250,.8);font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;transition:all .15s">+</button>`;
+  const mkSpacer = () => `<span style="width:20px;flex-shrink:0;display:inline-block"></span>`;
+
+  // Build leaf string list into HTML rows
+  const mkLeafRows = (lines, col, indent) =>
+    lines.map(n => `<div style="padding:4px 12px 4px ${indent}px;font-size:10.5px;color:rgba(175,205,225,.85);display:flex;align-items:flex-start;gap:5px;border-bottom:1px solid rgba(255,255,255,.03)">
+      <span style="color:${col};opacity:.7;flex-shrink:0;margin-top:1px">▸</span>
+      <span style="color:rgba(235,248,255,.9)">${n}</span>
+    </div>`).join('');
+
   const bodyHtml = items.map(item => {
-    if (item.isGroup) return `<div style="padding:9px 16px 4px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${item.color};border-bottom:1px solid rgba(255,255,255,.1);opacity:1">${item.text}</div>`;
+    if (item.isGroup) return `<div style="padding:9px 16px 4px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${item.color};border-bottom:1px solid rgba(255,255,255,.1)">${item.text}</div>`;
+
     const badge = item.badge || item.sub || '';
+    const col   = item.color || color || 'var(--accent)';
+    const uid1  = 'pd'+(++_pIdx);
+
+    // ── 2-LEVEL: item.children = [{text, sub, detail:[]}]
+    if (Array.isArray(item.children) && item.children.length > 0) {
+      const childrenHtml = item.children.map(ch => {
+        const uid2  = 'pd'+(++_pIdx);
+        const chCol = ch.color || col;
+        const hasLeaf = Array.isArray(ch.detail) && ch.detail.length > 0;
+        const leafBlock = hasLeaf
+          ? `<div id="${uid2}" style="display:none;border-bottom:1px solid rgba(255,255,255,.04)">${mkLeafRows(ch.detail, chCol, 52)}</div>`
+          : '';
+        return `<div style="border-bottom:1px solid rgba(255,255,255,.04)">
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 14px 6px 32px">
+            ${hasLeaf ? mkTogBtn(uid2, chCol) : mkSpacer()}
+            <span style="font-size:11.5px;color:rgba(230,245,255,.92);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ch.text}</span>
+            ${ch.sub ? `<span style="background:${chCol}22;color:${chCol};font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;white-space:nowrap;flex-shrink:0">${ch.sub}</span>` : ''}
+          </div>
+          ${leafBlock}
+        </div>`;
+      }).join('');
+      return `<div style="border-bottom:1px solid rgba(255,255,255,.05)">
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 14px">
+          ${mkTogBtn(uid1, col)}
+          <span style="font-size:12px;color:rgba(240,250,255,.97);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600">${item.text}</span>
+          <span style="background:${col}25;color:${col};font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0">${badge}</span>
+        </div>
+        <div id="${uid1}" style="display:none;border-bottom:1px solid rgba(255,255,255,.06)">${childrenHtml}</div>
+      </div>`;
+    }
+
+    // ── 1-LEVEL: item.detail = ['string', ...]
     const hasDetail = Array.isArray(item.detail) && item.detail.length > 0;
-    const uid = 'pd'+(++_pIdx);
     const detHtml = hasDetail
-      ? `<div id="${uid}" style="display:none;border-bottom:1px solid rgba(255,255,255,.06)">${
-          item.detail.map(n=>`<div style="padding:4px 12px 4px 32px;font-size:10.5px;color:rgba(175,205,225,.85);display:flex;align-items:flex-start;gap:5px;border-bottom:1px solid rgba(255,255,255,.03)">
-            <span style="color:${item.color};opacity:.7;flex-shrink:0;margin-top:1px">▸</span>
-            <span style="color:rgba(235,248,255,.9)">${n}</span>
-          </div>`).join('')
-        }</div>`
+      ? `<div id="${uid1}" style="display:none;border-bottom:1px solid rgba(255,255,255,.06)">${mkLeafRows(item.detail, col, 32)}</div>`
       : '';
-    const togBtn = hasDetail
-      ? `<button onclick="event.stopPropagation();(function(btn,id){var el=document.getElementById(id);if(!el)return;var op=el.style.display!=='none';el.style.display=op?'none':'block';btn.textContent=op?'+':'-';btn.style.background=op?'rgba(255,255,255,.06)':'rgba(0,200,255,.15)';btn.style.color=op?'rgba(220,235,250,.8)':'var(--accent)';})(this,'${uid}')" style="width:20px;height:20px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(220,235,250,.8);font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;transition:all .15s">+</button>`
-      : `<span style="width:20px;flex-shrink:0;display:inline-block"></span>`;
     return `<div style="border-bottom:1px solid rgba(255,255,255,.05)">
       <div style="display:flex;align-items:center;gap:8px;padding:7px 14px">
-        ${togBtn}
-        <span style="font-size:12px;color:rgba(240,248,255,.97);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${item.text}</span>
-        <span style="background:${item.color}25;color:${item.color};font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0">${badge}</span>
+        ${hasDetail ? mkTogBtn(uid1, col) : mkSpacer()}
+        <span style="font-size:12px;color:rgba(240,250,255,.97);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${item.text}</span>
+        <span style="background:${col}25;color:${col};font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0">${badge}</span>
       </div>
       ${detHtml}
     </div>`;
@@ -7124,273 +7161,30 @@ function _lytShowDetailPanel(title, color, totalLine, items, mbaSection) {
 
   p.innerHTML = `
     <div class="hm-resize-grip" id="hm-resize-grip"></div>
-    <div class="hm-detail-hd" style="border-left:3px solid ${color||'var(--accent)'}" id="hm-detail-hd-drag">
-      <span style="color:${color||'var(--accent)'}">${title}</span>
-      <span class="hm-detail-close"
-        onclick="this.closest('.hm-detail-panel').classList.remove('open');let b=document.getElementById('hm-detail-backdrop');if(b)b.style.display='none'">✕</span>
+    <div class="hm-detail-hd" style="border-left:3px solid ${color||'var(--accent)'}">
+      <span style="color:rgba(255,255,255,.97)">${title}</span>
+      <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span>
     </div>
-    <div style="padding:6px 16px 8px;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0">
-      <div style="font-size:9px;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:6px">${totalLine}</div>
-      <input type="text" placeholder="🔍 Tìm kiếm..." id="hm-detail-search"
-        style="width:100%;box-sizing:border-box;padding:5px 9px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text-primary);font-size:10px;outline:none"
-        oninput="_lytDetailSearchFn(this.value)"/>
+    <div style="padding:6px 16px 6px;font-size:9px;color:rgba(180,210,230,.7);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">${totalLine||''}</div>
+    <div style="padding:6px 14px 4px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">
+      <input type="text" placeholder="🔍 Tìm kiếm..." oninput="_hmPanelSearch(this.value)"
+        style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:5px 10px;color:rgba(235,248,255,.9);font-size:11px;outline:none;box-sizing:border-box">
     </div>
-    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;overscroll-behavior:contain;-webkit-overflow-scrolling:touch">${bodyHtml}</div>`;
+    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;overscroll-behavior:contain">${bodyHtml}</div>`;
+
   p.classList.add('open');
   _hmOpenPanel(p);
-  let bd = document.getElementById('hm-detail-backdrop');
-  if (!bd) {
-    bd = document.createElement('div');
-    bd.id = 'hm-detail-backdrop';
-    bd.style.cssText = 'position:fixed;inset:0;z-index:9190;background:rgba(0,0,0,.35);display:none;backdrop-filter:blur(1px)';
-    bd.onclick = () => { p.classList.remove('open'); bd.style.display='none'; };
-    document.body.appendChild(bd);
-  }
-  bd.style.display = 'block';
-  setTimeout(()=>{ const s=document.getElementById('hm-detail-search'); if(s)s.focus(); }, 80);
 }
 
-
-// ═══════════════════════════════════════════════════════════════
-//  DETAIL PANEL – EVENT DELEGATION (không dùng _dragInited flag)
-//  Bind một lần vào document khi trang load. Hoạt động đúng
-//  ngay cả khi innerHTML bị ghi đè nhiều lần.
-// ═══════════════════════════════════════════════════════════════
-(function _initPanelSystem() {
-  let _resizing = false, _resizeStartX = 0, _resizeStartW = 0;
-  let _dragging  = false, _dragStartY  = 0, _dragStartTop = 0;
-
-  // ── RESIZE (kéo cạnh trái) ──
-  document.addEventListener('mousedown', e => {
-    const grip = e.target.closest('.hm-resize-grip');
-    if (!grip) return;
-    const panel = grip.closest('.hm-detail-panel');
-    if (!panel) return;
-    e.preventDefault();
-    _resizing = true;
-    _resizeStartX = e.clientX;
-    _resizeStartW = panel.offsetWidth;
-    grip.classList.add('dragging');
-    document.body.style.userSelect = 'none';
-  });
-
-  document.addEventListener('mousemove', e => {
-    if (_resizing) {
-      const panel = document.querySelector('.hm-detail-panel.open');
-      if (!panel) { _resizing = false; return; }
-      const newW = Math.max(280, Math.min(window.innerWidth * 0.75, _resizeStartW + (_resizeStartX - e.clientX)));
-      panel.style.width = newW + 'px';
-    }
-    if (_dragging) {
-      const panel = document.querySelector('.hm-detail-panel.open');
-      if (!panel) { _dragging = false; return; }
-      const newTop = Math.max(0, Math.min(window.innerHeight - 100, _dragStartTop + (e.clientY - _dragStartY)));
-      panel.style.top    = newTop + 'px';
-      panel.style.bottom = 'auto';
-      panel.style.height = (window.innerHeight - newTop) + 'px';
-    }
-  });
-
-  document.addEventListener('mouseup', () => {
-    if (_resizing) {
-      document.querySelectorAll('.hm-resize-grip').forEach(g => g.classList.remove('dragging'));
-      _resizing = false;
-      document.body.style.userSelect = '';
-    }
-    if (_dragging) {
-      _dragging = false;
-      document.body.style.userSelect = '';
-    }
-  });
-
-  // ── DRAG HEADER (kéo lên/xuống) ──
-  document.addEventListener('mousedown', e => {
-    if (e.target.classList.contains('hm-detail-close')) return;
-    if (e.target.closest('.hm-resize-grip')) return;
-    const hd = e.target.closest('.hm-detail-hd');
-    if (!hd) return;
-    const panel = hd.closest('.hm-detail-panel');
-    if (!panel) return;
-    e.preventDefault();
-    _dragging = true;
-    _dragStartY   = e.clientY;
-    _dragStartTop = panel.style.top ? parseInt(panel.style.top, 10) : 0;
-    document.body.style.userSelect = 'none';
-  });
-
-  // ── TOUCH RESIZE ──
-  document.addEventListener('touchstart', e => {
-    const grip = e.target.closest('.hm-resize-grip');
-    if (!grip) return;
-    const panel = grip.closest('.hm-detail-panel');
-    if (!panel) return;
-    _resizing = true;
-    _resizeStartX = e.touches[0].clientX;
-    _resizeStartW = panel.offsetWidth;
-  }, { passive: true });
-
-  document.addEventListener('touchmove', e => {
-    if (!_resizing) return;
-    const panel = document.querySelector('.hm-detail-panel.open');
-    if (!panel) { _resizing = false; return; }
-    const newW = Math.max(280, Math.min(window.innerWidth * 0.75, _resizeStartW + (_resizeStartX - e.touches[0].clientX)));
-    panel.style.width = newW + 'px';
-  }, { passive: true });
-
-  document.addEventListener('touchend', () => { _resizing = false; });
-
-  // ── ESCAPE để đóng ──
-  document.addEventListener('keydown', e => {
-    if (e.key !== 'Escape') return;
-    const panel = document.getElementById('hm-detail-panel');
-    if (panel && panel.classList.contains('open')) {
-      panel.classList.remove('open');
-      panel.style.top = ''; panel.style.bottom = ''; panel.style.height = '';
-      const bd = document.getElementById('hm-detail-backdrop');
-      if (bd) bd.style.display = 'none';
-    }
-  });
-})();
-
-// Không cần _hmPanelInitDrag nữa – giữ stub để không lỗi các lần gọi cũ
-function _hmPanelInitDrag(panel) {
-  if (!panel || panel._dragInited) return;
-  panel._dragInited = true;
-
-  // ── Ensure panel is display:flex flex-direction:column ──
-  panel.style.display = 'flex';
-  panel.style.flexDirection = 'column';
-  panel.style.overflow = 'hidden';
-
-  // ── Add resize grip if not present ──
-  if (!panel.querySelector('.hm-resize-grip')) {
-    const grip = document.createElement('div');
-    grip.className = 'hm-resize-grip';
-    panel.insertBefore(grip, panel.firstChild);
-  }
-
-  // ── Ensure all flex:1 children are scrollable ──
-  panel.querySelectorAll('[style*="flex:1"]').forEach(el => {
-    el.style.overflowY = 'auto';
-    el.style.minHeight = '0';
-    el.style.overscrollBehavior = 'contain';
-    el.style.webkitOverflowScrolling = 'touch';
-  });
-
-  // ── LEFT EDGE DRAG = RESIZE WIDTH ──
-  const grip2 = panel.querySelector('.hm-resize-grip');
-  if (grip2) {
-    let startX, startW;
-    grip2.addEventListener('mousedown', e => {
-      e.preventDefault();
-      startX = e.clientX;
-      startW = panel.offsetWidth;
-      grip2.classList.add('dragging');
-      const onMove = ev => {
-        const newW = Math.max(260, Math.min(window.innerWidth * 0.7, startW + (startX - ev.clientX)));
-        panel.style.width = newW + 'px';
-      };
-      const onUp = () => {
-        grip2.classList.remove('dragging');
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
-      };
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
-    });
-    // Touch resize
-    grip2.addEventListener('touchstart', e => {
-      const t0 = e.touches[0]; startX = t0.clientX; startW = panel.offsetWidth;
-    }, { passive: true });
-    grip2.addEventListener('touchmove', e => {
-      const t0 = e.touches[0];
-      const newW = Math.max(260, Math.min(window.innerWidth * 0.7, startW + (startX - t0.clientX)));
-      panel.style.width = newW + 'px';
-    }, { passive: true });
-  }
-
-  // ── HEADER DRAG = VERTICAL POSITION ──
-  const hd = panel.querySelector('.hm-detail-hd');
-  if (hd) {
-    let startY, startTop;
-    hd.addEventListener('mousedown', e => {
-      if (e.target.classList.contains('hm-detail-close')) return;
-      e.preventDefault();
-      startY = e.clientY;
-      startTop = parseInt(panel.style.top || '0', 10);
-      const onMove = ev => {
-        const newTop = Math.max(0, Math.min(window.innerHeight - 80, startTop + ev.clientY - startY));
-        panel.style.top = newTop + 'px';
-        panel.style.bottom = 'auto';
-        panel.style.height = (window.innerHeight - newTop) + 'px';
-      };
-      const onUp = () => {
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
-      };
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
-    });
-  }
-
-  // ── KEYBOARD CLOSE (Escape) ──
-  if (!window._hmEscBound) {
-    window._hmEscBound = true;
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') {
-        const p = document.getElementById('hm-detail-panel');
-        if (p && p.classList.contains('open')) {
-          p.classList.remove('open');
-          p.style.top = ''; p.style.bottom = ''; p.style.height = '';
-          const bd = document.getElementById('hm-detail-backdrop');
-          if (bd) bd.style.display = 'none';
-        }
-      }
-    });
-  }
-}
-
-// Universal panel open — call after setting innerHTML + classList.add('open')
-function _hmOpenPanel(p, showBackdrop) {
-  _hmPanelInitDrag(p);
-  // Reset panel position
-  p.style.top = ''; p.style.bottom = '0'; p.style.height = '';
-  if (showBackdrop !== false) {
-    let bd = document.getElementById('hm-detail-backdrop');
-    if (!bd) {
-      bd = document.createElement('div');
-      bd.id = 'hm-detail-backdrop';
-      bd.style.cssText = 'position:fixed;inset:0;z-index:9190;background:rgba(0,0,0,.35);display:none;backdrop-filter:blur(1px)';
-      bd.onclick = () => {
-        p.classList.remove('open');
-        p.style.top=''; p.style.bottom='0'; p.style.height='';
-        bd.style.display='none';
-      };
-      document.body.appendChild(bd);
-    }
-    bd.style.display = 'block';
-  }
-  // Focus search if present
-  setTimeout(() => {
-    const si = p.querySelector('input[type=text]');
-    if (si) si.focus();
-  }, 250);
-}
-
-function _lytDetailSearchFn(val) {
-  const q = (val||'').toLowerCase().trim();
+function _hmPanelSearch(q) {
   const body = document.getElementById('hm-detail-body');
   if (!body) return;
-  body.querySelectorAll('.hm-detail-row').forEach(row => {
-    const show = !q || (row.dataset.search||'').includes(q);
-    row.style.display = show ? '' : 'none';
-    const next = row.nextElementSibling;
-    if (next?.classList.contains('hm-detail-sub-list')) next.style.display = show ? '' : 'none';
-  });
-  body.querySelectorAll('.hm-detail-group').forEach(g => {
-    let sib=g.nextElementSibling, any=false;
-    while(sib&&!sib.classList.contains('hm-detail-group')){ if(sib.classList.contains('hm-detail-row')&&sib.style.display!=='none')any=true; sib=sib.nextElementSibling; }
-    g.style.display = any||!q ? '' : 'none';
+  const term = (q||'').toLowerCase().trim();
+  body.querySelectorAll('[style*="border-bottom"][style*="padding:7px 14px"]').forEach(row => {
+    const g = row.closest('div[style*="border-bottom:1px solid rgba(255,255,255,.05)"]');
+    if (!g) return;
+    const any = !term || g.textContent.toLowerCase().includes(term);
+    g.style.display = any ? '' : 'none';
   });
 }
 
@@ -7772,28 +7566,68 @@ function lytStatsCardClick(label, color) {
     }
     case 'TBA 220kV': {
       title = '⚡ TBA 220kV';
-      const list220 = filteredTrams.filter(t => tramMaxCap[t] === '2');
-      const scope220 = lytBuildScopedNganSets(rows, _chipAllData);
-      list220.forEach(t => {
-        const tRows220 = scope220.scopedRows.filter(r=>(r.Tram||'').trim()===t);
-        const allNgans220 = [...new Set(tRows220.map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))];
-        items.push({ text: t, sub: `${allNgans220.length} ngăn`, color: LYT_CAP_COLORS['2'],
-          detail: _buildTramNganGroups(t, tRows220, allNgans220) });
+      const list_220 = filteredTrams.filter(t => tramMaxCap[t] === '2');
+      const scope_220 = lytBuildScopedNganSets(rows, _chipAllData);
+      const NGAN_GROUPS__220 = [
+        { label:'Ngăn ĐZ',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn ĐZ' },
+        { label:'Ngăn MBA',          fn: r=>lytIsMBARow(r) },
+        { label:'Ngăn XT',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn XT' },
+        { label:'Ngăn LL',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn LL' },
+        { label:'Ngăn Tụ bù (TBN)', fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn TBN'||((r.Phan_loai_thiet_bi||'').trim().toUpperCase().includes('TBN')) },
+        { label:'Ngăn Tự dùng (TD)',fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='NgănTD'||((r.Phan_loai_thiet_bi||'').trim().toUpperCase()==='MBATD') },
+        { label:'Ngăn Kháng',        fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn Kháng' },
+      ];
+      list_220.forEach(t => {
+        const tRows_220 = scope_220.scopedRows.filter(r=>(r.Tram||'').trim()===t);
+        const allNgans_220 = [...new Set(tRows_220.map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))];
+        // Build 2-level children: each group is a child with its ngăn as detail
+        const catSet_220 = new Set();
+        const children_220 = [];
+        NGAN_GROUPS__220.forEach(g => {
+          const gNgans = [...new Set(tRows_220.filter(g.fn).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))].sort();
+          if (!gNgans.length) return;
+          gNgans.forEach(n => catSet_220.add(n));
+          children_220.push({ text: g.label, sub: `${gNgans.length} ngăn`, color: LYT_CAP_COLORS['2'], detail: gNgans });
+        });
+        // Uncategorized ngăn
+        const uncat_220 = allNgans_220.filter(n=>!catSet_220.has(n)).sort();
+        if (uncat_220.length) children_220.push({ text: 'Ngăn khác', sub: `${uncat_220.length} ngăn`, color: LYT_CAP_COLORS['2'], detail: uncat_220 });
+        items.push({ text: t, sub: `${allNgans_220.length} ngăn`, color: LYT_CAP_COLORS['2'], children: children_220 });
       });
-      totalLine = `${list220.length} trạm`;
+      totalLine = `${list_220.length} trạm`;
       break;
     }
     case 'TBA 110kV': {
       title = '⚡ TBA 110kV';
-      const list110 = filteredTrams.filter(t => tramMaxCap[t] === '1');
-      const scope110 = lytBuildScopedNganSets(rows, _chipAllData);
-      list110.forEach(t => {
-        const tRows110 = scope110.scopedRows.filter(r=>(r.Tram||'').trim()===t);
-        const allNgans110 = [...new Set(tRows110.map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))];
-        items.push({ text: t, sub: `${allNgans110.length} ngăn`, color: LYT_CAP_COLORS['1'],
-          detail: _buildTramNganGroups(t, tRows110, allNgans110) });
+      const list_110 = filteredTrams.filter(t => tramMaxCap[t] === '1');
+      const scope_110 = lytBuildScopedNganSets(rows, _chipAllData);
+      const NGAN_GROUPS__110 = [
+        { label:'Ngăn ĐZ',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn ĐZ' },
+        { label:'Ngăn MBA',          fn: r=>lytIsMBARow(r) },
+        { label:'Ngăn XT',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn XT' },
+        { label:'Ngăn LL',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn LL' },
+        { label:'Ngăn Tụ bù (TBN)', fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn TBN'||((r.Phan_loai_thiet_bi||'').trim().toUpperCase().includes('TBN')) },
+        { label:'Ngăn Tự dùng (TD)',fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='NgănTD'||((r.Phan_loai_thiet_bi||'').trim().toUpperCase()==='MBATD') },
+        { label:'Ngăn Kháng',        fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn Kháng' },
+      ];
+      list_110.forEach(t => {
+        const tRows_110 = scope_110.scopedRows.filter(r=>(r.Tram||'').trim()===t);
+        const allNgans_110 = [...new Set(tRows_110.map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))];
+        // Build 2-level children: each group is a child with its ngăn as detail
+        const catSet_110 = new Set();
+        const children_110 = [];
+        NGAN_GROUPS__110.forEach(g => {
+          const gNgans = [...new Set(tRows_110.filter(g.fn).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))].sort();
+          if (!gNgans.length) return;
+          gNgans.forEach(n => catSet_110.add(n));
+          children_110.push({ text: g.label, sub: `${gNgans.length} ngăn`, color: LYT_CAP_COLORS['1'], detail: gNgans });
+        });
+        // Uncategorized ngăn
+        const uncat_110 = allNgans_110.filter(n=>!catSet_110.has(n)).sort();
+        if (uncat_110.length) children_110.push({ text: 'Ngăn khác', sub: `${uncat_110.length} ngăn`, color: LYT_CAP_COLORS['1'], detail: uncat_110 });
+        items.push({ text: t, sub: `${allNgans_110.length} ngăn`, color: LYT_CAP_COLORS['1'], children: children_110 });
       });
-      totalLine = `${list110.length} trạm`;
+      totalLine = `${list_110.length} trạm`;
       break;
     }
     case 'Tổng số ngăn': {
@@ -8016,22 +7850,43 @@ function lytStatsCardClick(label, color) {
         const pl = (r.Phan_loai_thiet_bi||'Khác').trim();
         if (!byType[pl]) byType[pl] = { qty: 0, trams: {} };
         byType[pl].qty += Number(r.So_luong)||1;
-        const t=(r.Tram||'').trim();
-        if(t){if(!byType[pl].trams[t])byType[pl].trams[t]=[];byType[pl].trams[t].push(r);}
+        const t = (r.Tram||'').trim();
+        if (t) {
+          if (!byType[pl].trams[t]) byType[pl].trams[t] = [];
+          byType[pl].trams[t].push(r);
+        }
       });
       const sorted = Object.entries(byType).sort((a,b)=>a[0].localeCompare(b[0],'vi'));
-      const total = sorted.reduce((s,[,v]) => s + v.qty, 0);
+      const total  = sorted.reduce((s,[,v]) => s + v.qty, 0);
       sorted.forEach(([pl, v]) => {
         const tramList = Object.entries(v.trams).sort((a,b)=>a[0].localeCompare(b[0],'vi'));
-        const detail = tramList.map(([t,rs]) => {
-          const cap = tramMaxCap[t]||'';
+        // Use dominant cap for type color (most common cap among trạm)
+        const capCounts = {};
+        tramList.forEach(([t]) => { const c = tramMaxCap[t]||'1'; capCounts[c]=(capCounts[c]||0)+1; });
+        const domCap = Object.entries(capCounts).sort((a,b)=>b[1]-a[1])[0]?.[0]||'1';
+        const typeColor = LYT_CAP_COLORS[domCap]||'#18ffff';
+        // Build 2-level children: each child = 1 trạm with devices as leaf detail
+        const children = tramList.map(([t, rs]) => {
+          const cap    = tramMaxCap[t]||'';
           const capTag = cap ? ` [${capLbl[cap]||cap}]` : '';
-          const devNames = [...new Set(rs.map(r=>(r.Ten_thiet_bi||r.Ngan_thiet_bi||r.Phan_loai_thiet_bi||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
-          const devStr = devNames.length ? ': ' + devNames.slice(0,6).join(', ') + (devNames.length>6?` …+${devNames.length-6}`:'') : '';
-          return `${pl} ${t}${capTag} — ${rs.length} TB${devStr}`;
+          // Leaf: each device name A-Z, deduplicated
+          const devNames = [...new Set(
+            rs.map(r=>(r.Ten_thiet_bi||r.Ngan_thiet_bi||r.Phan_loai_thiet_bi||'').trim()).filter(Boolean)
+          )].sort((a,b)=>a.localeCompare(b,'vi'));
+          const qty = rs.reduce((s,r)=>s+(Number(r.So_luong)||1),0);
+          return {
+            text: `${t}${capTag}`,
+            sub:  `${qty} TB`,
+            color: LYT_CAP_COLORS[cap]||typeColor,
+            detail: devNames,
+          };
         });
-        const typeColor = LYT_CAP_COLORS[tramList.length?tramMaxCap[tramList[0][0]]||'1':'1']||'#18ffff';
-        items.push({ text: pl, sub: `${v.qty.toLocaleString('vi-VN')} TB · ${tramList.length} trạm`, color: typeColor, detail });
+        items.push({
+          text:     pl,
+          sub:      `${v.qty.toLocaleString('vi-VN')} TB · ${tramList.length} trạm`,
+          color:    typeColor,
+          children,
+        });
       });
       totalLine = `${total.toLocaleString('vi-VN')} thiết bị · ${sorted.length} loại`;
       break;
