@@ -6874,7 +6874,7 @@ function _lfApply() {
   _recomputeStatsWithFilter();
   renderChipsSection();
   renderChartsSection();
-  renderTimelineSection();
+  renderTimelineSection();          // ← sync timeline with filter
 }
 
 function lytFddReset(uid) {
@@ -7621,6 +7621,7 @@ function lytChipToggle(type) {
   }
   renderChipsSection();
   renderChartsSection();
+  renderTimelineSection();          // ← cập nhật timeline khi filter thay đổi
   if (_chipAllData.length > 0) _recomputeStatsWithFilter();
 
   // Show detail panel — same style as stats card panel
@@ -7781,18 +7782,68 @@ function lytStatsCardClick(label, color) {
     }
     case 'Tổng số ngăn': {
       title = '▦ Tổng số ngăn';
-      const nganScope = lytBuildScopedNganSets(rows, _chipAllData);
+      const nganScope2 = lytBuildScopedNganSets(rows, _chipAllData);
+
+      // Build per-tram, per-type ngan counts
+      const nganTypes = [
+        { key:'dz',    label:'Ngăn ĐZ',        set: nganScope2.dz    },
+        { key:'mba',   label:'Ngăn MBA',        set: nganScope2.mba   },
+        { key:'xt',    label:'Ngăn Xuất tuyến', set: nganScope2.xt    },
+        { key:'ll',    label:'Ngăn LL',         set: nganScope2.ll    },
+        { key:'td',    label:'Ngăn Tự dùng',    set: nganScope2.td,   meta: nganScope2.tdMeta   },
+        { key:'tbn',   label:'Ngăn Tụ bù',      set: nganScope2.tbn,  meta: nganScope2.tbnMeta  },
+        { key:'khang', label:'Ngăn Kháng',      set: nganScope2.khang },
+      ];
+
       const byTram = {};
-      nganScope.total.forEach(key => {
-        const [tram, ngan] = key.split('|||');
-        if (!tram || !ngan) return;
-        if (!byTram[tram]) byTram[tram] = new Set();
-        byTram[tram].add(ngan);
+      nganScope2.total.forEach(k => {
+        const [tram, ngan] = k.split('|||'); if(!tram||!ngan) return;
+        if(!byTram[tram]) byTram[tram] = { total:new Set(), types:{} };
+        byTram[tram].total.add(ngan);
       });
+      nganTypes.forEach(({ key, label, set, meta }) => {
+        set.forEach(k => {
+          const [tram, ngan] = k.split('|||'); if(!tram||!ngan) return;
+          if(!byTram[tram]) byTram[tram] = { total:new Set(), types:{} };
+          if(!byTram[tram].types[label]) byTram[tram].types[label] = [];
+          const status = meta ? (meta.get(k) === 'chua_khai_thac' ? ' (chưa khai thác)' : '') : '';
+          byTram[tram].types[label].push(ngan + status);
+        });
+        // Also add "chưa khai thác" entries for td/tbn
+        if (meta) {
+          meta.forEach((v, k) => {
+            if (v !== 'chua_khai_thac') return;
+            const [tram, ngan] = k.split('|||'); if(!tram||!ngan) return;
+            if(!byTram[tram]) byTram[tram] = { total:new Set(), types:{} };
+            if(!byTram[tram].types[label]) byTram[tram].types[label] = [];
+            // Check if already added
+            if (!byTram[tram].types[label].some(x=>x.startsWith(ngan))) {
+              byTram[tram].types[label].push(ngan + ' (chưa khai thác)');
+            }
+          });
+        }
+      });
+
       let total = 0;
       filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const cnt = byTram[t].size; total += cnt;
-        items.push({ text: t, sub: `${cnt} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888' });
+        const cnt = byTram[t].total.size; total += cnt;
+        // Build detail: group by ngan type
+        const detail = Object.entries(byTram[t].types)
+          .sort((a,b) => a[0].localeCompare(b[0],'vi'))
+          .map(([typeLbl, ngans]) => {
+            const activeNgans = ngans.filter(n => !n.includes('chưa khai thác'));
+            const inactive = ngans.filter(n => n.includes('chưa khai thác'));
+            let line = `${typeLbl}: ${activeNgans.length} ngăn`;
+            if (activeNgans.length) line += ` (${activeNgans.slice(0,5).join(', ')}${activeNgans.length>5?'…':''})`;
+            if (inactive.length) line += ` · ${inactive.length} chưa khai thác`;
+            return line;
+          });
+        items.push({
+          text:   t,
+          sub:    `${cnt} ngăn`,
+          color:  LYT_CAP_COLORS[tramMaxCap[t]]||'#888',
+          detail,
+        });
       });
       totalLine = `${total} ngăn / ${items.length} trạm`;
       break;
@@ -7871,38 +7922,57 @@ function lytStatsCardClick(label, color) {
     }
     case 'Ngăn tụ bù (TBN)': {
       title = '🔋 Ngăn Tụ Bù (TBN)';
-      const nganScope = lytBuildScopedNganSets(rows, _chipAllData);
-      const byTram = {};
-      nganScope.tbn.forEach(key => {
-        const [tram, ngan] = key.split('|||');
-        if (!tram || !ngan) return;
-        if (!byTram[tram]) byTram[tram] = new Set();
-        byTram[tram].add(ngan);
+      const _tbnScope = lytBuildScopedNganSets(rows, _chipAllData);
+      const byTramTBN = {};
+      _tbnScope.tbnAll.forEach(key => {
+        const [tram, ngan] = key.split('|||'); if(!tram||!ngan) return;
+        if(!byTramTBN[tram]) byTramTBN[tram] = { active:[], inactive:[] };
+        const ckhai = (_tbnScope.tbnMeta?.get(key)||'') === 'chua_khai_thac';
+        if (ckhai) byTramTBN[tram].inactive.push(ngan);
+        else       byTramTBN[tram].active.push(ngan);
       });
       let total = 0;
-      filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort(); total += ngans.length;
-        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
+      filteredTrams.filter(t => byTramTBN[t]).forEach(t => {
+        const { active, inactive } = byTramTBN[t];
+        total += active.length;
+        const detail = [
+          ...active.sort().map(n => `${n} — Ngăn TBN (có thiết bị tụ bù)`),
+          ...inactive.sort().map(n => `${n} — Ngăn TBN (chưa khai thác)`),
+        ];
+        const sub = active.length
+          ? `${active.length} ngăn${inactive.length?' · '+inactive.length+' chưa khai thác':''}`
+          : `${inactive.length} ngăn (chưa khai thác)`;
+        items.push({ text: t, sub, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail });
       });
-      totalLine = `${total} ngăn TBN / ${Object.keys(byTram).length} trạm`;
+      totalLine = `${total} ngăn TBN / ${filteredTrams.size} trạm`;
       break;
     }
     case 'Ngăn tự dùng (TD)': {
       title = '🔌 Ngăn Tự Dùng (TD)';
-      const nganScope = lytBuildScopedNganSets(rows, _chipAllData);
-      const byTram = {};
-      nganScope.td.forEach(key => {
-        const [tram, ngan] = key.split('|||');
-        if (!tram || !ngan) return;
-        if (!byTram[tram]) byTram[tram] = new Set();
-        byTram[tram].add(ngan);
+      const _tdScope = lytBuildScopedNganSets(rows, _chipAllData);
+      // Use tdAll (includes chưa khai thác) for display, tdActiveSet for count
+      const byTramTD = {};
+      _tdScope.tdAll.forEach(key => {
+        const [tram, ngan] = key.split('|||'); if(!tram||!ngan) return;
+        if(!byTramTD[tram]) byTramTD[tram] = { active:[], inactive:[] };
+        const status = (_tdScope.tdMeta?.get(key)||'') === 'chua_khai_thac';
+        if (status) byTramTD[tram].inactive.push(ngan);
+        else        byTramTD[tram].active.push(ngan);
       });
       let total = 0;
-      filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort(); total += ngans.length;
-        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
+      filteredTrams.filter(t => byTramTD[t]).forEach(t => {
+        const { active, inactive } = byTramTD[t];
+        total += active.length; // chỉ đếm ngăn có MBATD
+        const detail = [
+          ...active.sort().map(n => `${n} — Ngăn TD (có MBATD)`),
+          ...inactive.sort().map(n => `${n} — Ngăn TD (chưa khai thác)`),
+        ];
+        const sub = active.length
+          ? `${active.length} ngăn${inactive.length?' · '+inactive.length+' chưa khai thác':''}`
+          : `${inactive.length} ngăn (chưa khai thác)`;
+        items.push({ text: t, sub, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail });
       });
-      totalLine = `${total} ngăn TD / ${Object.keys(byTram).length} trạm`;
+      totalLine = `${total} ngăn TD / ${filteredTrams.size} trạm`;
       break;
     }
     case 'Ngăn kháng': {
@@ -7951,18 +8021,42 @@ function lytStatsCardClick(label, color) {
     }
     case 'Tổng công suất': {
       title = '⚡ Tổng công suất MBA';
+      // Build per-tram per-ngan MBA data (deduplicated by Tram+Ngan)
       const byTram2 = {};
+      const mbaSeenCS = new Map(); // avoid double-count
       rows.forEach(r => {
-        const t = (r.Tram||'').trim(); if (!t) return;
+        const t   = (r.Tram||'').trim(); if (!t) return;
+        const pl  = (r.Phan_loai_thiet_bi||'').trim();
+        const cap = String(r.Cap_dien_ap??'');
+        if (pl !== 'MBA' || (cap !== '1' && cap !== '2')) return;
+        const ng  = (r.Ngan_thiet_bi||'').trim();
+        const csKey = t + '|||' + ng;
         const cs = Number(r.Cong_suat)||0;
-        if (!byTram2[t]) byTram2[t] = { cs: 0, cap: String(r.Cap_dien_ap??'') };
-        byTram2[t].cs += cs;
+        if (!byTram2[t]) byTram2[t] = { cs:0, cap, ngans:{} };
+        // Deduplicate per ngan (take max)
+        if (!byTram2[t].ngans[ng]) byTram2[t].ngans[ng] = { cs:0, name: r.Ten_thiet_bi||ng };
+        if (cs > byTram2[t].ngans[ng].cs) byTram2[t].ngans[ng].cs = cs;
+      });
+      // Compute tram totals from deduped ngans
+      Object.values(byTram2).forEach(v => {
+        v.cs = Object.values(v.ngans).reduce((s,ng)=>s+ng.cs, 0);
       });
       let total2 = 0;
       filteredTrams.filter(t => byTram2[t]).forEach(t => {
-        const { cs, cap } = byTram2[t];
+        const { cs, cap, ngans } = byTram2[t];
         total2 += cs;
-        if (cs > 0) items.push({ text: t, sub: `${cs.toLocaleString('vi-VN')} MVA`, color: LYT_CAP_COLORS[cap]||'#888' });
+        if (cs <= 0) return;
+        // Build detail: each MBA ngan with its power
+        const detail = Object.entries(ngans)
+          .filter(([,v]) => v.cs > 0)
+          .sort((a,b) => b[1].cs - a[1].cs)
+          .map(([ng, v]) => `${ng}${v.name && v.name!==ng?' · '+v.name:''} — ${v.cs.toLocaleString('vi-VN')} MVA`);
+        items.push({
+          text:   t,
+          sub:    `${cs.toLocaleString('vi-VN')} MVA`,
+          color:  LYT_CAP_COLORS[cap]||'#888',
+          detail,
+        });
       });
       totalLine = `${total2.toLocaleString('vi-VN')} MVA tổng / ${items.length} trạm`;
       break;
@@ -8043,6 +8137,55 @@ function lytBuildScopedNganSets(activeRows, sourceRows = _chipAllData) {
     return n === 'HTTĐ' || n === 'HTTD' || n.startsWith('HTTD');
   };
 
+  // ── Build nganKey sets with extended TD / TBN logic ──
+
+  // Ngăn Tự dùng (TD):
+  // 1. Loai_ngan_lo là "NgănTD" → luôn tính
+  // 2. Trong ngăn đó có thiết bị có Phan_loai_thiet_bi chứa 'MBATD' → cũng tính là ngăn TD
+  // 3. Ngăn Loai_ngan_lo là "NgănTD" nhưng không có MBATD trong ngăn → gán tag "chưa khai thác" và KHÔNG đếm vào total
+  const _tdNganKeys = new Map(); // key → 'active' | 'chua_khai_thac'
+  const _tbnNganKeys = new Map(); // key → 'active' | 'chua_khai_thac'
+
+  scopedRows.forEach(d => {
+    const tram = (d.Tram || '').trim();
+    const ngan = (d.Ngan_thiet_bi || '').trim();
+    if (!tram || !ngan) return;
+    const k = tram + '|||' + ngan;
+    const pl = (d.Phan_loai_thiet_bi || '').trim().toUpperCase().replace(/\s+/g,'');
+    const loai = lytNormalizeNganLoai(d.Loai_ngan_lo);
+
+    // Tự dùng: Loai_ngan_lo = NgănTD hoặc có MBATD trong ngăn
+    const hasMBATD = pl === 'MBATD' || pl.includes('MBATD');
+    const isLoaiTD = loai === 'NgănTD';
+    if (isLoaiTD || hasMBATD) {
+      // Nếu có MBATD thực sự → active; ngăn TD mà không có MBATD → chua_khai_thac
+      const prev = _tdNganKeys.get(k) || 'chua_khai_thac';
+      if (hasMBATD) {
+        _tdNganKeys.set(k, 'active');
+      } else if (!_tdNganKeys.has(k)) {
+        _tdNganKeys.set(k, 'chua_khai_thac');
+      }
+    }
+
+    // Tụ bù (TBN): Loai_ngan_lo = 'Ngăn TBN' hoặc có thiết bị TBN/tụ bù
+    const hasTBNDev = pl === 'TBN' || pl === 'TUBÙ' || pl === 'TUBU' || pl.includes('TBN');
+    const isLoaiTBN = loai === 'Ngăn TBN';
+    if (isLoaiTBN || hasTBNDev) {
+      const prev2 = _tbnNganKeys.get(k) || 'chua_khai_thac';
+      if (hasTBNDev) {
+        _tbnNganKeys.set(k, 'active');
+      } else if (!_tbnNganKeys.has(k)) {
+        _tbnNganKeys.set(k, 'chua_khai_thac');
+      }
+    }
+  });
+
+  // Build active-only sets (for counting) and full sets (for display)
+  const tdActiveSet = new Set([..._tdNganKeys.entries()].filter(([,v])=>v==='active').map(([k])=>k));
+  const tdAllSet    = new Set(_tdNganKeys.keys());     // for panel display (incl. chưa khai thác)
+  const tbnActiveSet = new Set([..._tbnNganKeys.entries()].filter(([,v])=>v==='active').map(([k])=>k));
+  const tbnAllSet    = new Set(_tbnNganKeys.keys());
+
   return {
     filteredTrams,
     scopedRows,
@@ -8051,8 +8194,12 @@ function lytBuildScopedNganSets(activeRows, sourceRows = _chipAllData) {
     mba:    buildSet(d => lytIsMBARow(d)),
     xt:     buildSet(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn XT'),
     ll:     buildSet(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn LL'),
-    tbn:    buildSet(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn TBN'),
-    td:     buildSet(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'NgănTD'),
+    tbn:    tbnActiveSet,       // chỉ đếm ngăn có TBN thực sự
+    tbnAll: tbnAllSet,           // gồm cả "chưa khai thác" (dùng cho panel)
+    tbnMeta: _tbnNganKeys,       // 'active' | 'chua_khai_thac'
+    td:     tdActiveSet,         // chỉ đếm ngăn có MBATD thực sự
+    tdAll:  tdAllSet,
+    tdMeta: _tdNganKeys,
     khang:  buildSet(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn Kháng'),
   };
 }
@@ -10329,6 +10476,147 @@ function _bcRenderByMonth(conf) {
       return age === 0 ? '#00e676' : age === 1 ? '#00c8ff' : '#607d8b';
     })}
   </div>
+
+  <!-- ── MẪU BÁO CÁO KL TN ĐỊNH KỲ THEO PDF ── -->
+  ${(()=>{
+    const nowY2=new Date().getFullYear(), nowM2=new Date().getMonth()+1;
+    // Group by device type + sub-cap: MBA > 220kV, MBA > 110kV, MBA > TD, MC > 110kV, MC > TA...
+    // Use Phan_loai_thiet_bi + Cap_dien_ap for rows
+    const CAP_LBL = {'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+    const DVT_MAP = {
+      'MBA':'máy','MC':'máy','DCL':'bộ','DTD':'bộ','CSV':'bộ','Cáp':'sợi',
+      'TU':'máy','TI':'máy','TBN':'quả','MBA điện áp':'máy','GIS':'bộ',
+    };
+    // Define display order from PDF
+    const PDF_ROWS = [
+      {type:'MBA',    cap:'2', label:'MBA 220kV',          dvt:'máy'},
+      {type:'MBA',    cap:'1', label:'MBA 110kV',          dvt:'máy'},
+      {type:'MBA',    cap:'0', label:'MBA Tự dùng (TD)',   dvt:'máy'},
+      {type:'MC',     cap:'1', label:'MC 110kV',           dvt:'máy'},
+      {type:'MC',     cap:null,label:'MC Trung áp',        dvt:'máy'},
+      {type:'GIS',    cap:null,label:'GIS',                dvt:'bộ'},
+      {type:'DCL',    cap:'1', label:'DCL 110kV',          dvt:'bộ'},
+      {type:'DCL',    cap:null,label:'DCL Trung áp',       dvt:'bộ'},
+      {type:'DTD',    cap:'1', label:'DTD 3pha 110kV',     dvt:'bộ'},
+      {type:'DTD',    cap:null,label:'DTD 3pha Trung áp',  dvt:'bộ'},
+      {type:'CSV',    cap:'1', label:'CSV 110kV',          dvt:'bộ'},
+      {type:'CSV',    cap:null,label:'CSV Trung áp',       dvt:'bộ'},
+      {type:'Cáp',    cap:null,label:'Cáp lực trung thế',  dvt:'sợi'},
+      {type:'TU',     cap:'1', label:'TU 110kV',           dvt:'máy'},
+      {type:'TU',     cap:null,label:'TU Trung áp',        dvt:'máy'},
+      {type:'TI',     cap:'1', label:'TI 110kV',           dvt:'máy'},
+      {type:'TI',     cap:null,label:'TI Trung áp',        dvt:'máy'},
+      {type:'TBN',    cap:null,label:'Tụ bù (TBN)',         dvt:'quả'},
+    ];
+
+    // For each PDF row, compute: tongDuKien (plan), thang[1..12] (done by month), luyKe, tyLe
+    function getPdfRowData(pdfRow) {
+      const yearFilter = _bcFYear ? Number(_bcFYear) : nowY2;
+      // Plan = Thoi_gian_thi_nghiem_tiep_theo in target year
+      // Done = Ngay_thi_nghiem in target year
+      const match = r => {
+        const pl = (r.Phan_loai_thiet_bi||'').trim();
+        if (pl !== pdfRow.type) return false;
+        if (pdfRow.cap !== null && String(r.Cap_dien_ap??'') !== pdfRow.cap) return false;
+        if (pdfRow.cap === null) {
+          // Trung áp = NOT the specific caps above for this type
+          const siblingCaps = PDF_ROWS.filter(p=>p.type===pdfRow.type&&p.cap!==null).map(p=>p.cap);
+          if (siblingCaps.includes(String(r.Cap_dien_ap??''))) return false;
+        }
+        return true;
+      };
+      const planRows = rawData.filter(r => {
+        if (!match(r)) return false;
+        const ds = r.Thoi_gian_thi_nghiem_tiep_theo;
+        if (!ds) return false;
+        const d = new Date(ds);
+        return d.getFullYear() === yearFilter;
+      });
+      const doneRows = rawData.filter(r => {
+        if (!match(r)) return false;
+        const ds = r.Ngay_thi_nghiem;
+        if (!ds) return false;
+        const d = new Date(ds);
+        return d.getFullYear() === yearFilter;
+      });
+      // Count by month (use So_luong if available, else 1)
+      const countQty = rows => rows.reduce((s,r)=>s+(Number(r.So_luong)||1),0);
+      const tongDuKien = countQty(planRows);
+      const byMonth = {};
+      for(let m=1;m<=12;m++) byMonth[m]=0;
+      doneRows.forEach(r=>{
+        const d=new Date(r.Ngay_thi_nghiem);
+        const m=d.getMonth()+1;
+        byMonth[m]+=(Number(r.So_luong)||1);
+      });
+      const luyKe = Object.values(byMonth).reduce((s,v)=>s+v,0);
+      const tyLe = tongDuKien>0?((luyKe/tongDuKien)*100).toFixed(1)+'%':'—';
+      const conLai = Math.max(0, tongDuKien - luyKe);
+      return { tongDuKien, byMonth, luyKe, tyLe, conLai };
+    }
+
+    const months12 = Array.from({length:12},(_,i)=>i+1);
+    const yearFilter2 = _bcFYear ? Number(_bcFYear) : nowY2;
+
+    const thStyle = 'padding:4px 6px;font-size:8.5px;font-weight:700;color:var(--text-muted);border:1px solid rgba(255,255,255,.08);text-align:center;white-space:nowrap;background:rgba(255,255,255,.04)';
+    const tdStyle = v => `padding:3px 6px;font-size:9px;font-family:var(--font-mono);border:1px solid rgba(255,255,255,.06);text-align:right;color:${v>0?'rgba(200,230,220,.9)':'rgba(255,255,255,.2)'}`;
+    const tdStylePlan = v => `padding:3px 6px;font-size:9px;font-family:var(--font-mono);border:1px solid rgba(255,255,255,.06);text-align:right;color:${v>0?'var(--accent)':'rgba(255,255,255,.2)'}`;
+    const tdStylePct = pct => {
+      const n = parseFloat(pct);
+      const col = isNaN(n)?'rgba(255,255,255,.3)':n>=100?'#00e676':n>=80?'var(--accent)':n>=50?'#ffd740':'#ff5252';
+      return `padding:3px 6px;font-size:9px;font-family:var(--font-mono);border:1px solid rgba(255,255,255,.06);text-align:right;font-weight:700;color:${col}`;
+    };
+
+    const tableRows = PDF_ROWS.map((row, i) => {
+      const d = getPdfRowData(row);
+      const monthCells = months12.map(m => {
+        const v = d.byMonth[m];
+        return `<td style="${tdStyle(v)}">${v||'—'}</td>`;
+      }).join('');
+      const highlight = d.tongDuKien===0 ? 'opacity:.45' : '';
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);${highlight}">
+        <td style="padding:3px 6px;font-size:9px;border:1px solid rgba(255,255,255,.06);text-align:center;color:rgba(255,255,255,.4)">${i+1}</td>
+        <td style="padding:3px 8px;font-size:9px;border:1px solid rgba(255,255,255,.06);color:rgba(215,230,245,.9);white-space:nowrap">${row.label}</td>
+        <td style="padding:3px 6px;font-size:9px;border:1px solid rgba(255,255,255,.06);text-align:center;color:rgba(255,255,255,.4)">${row.dvt}</td>
+        <td style="${tdStylePlan(d.tongDuKien)}">${d.tongDuKien||'—'}</td>
+        ${monthCells}
+        <td style="${tdStylePlan(d.luyKe)}">${d.luyKe||'—'}</td>
+        <td style="${tdStylePct(d.tyLe)}">${d.tyLe}</td>
+        <td style="${tdStyle(d.conLai)}">${d.conLai||'—'}</td>
+      </tr>`;
+    }).join('');
+
+    return `<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em">
+          MẪU KHỐI LƯỢNG TN ĐỊNH KỲ NĂM ${yearFilter2}
+        </div>
+        <span style="font-size:9px;color:rgba(0,200,255,.6)">Cập nhật: ${new Date().toLocaleDateString('vi-VN')}</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:9px">
+          <thead>
+            <tr>
+              <th style="${thStyle}" rowspan="2">TT</th>
+              <th style="${thStyle}" rowspan="2">Thiết bị TN, kiểm định</th>
+              <th style="${thStyle}" rowspan="2">ĐVT</th>
+              <th style="${thStyle}" rowspan="2">Tổng số<br>dự kiến</th>
+              <th style="${thStyle}" colspan="12">Đã thực hiện trong tháng</th>
+              <th style="${thStyle}" rowspan="2">Lũy kế<br>thực hiện</th>
+              <th style="${thStyle}" rowspan="2">Tỷ lệ<br>hoàn thành</th>
+              <th style="${thStyle}" rowspan="2">Còn lại</th>
+            </tr>
+            <tr>
+              ${months12.map(m=>`<th style="${thStyle}">T${m}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  })()}
 
   <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px">
     <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:10px">CHI TIẾT THEO THÁNG × LOẠI THIẾT BỊ</div>
