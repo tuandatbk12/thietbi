@@ -1010,6 +1010,7 @@ function buildSectionWrapper(item, idx) {
   prev.className = 'card-preview';
   prev.innerHTML = getPreview(item.type, { ...item.props, _uid: item.uid });
 
+
   const rh = document.createElement('div');
   rh.className = 'resize-handle';
 
@@ -1509,10 +1510,13 @@ const _renderTechChart = (c, cardUid, ci) => {
     let html = `<div class="ic-tech-cap" style="display:flex;align-items:center;gap:6px;justify-content:space-between">
       <span>⚡</span>${dropHV}</div>`;
     html += `<div class="ic-tech-grid">`;
-    html += barItem('ais',    'AIS',        ais,    maxHV);
-    html += barItem('honhop', 'HGIS – AIS', honhop, maxHV);
-    html += barItem('gis',    'GIS',        gis,    maxHV);
-    html += barItem('hgis',   'HGIS',       hgis,   maxHV);
+    if (ais    > 0) html += barItem('ais',    'AIS',        ais,    maxHV);
+    if (honhop > 0) html += barItem('honhop', 'HGIS – AIS', honhop, maxHV);
+    if (gis    > 0) html += barItem('gis',    'GIS',        gis,    maxHV);
+    if (hgis   > 0) html += barItem('hgis',   'HGIS',       hgis,   maxHV);
+    // Nếu tất cả = 0 (section trống), hiện AIS mặc định
+    if (ais === 0 && gis === 0 && hgis === 0 && honhop === 0)
+      html += barItem('ais', 'AIS', 0, 1);
     html += `</div>`;
     return html;
   }
@@ -1520,11 +1524,15 @@ const _renderTechChart = (c, cardUid, ci) => {
   function buildLVSection() {
     // 22kV: GIS | GIS+KCK (hỗn hợp) | KCK (Khí-Chân không)
     const t = t22;
+    const total = (t.GIS||0) + (t.KCK||0) + (t.GIS_KCK||0);
+    if (total === 0) return ''; // Không có thiết bị 22-35kV -> ẩn section
     const maxV = Math.max(t.GIS||0, t.GIS_KCK||0, t.KCK||0, 1);
     let html = `<div class="ic-tech-cap" style="margin-top:8px">⚡ 22 – 35kV</div>`;
     html += `<div class="ic-tech-grid">`;
-    html += barItem('gis',    'GIS',              t.GIS||0,     maxV);
-    html += barItem('kck',    'Khí – Chân không', t.KCK||0,     maxV);
+    if ((t.GIS||0) > 0)
+      html += barItem('gis',    'GIS',              t.GIS||0,     maxV);
+    if ((t.KCK||0) > 0)
+      html += barItem('kck',    'Khí – Chân không', t.KCK||0,     maxV);
     if ((t.GIS_KCK||0) > 0)
       html += barItem('honhop', 'GIS + KCK',      t.GIS_KCK||0, maxV);
     html += `</div>`;
@@ -1675,29 +1683,43 @@ function getPreview(type, props) {
           ${extraHtml}
         </div>
       ` : `
-        <div class="ic-body">
-          <div class="ic-icon" ${isComputed ? '' : 'contenteditable="true" spellcheck="false"'}
+                <div class="ic-body" style="${isComputed?'flex-direction:row;align-items:stretch;gap:10px':''}">
+          ${isComputed ? (()=>{
+            const vStr=String(c.value||'');
+            const digits=vStr.replace(/[^0-9]/g,'').length;
+            const fs=digits<=2?58:digits<=3?48:digits<=4?40:digits<=5?32:26;
+            return `<div style="display:flex;flex-direction:column;justify-content:space-between;flex:1;min-width:0;cursor:pointer"
+              onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\\'")}','${c.color}')">
+              <div style="font-size:${c.iconSize||20}px;filter:brightness(1.2)">${c.icon||'▣'}</div>
+              <div style="font-size:clamp(9px,.85vw,11.5px);font-weight:500;color:rgba(195,215,235,.9);white-space:normal;line-height:1.3">${c.label}</div>
+            </div>
+            <div data-computed="true"
+              style="color:${c.color};font-size:${fs}px;font-weight:900;letter-spacing:-0.05em;line-height:1;align-self:center;flex-shrink:0;text-align:right;cursor:pointer;filter:brightness(1.3);text-shadow:0 0 28px ${c.color}88"
+              onclick="event.stopPropagation();lytStatsCardClick('${c.label.replace(/'/g,"\\'")}','${c.color}')"
+            >${c.value}</div>`;
+          })() : `
+          <div class="ic-icon" contenteditable="true" spellcheck="false"
             data-uid="${uid}" data-ci="${ci}" data-field="icon"
             style="font-size:${c.iconSize||18}px"
-            ${isComputed ? '' : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'||event.key===\'Tab\'){event.preventDefault();this.closest(\'.ic-card\').querySelector(\'.ic-val\').focus()}"'}
+            onblur="icSave(this)" onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();this.closest('.ic-card').querySelector('.ic-val').focus()}"
           >${c.icon||'▣'}</div>
-          <div class="ic-val" ${isComputed ? 'data-computed="true"' : 'contenteditable="true" spellcheck="false"'}
+          <div class="ic-val" contenteditable="true" spellcheck="false"
             style="color:${c.color};font-size:${c.valSize||26}px"
             data-uid="${uid}" data-ci="${ci}" data-field="value"
-            ${isComputed ? `onclick="this.closest('.ic-card').click()"` : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'||event.key===\'Tab\'){event.preventDefault();this.closest(\'.ic-card\').querySelector(\'.ic-lbl\').focus()}"'}
+            onblur="icSave(this)" onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();this.closest('.ic-card').querySelector('.ic-lbl').focus()}"
           >${c.value}</div>
-          <div class="${isComputed ? 'ic-lbl' : 'ic-lbl'}" ${isComputed ? '' : 'contenteditable="true" spellcheck="false"'}
+          <div class="ic-lbl" contenteditable="true" spellcheck="false"
             data-uid="${uid}" data-ci="${ci}" data-field="label"
-            ${isComputed ? `onclick="this.closest('.ic-card').click()"` : 'onblur="icSave(this)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}"'}
-          >${c.label}</div>
+            onblur="icSave(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"
+          >${c.label}</div>`}
         </div>
       `;
 
       return `
       <div class="ic-card ${isTechChart && useTechStackLayout ? 'ic-card-tech-stack' : ''}" id="icc_${uid}_${ci}"
         style="--card-color:${c.color};border-color:${c.color}22;border-top-color:${c.color};cursor:pointer;${placementStyle}"
-        draggable="true"
-        onclick="lytStatsCardClick('${c.label}','${c.color}')"
+        draggable="${isComputed ? 'false' : 'true'}"
+        onclick="if(!event.target.closest('.ic-toolbar')&&!event.target.closest('.ic-sz-btn')&&!event.target.isContentEditable){lytStatsCardClick('${c.label}','${c.color}')}"
         ondragstart="icDragStart(event,'${uid}',${ci})"
         ondragover="icDragOver(event,'${uid}',${ci})"
         ondrop="icDrop(event,'${uid}',${ci})"
@@ -1705,7 +1727,7 @@ function getPreview(type, props) {
         ondragend="icDragEnd(event,'${uid}')">
         ${ratioHtml}
         <div class="ic-toolbar">
-          <span class="ic-tbtn ic-drag-btn"><i class="fas fa-grip-vertical"></i></span>
+          <span class="ic-tbtn ic-drag-btn" draggable="true" ondragstart="event.stopPropagation();icDragStart(event,'${uid}',${ci})" title="Kéo để sắp xếp"><i class="fas fa-grip-vertical"></i></span>
           <button class="ic-tbtn" onclick="icPickColor(event,'${uid}',${ci})" title="Màu"><i class="fas fa-palette"></i></button>
           <div class="ic-size-ctrl" title="Cỡ icon">
             <button class="ic-sz-btn" onclick="icAdjustSize('${uid}',${ci},'icon',-2)">−</button>
@@ -3593,7 +3615,7 @@ function _lfApply() {
   _recomputeStatsWithFilter();
   renderChipsSection();
   renderChartsSection();
-  renderTimelineSection();
+  renderTimelineSection();          // ← sync timeline with filter
 }
 
 function lytFddReset(uid) {
@@ -3699,7 +3721,7 @@ function renderTimelineSection() {
   </div>
 
   <div style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.08em;margin-bottom:8px">
-    PHÂN TÍCH THÂM NIÊN VẬN HÀNH THEO LOẠI THIẾT BỊ
+    PHÂN TÍCH THỜI GIAN VẬN HÀNH THEO LOẠI THIẾT BỊ
     <span style="margin-left:12px;font-weight:400">
       ${TL_BUCKETS.map(b=>`<span style="color:${b.color};margin-right:10px">■ ${b.label}</span>`).join('')}
     </span>
@@ -3802,8 +3824,15 @@ function lytTLBucketClick(type, bucketKey, bucketLabel, color) {
       const yrs=[...info.years].sort();
       const yrStr=yrs.length?(yrs[0]===yrs[yrs.length-1]?`${yrs[0]}`:`${yrs[0]}–${yrs[yrs.length-1]}`):'—';
       const ages=yrs.map(y=>nowY-y);
-      const ageStr=ages.length?`~${Math.round(ages.reduce((s,a)=>s+a,0)/ages.length)}n`:'';
-      items.push({text:t,badge:`${info.qty}TB · ${yrStr}${ageStr?' · '+ageStr:''}`,color:capColor[cap]||'#888'});
+      const ageStr=ages.length?`~${Math.round(ages.reduce((s,a)=>s+a,0)/ages.length)} năm`:'';
+      const tDevices=matched.filter(d=>(d.Tram||'').trim()===t).map(d=>{
+        const nvh=Number(d.Nam_van_hanh)||0,nsx=Number(d.Nam_san_xuat)||0;
+        const refY=nvh>1970?nvh:(nsx>1970?nsx:0);
+        const dAge=refY>0?(nowY-refY):-1;
+        const dn=(d.Ten_thiet_bi||d.Ngan_thiet_bi||d.Phan_loai_thiet_bi||'—').trim();
+        return `${dn}${refY?' · '+refY:''}${dAge>=0?' · ~'+dAge+' năm':''}`;
+      });
+      items.push({text:t,badge:`${info.qty}TB · ${yrStr}${ageStr?' · '+ageStr:''}`,color:capColor[cap]||'#888',detail:tDevices});
     });
   });
   const totalQty = matched.reduce((s,d)=>s+(Number(d.So_luong)||1),0);
@@ -3821,16 +3850,31 @@ function _lytShowDetailPanel(title, color, totalLine, items, mbaSection) {
     p.className = 'hm-detail-panel';
     document.body.appendChild(p);
   }
+  let _pIdx=0;
   const bodyHtml = items.map(item => {
-    if (item.isGroup) return `<div class="hm-detail-group" style="color:${item.color}">${item.text}</div>`;
-    const detHtml = item.detail
-      ? `<div class="hm-detail-sub-list">${item.detail.map(n=>`<div class="hm-detail-sub-item">• ${n}</div>`).join('')}</div>`
-      : '';
+    if (item.isGroup) return `<div style="padding:9px 16px 4px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${item.color};border-bottom:1px solid rgba(255,255,255,.06);opacity:.9">${item.text}</div>`;
     const badge = item.badge || item.sub || '';
-    return `<div class="hm-detail-row" data-search="${(item.text||'').toLowerCase()}">
-      <span class="hm-dr-name">${item.text}</span>
-      <span class="hm-dr-badge" style="background:${item.color}22;color:${item.color}">${badge}</span>
-    </div>${detHtml}`;
+    const hasDetail = Array.isArray(item.detail) && item.detail.length > 0;
+    const uid = 'pd'+(++_pIdx);
+    const detHtml = hasDetail
+      ? `<div id="${uid}" style="display:none;border-bottom:1px solid rgba(255,255,255,.06)">${
+          item.detail.map(n=>`<div style="padding:4px 12px 4px 32px;font-size:10.5px;color:rgba(175,205,225,.85);display:flex;align-items:flex-start;gap:5px;border-bottom:1px solid rgba(255,255,255,.03)">
+            <span style="color:${item.color};opacity:.55;flex-shrink:0;margin-top:1px">▸</span>
+            <span>${n}</span>
+          </div>`).join('')
+        }</div>`
+      : '';
+    const togBtn = hasDetail
+      ? `<button onclick="event.stopPropagation();(function(btn,id){var el=document.getElementById(id);if(!el)return;var op=el.style.display!=='none';el.style.display=op?'none':'block';btn.textContent=op?'+':'-';btn.style.background=op?'rgba(255,255,255,.06)':'rgba(0,200,255,.15)';btn.style.color=op?'rgba(220,235,250,.8)':'var(--accent)';})(this,'${uid}')" style="width:20px;height:20px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(220,235,250,.8);font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;transition:all .15s">+</button>`
+      : `<span style="width:20px;flex-shrink:0;display:inline-block"></span>`;
+    return `<div style="border-bottom:1px solid rgba(255,255,255,.05)">
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 14px">
+        ${togBtn}
+        <span style="font-size:12px;color:rgba(215,232,248,.92);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${item.text}</span>
+        <span style="background:${item.color}25;color:${item.color};font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0">${badge}</span>
+      </div>
+      ${detHtml}
+    </div>`;
   }).join('');
 
   p.innerHTML = `
@@ -3965,39 +4009,127 @@ function _lytShowDetailPanel(title, color, totalLine, items, mbaSection) {
 
 // Không cần _hmPanelInitDrag nữa – giữ stub để không lỗi các lần gọi cũ
 function _hmPanelInitDrag(panel) {
-  if (!panel) return;
-  panel.style.display       = 'flex';
+  if (!panel || panel._dragInited) return;
+  panel._dragInited = true;
+
+  // ── Ensure panel is display:flex flex-direction:column ──
+  panel.style.display = 'flex';
   panel.style.flexDirection = 'column';
-  panel.style.overflow      = 'hidden';
+  panel.style.overflow = 'hidden';
+
+  // ── Add resize grip if not present ──
+  if (!panel.querySelector('.hm-resize-grip')) {
+    const grip = document.createElement('div');
+    grip.className = 'hm-resize-grip';
+    panel.insertBefore(grip, panel.firstChild);
+  }
+
+  // ── Ensure all flex:1 children are scrollable ──
+  panel.querySelectorAll('[style*="flex:1"]').forEach(el => {
+    el.style.overflowY = 'auto';
+    el.style.minHeight = '0';
+    el.style.overscrollBehavior = 'contain';
+    el.style.webkitOverflowScrolling = 'touch';
+  });
+
+  // ── LEFT EDGE DRAG = RESIZE WIDTH ──
+  const grip2 = panel.querySelector('.hm-resize-grip');
+  if (grip2) {
+    let startX, startW;
+    grip2.addEventListener('mousedown', e => {
+      e.preventDefault();
+      startX = e.clientX;
+      startW = panel.offsetWidth;
+      grip2.classList.add('dragging');
+      const onMove = ev => {
+        const newW = Math.max(260, Math.min(window.innerWidth * 0.7, startW + (startX - ev.clientX)));
+        panel.style.width = newW + 'px';
+      };
+      const onUp = () => {
+        grip2.classList.remove('dragging');
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+    // Touch resize
+    grip2.addEventListener('touchstart', e => {
+      const t0 = e.touches[0]; startX = t0.clientX; startW = panel.offsetWidth;
+    }, { passive: true });
+    grip2.addEventListener('touchmove', e => {
+      const t0 = e.touches[0];
+      const newW = Math.max(260, Math.min(window.innerWidth * 0.7, startW + (startX - t0.clientX)));
+      panel.style.width = newW + 'px';
+    }, { passive: true });
+  }
+
+  // ── HEADER DRAG = VERTICAL POSITION ──
+  const hd = panel.querySelector('.hm-detail-hd');
+  if (hd) {
+    let startY, startTop;
+    hd.addEventListener('mousedown', e => {
+      if (e.target.classList.contains('hm-detail-close')) return;
+      e.preventDefault();
+      startY = e.clientY;
+      startTop = parseInt(panel.style.top || '0', 10);
+      const onMove = ev => {
+        const newTop = Math.max(0, Math.min(window.innerHeight - 80, startTop + ev.clientY - startY));
+        panel.style.top = newTop + 'px';
+        panel.style.bottom = 'auto';
+        panel.style.height = (window.innerHeight - newTop) + 'px';
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+
+  // ── KEYBOARD CLOSE (Escape) ──
+  if (!window._hmEscBound) {
+    window._hmEscBound = true;
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        const p = document.getElementById('hm-detail-panel');
+        if (p && p.classList.contains('open')) {
+          p.classList.remove('open');
+          p.style.top = ''; p.style.bottom = ''; p.style.height = '';
+          const bd = document.getElementById('hm-detail-backdrop');
+          if (bd) bd.style.display = 'none';
+        }
+      }
+    });
+  }
 }
 
-// Mở panel + hiện backdrop + focus search
+// Universal panel open — call after setting innerHTML + classList.add('open')
 function _hmOpenPanel(p, showBackdrop) {
-  // Panel dùng overflow-y:auto trực tiếp - không cần flex tricks
-  p.style.top    = '0';
-  p.style.bottom = '0';
-  p.style.height = '';
-
-  // Backdrop
+  _hmPanelInitDrag(p);
+  // Reset panel position
+  p.style.top = ''; p.style.bottom = '0'; p.style.height = '';
   if (showBackdrop !== false) {
     let bd = document.getElementById('hm-detail-backdrop');
     if (!bd) {
       bd = document.createElement('div');
       bd.id = 'hm-detail-backdrop';
-      bd.style.cssText = 'position:fixed;inset:0;z-index:9190;background:rgba(0,0,0,.35);display:none';
+      bd.style.cssText = 'position:fixed;inset:0;z-index:9190;background:rgba(0,0,0,.35);display:none;backdrop-filter:blur(1px)';
       bd.onclick = () => {
         p.classList.remove('open');
-        bd.style.display = 'none';
+        p.style.top=''; p.style.bottom='0'; p.style.height='';
+        bd.style.display='none';
       };
       document.body.appendChild(bd);
     }
     bd.style.display = 'block';
   }
-  // Focus search box
+  // Focus search if present
   setTimeout(() => {
     const si = p.querySelector('input[type=text]');
     if (si) si.focus();
-  }, 220);
+  }, 250);
 }
 
 function _lytDetailSearchFn(val) {
@@ -4230,6 +4362,7 @@ function lytChipToggle(type) {
   }
   renderChipsSection();
   renderChartsSection();
+  renderTimelineSection();          // ← cập nhật timeline khi filter thay đổi
   if (_chipAllData.length > 0) _recomputeStatsWithFilter();
 
   // Show detail panel — same style as stats card panel
@@ -4322,11 +4455,17 @@ function lytChipReset() {
 
 // ── Stats card click — hiện detail panel bên phải ──────────────
 function lytStatsCardClick(label, color) {
-  const rows    = (_chipFiltered.length ? _chipFiltered : _chipAllData);
+  // Guard: data chưa load
+  if (!_chipAllData || !_chipAllData.length) {
+    if (typeof showToast === 'function') showToast('⏳ Dữ liệu chưa tải xong, vui lòng thử lại...');
+    return;
+  }
+
+  const rows    = (_chipFiltered && _chipFiltered.length ? _chipFiltered : _chipAllData);
   const capLbl  = {'0':'TT','1':'110kV','2':'220kV','3':'35kV','4':'22kV','6':'6kV','9':'10kV'};
   const capPrio = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
 
-  // Build maxCap map từ toàn bộ data
+  // Build maxCap map
   const tramMaxCap = {};
   _chipAllData.forEach(d => {
     const t = (d.Tram||'').trim(); if (!t) return;
@@ -4335,15 +4474,14 @@ function lytStatsCardClick(label, color) {
     if (!tramMaxCap[t] || (capPrio[c]??99) < (capPrio[tramMaxCap[t]]??99)) tramMaxCap[t] = c;
   });
 
-  // Danh sách trạm xuất hiện trong rows
   const filteredTrams = [...new Set(rows.map(d=>(d.Tram||'').trim()).filter(Boolean))];
   filteredTrams.sort((a,b) => {
     const pa = capPrio[tramMaxCap[a]]??9, pb = capPrio[tramMaxCap[b]]??9;
-    return pa!==pb ? pa-pb : a.localeCompare(b);
+    return pa!==pb ? pa-pb : a.localeCompare(b,'vi');
   });
 
   let title = label;
-  let items = [];      // [{text, sub, color}]
+  let items = [];
   let totalLine = '';
 
   switch (label) {
@@ -4366,32 +4504,87 @@ function lytStatsCardClick(label, color) {
     case 'TBA 220kV': {
       title = '⚡ TBA 220kV';
       const list = filteredTrams.filter(t => tramMaxCap[t] === '2');
-      list.forEach(t => items.push({ text: t, sub: '220kV', color: LYT_CAP_COLORS['2'] }));
+      list.forEach(t => {
+        const ngans=[...new Set(rows.filter(r=>(r.Tram||'').trim()===t).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))].sort();
+        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS['2'], detail: ngans });
+      });
       totalLine = `${list.length} trạm`;
       break;
     }
     case 'TBA 110kV': {
       title = '⚡ TBA 110kV';
       const list = filteredTrams.filter(t => tramMaxCap[t] === '1');
-      list.forEach(t => items.push({ text: t, sub: '110kV', color: LYT_CAP_COLORS['1'] }));
+      list.forEach(t => {
+        const ngans=[...new Set(rows.filter(r=>(r.Tram||'').trim()===t).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))].sort();
+        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS['1'], detail: ngans });
+      });
       totalLine = `${list.length} trạm`;
       break;
     }
     case 'Tổng số ngăn': {
       title = '▦ Tổng số ngăn';
-      const nganScope = lytBuildScopedNganSets(rows, _chipAllData);
+      const nganScope2 = lytBuildScopedNganSets(rows, _chipAllData);
+
+      // Build per-tram, per-type ngan counts
+      const nganTypes = [
+        { key:'dz',    label:'Ngăn ĐZ',        set: nganScope2.dz    },
+        { key:'mba',   label:'Ngăn MBA',        set: nganScope2.mba   },
+        { key:'xt',    label:'Ngăn Xuất tuyến', set: nganScope2.xt    },
+        { key:'ll',    label:'Ngăn LL',         set: nganScope2.ll    },
+        { key:'td',    label:'Ngăn Tự dùng',    set: nganScope2.td,   meta: nganScope2.tdMeta   },
+        { key:'tbn',   label:'Ngăn Tụ bù',      set: nganScope2.tbn,  meta: nganScope2.tbnMeta  },
+        { key:'khang', label:'Ngăn Kháng',      set: nganScope2.khang },
+      ];
+
       const byTram = {};
-      nganScope.total.forEach(key => {
-        const [tram, ngan] = key.split('|||');
-        if (!tram || !ngan) return;
-        if (!byTram[tram]) byTram[tram] = new Set();
-        byTram[tram].add(ngan);
+      nganScope2.total.forEach(k => {
+        const [tram, ngan] = k.split('|||'); if(!tram||!ngan) return;
+        if(!byTram[tram]) byTram[tram] = { total:new Set(), types:{} };
+        byTram[tram].total.add(ngan);
       });
+      nganTypes.forEach(({ key, label, set, meta }) => {
+        set.forEach(k => {
+          const [tram, ngan] = k.split('|||'); if(!tram||!ngan) return;
+          if(!byTram[tram]) byTram[tram] = { total:new Set(), types:{} };
+          if(!byTram[tram].types[label]) byTram[tram].types[label] = [];
+          const status = meta ? (meta.get(k) === 'chua_khai_thac' ? ' (chưa khai thác)' : '') : '';
+          byTram[tram].types[label].push(ngan + status);
+        });
+        // Also add "chưa khai thác" entries for td/tbn
+        if (meta) {
+          meta.forEach((v, k) => {
+            if (v !== 'chua_khai_thac') return;
+            const [tram, ngan] = k.split('|||'); if(!tram||!ngan) return;
+            if(!byTram[tram]) byTram[tram] = { total:new Set(), types:{} };
+            if(!byTram[tram].types[label]) byTram[tram].types[label] = [];
+            // Check if already added
+            if (!byTram[tram].types[label].some(x=>x.startsWith(ngan))) {
+              byTram[tram].types[label].push(ngan + ' (chưa khai thác)');
+            }
+          });
+        }
+      });
+
       let total = 0;
       filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const cnt = byTram[t].size;
-        total += cnt;
-        items.push({ text: t, sub: `${cnt} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888' });
+        const cnt = byTram[t].total.size; total += cnt;
+        // Build detail: group by ngan type
+        const detail = Object.entries(byTram[t].types)
+          .sort((a,b) => a[0].localeCompare(b[0],'vi'))
+          .map(([typeLbl, ngans]) => {
+            const activeNgans = ngans.filter(n => !n.includes('chưa khai thác'));
+            const inactive = ngans.filter(n => n.includes('chưa khai thác'));
+            let line = `${typeLbl}: ${activeNgans.length} ngăn`;
+            if (activeNgans.length) line += ` (${activeNgans.slice(0,5).join(', ')}${activeNgans.length>5?'…':''})`;
+            if (inactive.length) line += ` · ${inactive.length} chưa khai thác`;
+            return line;
+          });
+        items.push({
+          text:   t,
+          sub:    `${cnt} ngăn`,
+          color:  LYT_CAP_COLORS[tramMaxCap[t]]||'#888',
+          detail,
+        });
       });
       totalLine = `${total} ngăn / ${items.length} trạm`;
       break;
@@ -4408,8 +4601,7 @@ function lytStatsCardClick(label, color) {
       });
       let total = 0;
       filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort();
-        total += ngans.length;
+        const ngans = [...byTram[t]].sort(); total += ngans.length;
         items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
       });
       totalLine = `${total} ngăn ĐZ / ${Object.keys(byTram).length} trạm`;
@@ -4427,8 +4619,7 @@ function lytStatsCardClick(label, color) {
       });
       let total = 0;
       filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort();
-        total += ngans.length;
+        const ngans = [...byTram[t]].sort(); total += ngans.length;
         items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
       });
       totalLine = `${total} ngăn MBA / ${Object.keys(byTram).length} trạm`;
@@ -4446,8 +4637,7 @@ function lytStatsCardClick(label, color) {
       });
       let total = 0;
       filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort();
-        total += ngans.length;
+        const ngans = [...byTram[t]].sort(); total += ngans.length;
         items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
       });
       totalLine = `${total} ngăn XT / ${Object.keys(byTram).length} trạm`;
@@ -4465,8 +4655,7 @@ function lytStatsCardClick(label, color) {
       });
       let total = 0;
       filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort();
-        total += ngans.length;
+        const ngans = [...byTram[t]].sort(); total += ngans.length;
         items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
       });
       totalLine = `${total} ngăn LL / ${Object.keys(byTram).length} trạm`;
@@ -4474,40 +4663,57 @@ function lytStatsCardClick(label, color) {
     }
     case 'Ngăn tụ bù (TBN)': {
       title = '🔋 Ngăn Tụ Bù (TBN)';
-      const nganScope = lytBuildScopedNganSets(rows, _chipAllData);
-      const byTram = {};
-      nganScope.tbn.forEach(key => {
-        const [tram, ngan] = key.split('|||');
-        if (!tram || !ngan) return;
-        if (!byTram[tram]) byTram[tram] = new Set();
-        byTram[tram].add(ngan);
+      const _tbnScope = lytBuildScopedNganSets(rows, _chipAllData);
+      const byTramTBN = {};
+      _tbnScope.tbnAll.forEach(key => {
+        const [tram, ngan] = key.split('|||'); if(!tram||!ngan) return;
+        if(!byTramTBN[tram]) byTramTBN[tram] = { active:[], inactive:[] };
+        const ckhai = (_tbnScope.tbnMeta?.get(key)||'') === 'chua_khai_thac';
+        if (ckhai) byTramTBN[tram].inactive.push(ngan);
+        else       byTramTBN[tram].active.push(ngan);
       });
       let total = 0;
-      filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort();
-        total += ngans.length;
-        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
+      filteredTrams.filter(t => byTramTBN[t]).forEach(t => {
+        const { active, inactive } = byTramTBN[t];
+        total += active.length;
+        const detail = [
+          ...active.sort().map(n => `${n} — Ngăn TBN (có thiết bị tụ bù)`),
+          ...inactive.sort().map(n => `${n} — Ngăn TBN (chưa khai thác)`),
+        ];
+        const sub = active.length
+          ? `${active.length} ngăn${inactive.length?' · '+inactive.length+' chưa khai thác':''}`
+          : `${inactive.length} ngăn (chưa khai thác)`;
+        items.push({ text: t, sub, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail });
       });
-      totalLine = `${total} ngăn TBN / ${Object.keys(byTram).length} trạm`;
+      totalLine = `${total} ngăn TBN / ${filteredTrams.size} trạm`;
       break;
     }
     case 'Ngăn tự dùng (TD)': {
       title = '🔌 Ngăn Tự Dùng (TD)';
-      const nganScope = lytBuildScopedNganSets(rows, _chipAllData);
-      const byTram = {};
-      nganScope.td.forEach(key => {
-        const [tram, ngan] = key.split('|||');
-        if (!tram || !ngan) return;
-        if (!byTram[tram]) byTram[tram] = new Set();
-        byTram[tram].add(ngan);
+      const _tdScope = lytBuildScopedNganSets(rows, _chipAllData);
+      // Use tdAll (includes chưa khai thác) for display, tdActiveSet for count
+      const byTramTD = {};
+      _tdScope.tdAll.forEach(key => {
+        const [tram, ngan] = key.split('|||'); if(!tram||!ngan) return;
+        if(!byTramTD[tram]) byTramTD[tram] = { active:[], inactive:[] };
+        const status = (_tdScope.tdMeta?.get(key)||'') === 'chua_khai_thac';
+        if (status) byTramTD[tram].inactive.push(ngan);
+        else        byTramTD[tram].active.push(ngan);
       });
       let total = 0;
-      filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort();
-        total += ngans.length;
-        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
+      filteredTrams.filter(t => byTramTD[t]).forEach(t => {
+        const { active, inactive } = byTramTD[t];
+        total += active.length; // chỉ đếm ngăn có MBATD
+        const detail = [
+          ...active.sort().map(n => `${n} — Ngăn TD (có MBATD)`),
+          ...inactive.sort().map(n => `${n} — Ngăn TD (chưa khai thác)`),
+        ];
+        const sub = active.length
+          ? `${active.length} ngăn${inactive.length?' · '+inactive.length+' chưa khai thác':''}`
+          : `${inactive.length} ngăn (chưa khai thác)`;
+        items.push({ text: t, sub, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail });
       });
-      totalLine = `${total} ngăn TD / ${Object.keys(byTram).length} trạm`;
+      totalLine = `${total} ngăn TD / ${filteredTrams.size} trạm`;
       break;
     }
     case 'Ngăn kháng': {
@@ -4522,8 +4728,7 @@ function lytStatsCardClick(label, color) {
       });
       let total = 0;
       filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort();
-        total += ngans.length;
+        const ngans = [...byTram[t]].sort(); total += ngans.length;
         items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
       });
       totalLine = `${total} ngăn Kháng / ${Object.keys(byTram).length} trạm`;
@@ -4531,36 +4736,68 @@ function lytStatsCardClick(label, color) {
     }
     case 'Tổng số thiết bị': {
       title = '📦 Tổng số thiết bị';
-      // Nhóm theo loại thiết bị
       const byType = {};
+      const nowY3=new Date().getFullYear();
       rows.forEach(r => {
         const pl = (r.Phan_loai_thiet_bi||'Khác').trim();
-        if (!byType[pl]) byType[pl] = { qty: 0, trams: new Set() };
+        if (!byType[pl]) byType[pl] = { qty: 0, trams: {} };
         byType[pl].qty += Number(r.So_luong)||1;
-        if (r.Tram) byType[pl].trams.add((r.Tram||'').trim());
+        const t=(r.Tram||'').trim();
+        if(t){if(!byType[pl].trams[t])byType[pl].trams[t]=[];byType[pl].trams[t].push(r);}
       });
       const sorted = Object.entries(byType).sort((a,b) => b[1].qty - a[1].qty);
       const total = sorted.reduce((s,[,v]) => s + v.qty, 0);
       sorted.forEach(([pl, v]) => {
-        items.push({ text: pl, sub: `${v.qty.toLocaleString('vi-VN')} TB / ${v.trams.size} trạm`, color: LYT_CAP_COLORS['1']||'#18ffff' });
+        const tramList=Object.entries(v.trams).sort((a,b)=>b[1].length-a[1].length);
+        const detail=tramList.map(([t,rs])=>{
+          const cap=tramMaxCap[t]||'';
+          const capTag=cap?` [${capLbl[cap]||cap}]`:'';
+          const devNames=[...new Set(rs.map(r=>(r.Ten_thiet_bi||r.Ngan_thiet_bi||'').trim()).filter(Boolean))].slice(0,4).join(', ');
+          return `${t}${capTag} — ${rs.length} TB${devNames?': '+devNames:''}`;
+        });
+        items.push({ text: pl, sub: `${v.qty.toLocaleString('vi-VN')} TB · ${tramList.length} trạm`, color: LYT_CAP_COLORS['1']||'#18ffff', detail });
       });
       totalLine = `${total.toLocaleString('vi-VN')} thiết bị · ${sorted.length} loại`;
       break;
     }
     case 'Tổng công suất': {
       title = '⚡ Tổng công suất MBA';
+      // Build per-tram per-ngan MBA data (deduplicated by Tram+Ngan)
       const byTram2 = {};
+      const mbaSeenCS = new Map(); // avoid double-count
       rows.forEach(r => {
-        const t = (r.Tram||'').trim(); if (!t) return;
+        const t   = (r.Tram||'').trim(); if (!t) return;
+        const pl  = (r.Phan_loai_thiet_bi||'').trim();
+        const cap = String(r.Cap_dien_ap??'');
+        if (pl !== 'MBA' || (cap !== '1' && cap !== '2')) return;
+        const ng  = (r.Ngan_thiet_bi||'').trim();
+        const csKey = t + '|||' + ng;
         const cs = Number(r.Cong_suat)||0;
-        if (!byTram2[t]) byTram2[t] = { cs: 0, cap: String(r.Cap_dien_ap??'') };
-        byTram2[t].cs += cs;
+        if (!byTram2[t]) byTram2[t] = { cs:0, cap, ngans:{} };
+        // Deduplicate per ngan (take max)
+        if (!byTram2[t].ngans[ng]) byTram2[t].ngans[ng] = { cs:0, name: r.Ten_thiet_bi||ng };
+        if (cs > byTram2[t].ngans[ng].cs) byTram2[t].ngans[ng].cs = cs;
+      });
+      // Compute tram totals from deduped ngans
+      Object.values(byTram2).forEach(v => {
+        v.cs = Object.values(v.ngans).reduce((s,ng)=>s+ng.cs, 0);
       });
       let total2 = 0;
       filteredTrams.filter(t => byTram2[t]).forEach(t => {
-        const { cs, cap } = byTram2[t];
+        const { cs, cap, ngans } = byTram2[t];
         total2 += cs;
-        if (cs > 0) items.push({ text: t, sub: `${cs.toLocaleString('vi-VN')} MVA`, color: LYT_CAP_COLORS[cap]||'#888' });
+        if (cs <= 0) return;
+        // Build detail: each MBA ngan with its power
+        const detail = Object.entries(ngans)
+          .filter(([,v]) => v.cs > 0)
+          .sort((a,b) => b[1].cs - a[1].cs)
+          .map(([ng, v]) => `${ng}${v.name && v.name!==ng?' · '+v.name:''} — ${v.cs.toLocaleString('vi-VN')} MVA`);
+        items.push({
+          text:   t,
+          sub:    `${cs.toLocaleString('vi-VN')} MVA`,
+          color:  LYT_CAP_COLORS[cap]||'#888',
+          detail,
+        });
       });
       totalLine = `${total2.toLocaleString('vi-VN')} MVA tổng / ${items.length} trạm`;
       break;
@@ -4582,93 +4819,19 @@ function lytStatsCardClick(label, color) {
       break;
     }
     default:
-      return; // Card không hỗ trợ drill-down — không mở panel
+      // Card không hỗ trợ drill-down — thử hiển thị tổng quan
+      items.push({ text: label, sub: 'Không có dữ liệu chi tiết', color: color||'var(--accent)' });
+      totalLine = '';
+      break;
   }
 
-  if (!items.length) return;
-
-  // Build panel HTML
-  let bodyHtml = items.map((item, i) => {
-    if (item.isGroup) {
-      return `<div style="padding:6px 16px 3px;font-size:8px;font-weight:700;letter-spacing:.1em;
-        color:${item.color};background:var(--bg-elevated);position:sticky;top:0;
-        border-bottom:1px solid rgba(255,255,255,0.05)">${item.text}</div>`;
-    }
-    const detailHtml = item.detail
-      ? `<div style="padding:2px 16px 6px 24px">` +
-        item.detail.map(n => `<div style="font-size:9.5px;color:var(--text-muted);padding:2px 0;
-          border-bottom:1px solid rgba(255,255,255,0.04);font-family:var(--font-mono)">• ${n}</div>`).join('') +
-        `</div>`
-      : '';
-    return `<div style="display:flex;justify-content:space-between;align-items:center;
-        padding:7px 16px;border-bottom:1px solid rgba(255,255,255,0.05);
-        font-family:var(--font-mono)">
-        <span style="font-size:10px;color:var(--text-secondary)">${item.text}</span>
-        <span style="font-size:9px;font-weight:700;color:${item.color};
-          background:${item.color}18;padding:2px 8px;border-radius:10px">${item.sub}</span>
-      </div>${detailHtml}`;
-  }).join('');
-
-  // MBA/Tram breakdown section
-  let mbaSectionHtml = '';
-  if (mbaSection) {
-    const { tramMbaMap, capColor, capLbl, capPrio, tramMaxCap } = mbaSection;
-    const tramsSorted = Object.keys(tramMbaMap).sort((a,b)=>{
-      const pa=capPrio[tramMaxCap[a]]??9,pb=capPrio[tramMaxCap[b]]??9;
-      return pa!==pb?pa-pb:a.localeCompare(b,'vi');
-    });
-    let mbaRows = '';
-    tramsSorted.forEach(t => {
-      const rows = tramMbaMap[t];
-      const cv = tramMaxCap[t]||'';
-      const col = capColor[cv]||'#888';
-      const lbl = capLbl[cv]||cv;
-      const totalTram = rows.reduce((s,d)=>s+(Number(d.So_luong)||1),0);
-      mbaRows += `<div style="border-bottom:1px solid rgba(255,255,255,.04)">
-        <div style="padding:6px 16px 3px;display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.02)">
-          <span style="font-size:10px;font-weight:700;color:var(--text-primary);font-family:var(--font-mono)">${t}</span>
-          <div style="display:flex;gap:5px;align-items:center">
-            ${cv?`<span style="font-size:8px;font-weight:700;color:${col};background:${col}18;padding:1px 5px;border-radius:4px">${lbl}</span>`:''}
-            <span style="font-size:9px;color:var(--text-muted);background:rgba(255,255,255,.06);padding:1px 6px;border-radius:5px">${totalTram} TB</span>
-          </div>
-        </div>
-        ${rows.map(d=>`<div style="padding:3px 24px;font-size:9px;color:var(--text-secondary);display:flex;justify-content:space-between;font-family:var(--font-mono)">
-          <span style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.Ten_thiet_bi||''}">${d.Ten_thiet_bi||'—'}</span>
-          <span style="color:var(--accent);flex-shrink:0">${Number(d.So_luong)||1} TB</span>
-        </div>`).join('')}
-      </div>`;
-    });
-    mbaSectionHtml = `<div style="border-top:2px solid rgba(0,200,255,.2);margin-top:6px">
-      <div style="padding:8px 16px 4px;font-size:9px;font-weight:800;color:var(--accent);letter-spacing:.1em;background:rgba(0,200,255,.05)">
-        <i class="fas fa-list-ul" style="margin-right:5px"></i>CHI TIẾT THEO TRẠM
-      </div>
-      ${mbaRows}
-    </div>`;
+  if (!items.length) {
+    items.push({ text: 'Không có dữ liệu', sub: 'Vui lòng kiểm tra kết nối Supabase', color: '#ff5252' });
+    totalLine = '0 bản ghi';
   }
 
-  // Lấy hoặc tạo panel
-  let p = document.getElementById('hm-detail-panel');
-  if (!p) {
-    p = document.createElement('div');
-    p.id        = 'hm-detail-panel';
-    p.className = 'hm-detail-panel';
-    document.body.appendChild(p);
-  }
-
-  p.innerHTML = `
-    <div class="hm-resize-grip"></div>
-    <div class="hm-detail-hd" style="border-left:3px solid ${color||'var(--accent)'}">
-      <span style="color:${color||'var(--accent)'}">${title}</span>
-      <span class="hm-detail-close"
-        onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span>
-    </div>
-    <div style="padding:8px 16px;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0">
-      ${totalLine}
-    </div>
-    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">${bodyHtml}</div>`;
-
-  p.classList.add('open');
-  _hmOpenPanel(p);
+  // Delegate to the standard panel function (_lytShowDetailPanel)
+  _lytShowDetailPanel(title, color || 'var(--accent)', totalLine, items, null);
 }
 
 function lytNormalizeNganLoai(v) {
@@ -4715,6 +4878,55 @@ function lytBuildScopedNganSets(activeRows, sourceRows = _chipAllData) {
     return n === 'HTTĐ' || n === 'HTTD' || n.startsWith('HTTD');
   };
 
+  // ── Build nganKey sets with extended TD / TBN logic ──
+
+  // Ngăn Tự dùng (TD):
+  // 1. Loai_ngan_lo là "NgănTD" → luôn tính
+  // 2. Trong ngăn đó có thiết bị có Phan_loai_thiet_bi chứa 'MBATD' → cũng tính là ngăn TD
+  // 3. Ngăn Loai_ngan_lo là "NgănTD" nhưng không có MBATD trong ngăn → gán tag "chưa khai thác" và KHÔNG đếm vào total
+  const _tdNganKeys = new Map(); // key → 'active' | 'chua_khai_thac'
+  const _tbnNganKeys = new Map(); // key → 'active' | 'chua_khai_thac'
+
+  scopedRows.forEach(d => {
+    const tram = (d.Tram || '').trim();
+    const ngan = (d.Ngan_thiet_bi || '').trim();
+    if (!tram || !ngan) return;
+    const k = tram + '|||' + ngan;
+    const pl = (d.Phan_loai_thiet_bi || '').trim().toUpperCase().replace(/\s+/g,'');
+    const loai = lytNormalizeNganLoai(d.Loai_ngan_lo);
+
+    // Tự dùng: Loai_ngan_lo = NgănTD hoặc có MBATD trong ngăn
+    const hasMBATD = pl === 'MBATD' || pl.includes('MBATD');
+    const isLoaiTD = loai === 'NgănTD';
+    if (isLoaiTD || hasMBATD) {
+      // Nếu có MBATD thực sự → active; ngăn TD mà không có MBATD → chua_khai_thac
+      const prev = _tdNganKeys.get(k) || 'chua_khai_thac';
+      if (hasMBATD) {
+        _tdNganKeys.set(k, 'active');
+      } else if (!_tdNganKeys.has(k)) {
+        _tdNganKeys.set(k, 'chua_khai_thac');
+      }
+    }
+
+    // Tụ bù (TBN): Loai_ngan_lo = 'Ngăn TBN' hoặc có thiết bị TBN/tụ bù
+    const hasTBNDev = pl === 'TBN' || pl === 'TUBÙ' || pl === 'TUBU' || pl.includes('TBN');
+    const isLoaiTBN = loai === 'Ngăn TBN';
+    if (isLoaiTBN || hasTBNDev) {
+      const prev2 = _tbnNganKeys.get(k) || 'chua_khai_thac';
+      if (hasTBNDev) {
+        _tbnNganKeys.set(k, 'active');
+      } else if (!_tbnNganKeys.has(k)) {
+        _tbnNganKeys.set(k, 'chua_khai_thac');
+      }
+    }
+  });
+
+  // Build active-only sets (for counting) and full sets (for display)
+  const tdActiveSet = new Set([..._tdNganKeys.entries()].filter(([,v])=>v==='active').map(([k])=>k));
+  const tdAllSet    = new Set(_tdNganKeys.keys());     // for panel display (incl. chưa khai thác)
+  const tbnActiveSet = new Set([..._tbnNganKeys.entries()].filter(([,v])=>v==='active').map(([k])=>k));
+  const tbnAllSet    = new Set(_tbnNganKeys.keys());
+
   return {
     filteredTrams,
     scopedRows,
@@ -4723,8 +4935,12 @@ function lytBuildScopedNganSets(activeRows, sourceRows = _chipAllData) {
     mba:    buildSet(d => lytIsMBARow(d)),
     xt:     buildSet(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn XT'),
     ll:     buildSet(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn LL'),
-    tbn:    buildSet(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn TBN'),
-    td:     buildSet(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'NgănTD'),
+    tbn:    tbnActiveSet,       // chỉ đếm ngăn có TBN thực sự
+    tbnAll: tbnAllSet,           // gồm cả "chưa khai thác" (dùng cho panel)
+    tbnMeta: _tbnNganKeys,       // 'active' | 'chua_khai_thac'
+    td:     tdActiveSet,         // chỉ đếm ngăn có MBATD thực sự
+    tdAll:  tdAllSet,
+    tdMeta: _tdNganKeys,
     khang:  buildSet(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn Kháng'),
   };
 }
@@ -4807,6 +5023,35 @@ function _recomputeStatsWithFilter() {
                                 card.value = fmt(Math.round(tongCS)); break;
     }
   });
+
+  // ── Cập nhật Công nghệ TBA theo filter ──
+  (function() {
+    const { tech220, tech110, tech22 } = lytComputeTech(rows);
+    const statsItem2 = layout.find(l => l.type === 'stats');
+    if (!statsItem2) return;
+    const techCard = statsItem2.props.cards.find(c => c.chartType === 'tech' || (c.label||'').includes('Công nghệ'));
+    if (!techCard) return;
+    techCard.tech220 = { ...tech220 };
+    techCard.tech110 = { ...tech110 };
+    techCard.tech22  = { ...tech22  };
+  })();
+
+  // Update tech chart DOM trực tiếp (không chờ RAF)
+  (function() {
+    const si = layout.find(l => l.type === 'stats');
+    if (!si) return;
+    const tc = si.props.cards.find(c => c.chartType === 'tech');
+    if (!tc) return;
+    const uid = si.uid;
+    const ci  = si.props.cards.indexOf(tc);
+    const el  = document.getElementById(`tc_${uid}_${ci}`);
+    if (!el) return;
+    const rowEl = document.getElementById(`tr_${uid}_${ci}`);
+    if (!rowEl) return;
+    // Re-render tech rows bằng cách gọi lại logic buildHVSection + buildLVSection
+    // Đơn giản: trigger scheduleCanvasRender ngay
+    scheduleCanvasRender(uid);
+  })();
 
   // Cập nhật DOM trực tiếp — KHÔNG chờ RAF để tránh flash giá trị cũ
   const statsWrapper = document.querySelector(`.section-wrapper[data-uid="${statsItem.uid}"]`);
@@ -5489,12 +5734,15 @@ function _tbStats(rows) {
 function _tbStatCardClick(key) {
   const rows = _tbFiltered.length ? _tbFiltered : _tbData;
   const capPrio = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
+  const capLbl2 = {'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+  const capCol2 = {'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
   const tramMaxCap = {};
   rows.forEach(d => {
     const t=(d.Tram||'').trim(); if(!t) return;
     const c=String(d.Cap_dien_ap??''); if(!c||c==='null') return;
     if(!tramMaxCap[t]||(capPrio[c]??99)<(capPrio[tramMaxCap[t]]??99)) tramMaxCap[t]=c;
   });
+  const nowY=new Date().getFullYear();
   const fmt = n => Number(n).toLocaleString('vi-VN');
 
   let title='', totalLine='', bodyHtml='';
@@ -5551,7 +5799,7 @@ function _tbStatCardClick(key) {
           <div style="font-size:10px;color:var(--text-secondary)">${r.Ten_thiet_bi||r.Phan_loai_thiet_bi||'—'}</div>
           <div style="font-size:9px;color:var(--text-muted);margin-top:1px">${r.Tram||'—'} ${cap?'· <span style="color:'+capCol[cap]+'">'+capLbl[cap]+'</span>':''}</div>
         </div>
-        <span style="font-size:11px;font-weight:700;color:${age>=25?'#ff5252':'#ffd740'};font-family:var(--font-mono)">${age}n</span>
+        <span style="font-size:11px;font-weight:700;color:${age>=25?'#ff5252':'#ffd740'};font-family:var(--font-mono)">${age} năm</span>
       </div>`;
     }).join('')+(old15.length>200?`<div style="padding:10px 16px;text-align:center;font-size:9px;color:var(--text-muted)">...và ${old15.length-200} thiết bị khác</div>`:'');
 
@@ -5576,21 +5824,72 @@ function _tbStatCardClick(key) {
     }).join('');
   }
 
-  // Show detail panel (reuse hm-detail-panel)
+  // Build items array and delegate to _lytShowDetailPanel
   const colorMap={'total':'#00c8ff','trams':'#00e676','gt15':'#ff5252','hangs':'#ffd740'};
   const col=colorMap[key]||'var(--accent)';
-  let p=document.getElementById('hm-detail-panel');
-  if(!p){p=document.createElement('div');p.id='hm-detail-panel';p.className='hm-detail-panel';document.body.appendChild(p);}
-  p.innerHTML=`
-    <div class="hm-resize-grip"></div>
-    <div class="hm-detail-hd" style="border-left:3px solid ${col}">
-      <span style="color:${col}">${title}</span>
-      <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span>
-    </div>
-    <div style="padding:8px 16px;font-size:9px;color:var(--text-muted);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">${totalLine}</div>
-    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain">${bodyHtml||'<div style=\'padding:24px;text-align:center;color:var(--text-muted)\'>Không có dữ liệu</div>'}</div>`;
-  p.classList.add('open');
-  _hmOpenPanel(p);
+  const items=[];
+
+  if(key==='total'){
+    const byType={};
+    rows.forEach(r=>{
+      const pl=(r.Phan_loai_thiet_bi||'Khác').trim();
+      if(!byType[pl])byType[pl]={qty:0,trams:{}};
+      byType[pl].qty+=(Number(r.So_luong)||1);
+      const t=(r.Tram||'').trim();
+      if(t){if(!byType[pl].trams[t])byType[pl].trams[t]=[];byType[pl].trams[t].push(r);}
+    });
+    Object.entries(byType).sort((a,b)=>b[1].qty-a[1].qty).forEach(([pl,v])=>{
+      const tList=Object.entries(v.trams).sort((a,b)=>b[1].length-a[1].length);
+      const detail=tList.map(([t,rs])=>{
+        const cap=tramMaxCap[t]||'';
+        const devNames=rs.slice(0,5).map(r=>(r.Ten_thiet_bi||r.Ngan_thiet_bi||'—').trim()).filter((x,i,a)=>a.indexOf(x)===i);
+        return `${t}${cap?` [${capLbl2[cap]||cap}]`:''} — ${rs.length} TB: ${devNames.join(', ')}${rs.length>5?'…':''}`;
+      });
+      items.push({text:pl,badge:`${fmt(v.qty)} TB · ${tList.length} trạm`,color:'#00c8ff',detail});
+    });
+  } else if(key==='trams'){
+    const byTram={};
+    rows.forEach(r=>{const t=(r.Tram||'').trim();if(!t)return;if(!byTram[t])byTram[t]=[];byTram[t].push(r);});
+    // Group by cap
+    const byCap={};
+    Object.entries(byTram).forEach(([t,rs])=>{const cap=tramMaxCap[t]||'?';if(!byCap[cap])byCap[cap]=[];byCap[cap].push([t,rs]);});
+    ['2','1','3','4','9','6','0'].forEach(cap=>{
+      const arr=byCap[cap];if(!arr||!arr.length)return;
+      items.push({isGroup:true,text:`── ${capLbl2[cap]||cap} (${arr.length} trạm) ──`,color:capCol2[cap]||'#888'});
+      arr.sort((a,b)=>a[0].localeCompare(b[0],'vi')).forEach(([t,rs])=>{
+        const byType2={};rs.forEach(r=>{const pl=(r.Phan_loai_thiet_bi||'?').trim();if(!byType2[pl])byType2[pl]=0;byType2[pl]+=(Number(r.So_luong)||1);});
+        const detail=Object.entries(byType2).sort((a,b)=>b[1]-a[1]).map(([pl,n])=>`${pl}: ${fmt(n)} TB`);
+        items.push({text:t,badge:`${fmt(rs.length)} TB`,color:capCol2[cap]||'#00e676',detail});
+      });
+    });
+  } else if(key==='gt15'){
+    const old15=rows.filter(r=>_tbAge(r)>=15).sort((a,b)=>_tbAge(b)-_tbAge(a));
+    const byTram={};
+    old15.forEach(r=>{const t=(r.Tram||'').trim();if(!byTram[t])byTram[t]=[];byTram[t].push(r);});
+    Object.entries(byTram).sort((a,b)=>{
+      const pa=capPrio[tramMaxCap[a[0]]]??9,pb=capPrio[tramMaxCap[b[0]]]??9;
+      return pa!==pb?pa-pb:a[0].localeCompare(b[0],'vi');
+    }).forEach(([t,rs])=>{
+      const cap=tramMaxCap[t]||'';
+      const detail=rs.slice(0,20).map(r=>{
+        const age=_tbAge(r),nvh=Number(r.Nam_van_hanh)||0;
+        return `${(r.Ten_thiet_bi||r.Phan_loai_thiet_bi||'—').trim()}${nvh>1970?' · '+nvh:''} · ${age} năm VH`;
+      });
+      items.push({text:t,badge:`${rs.length} TB · max ${_tbAge(rs[0])} năm`,color:cap?capCol2[cap]:'#ff5252',detail});
+    });
+  } else if(key==='hangs'){
+    const byHang={};
+    rows.forEach(r=>{const h=(r.Hang_san_xuat||'').trim();if(!h)return;if(!byHang[h])byHang[h]={qty:0,years:new Set(),trams:new Set()};byHang[h].qty+=(Number(r.So_luong)||1);const y=Number(r.Nam_san_xuat);if(y>1970)byHang[h].years.add(y);const t=(r.Tram||'').trim();if(t)byHang[h].trams.add(t);});
+    Object.entries(byHang).sort((a,b)=>b[1].qty-a[1].qty).forEach(([h,v])=>{
+      const ys=[...v.years].sort((a,b)=>a-b);
+      const yrStr=ys.length?`${ys[0]}${ys.length>1?'–'+ys[ys.length-1]:''}`:'-';
+      const detail=[...v.trams].sort().map(t=>`Trạm ${t}`);
+      items.push({text:`${h} (${yrStr})`,badge:`${fmt(v.qty)} TB · ${v.trams.size} trạm`,color:'#ffd740',detail});
+    });
+  }
+
+  if(!items.length) items.push({text:'Không có dữ liệu',badge:'',color:'#ff5252'});
+  _lytShowDetailPanel(title,col,totalLine,items);
 }
 
 // ── TABLE ─────────────────────────────────────────────────────
@@ -5616,7 +5915,7 @@ function _tbTable() {
     {k:'Hang_san_xuat',      l:'Hãng SX',     w:'90px' },
     {k:'Nam_san_xuat',       l:'Năm SX',      w:'58px', cls:'tb-num'},
     {k:'Nam_van_hanh',       l:'Năm VH',      w:'58px', cls:'tb-num'},
-    {k:'_age',               l:'Thâm niên',   w:'70px', cls:'tb-num'},
+    {k:'_age',               l:'Thời gian VH',   w:'70px', cls:'tb-num'},
     {k:'Cong_suat',          l:'CS (MVA)',    w:'68px', cls:'tb-num'},
     {k:'Ly_lich',            l:'Lý lịch',     w:'80px' },
     {k:'Thong_so',           l:'Thông số',    w:'100px'},
@@ -5649,7 +5948,7 @@ function _tbTable() {
       <td title="${r.Hang_san_xuat||''}">${r.Hang_san_xuat||'—'}</td>
       <td class="tb-num">${r.Nam_san_xuat||'—'}</td>
       <td class="tb-num">${r.Nam_van_hanh||'—'}</td>
-      <td class="${ageCls}">${age>=0?age+'n':'—'}</td>
+      <td class="${ageCls}">${age>=0?age:'—'}</td>
       <td class="tb-num">${r.Cong_suat||'—'}</td>
       <td>${lyLich}</td>
       <td title="${r.Thong_so||''}">${r.Thong_so?r.Thong_so.slice(0,30)+(r.Thong_so.length>30?'…':''):'—'}</td>
@@ -5708,8 +6007,8 @@ function _tbShowLyLich(idx) {
     <div style="padding:14px 20px;flex:1;overflow-y:auto">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
         ${[['Loại thiết bị',r.Phan_loai_thiet_bi,'#00c8ff'],['Số lượng',r.So_luong??'—','#00e676'],
-           ['Hãng sản xuất',r.Hang_san_xuat,'#ffd740'],['Năm sản xuất',r.Nam_san_xuat,'#ffd740'],
-           ['Năm vận hành',r.Nam_van_hanh,'#00c8ff'],['Thâm niên',age>=0?age+' năm':'—',age>=15?'#ff5252':age>=10?'#ffd740':'#00e676'],
+           ['Hãng sản xuất',r.Hang_san_xuat,'#ffd740'],['Năm vận hành',r.Nam_van_hanh,'#00c8ff'],
+           ['Năm vận hành',r.Nam_van_hanh,'#00c8ff'],['Thời gian VH',age>=0?age+' năm VH':'—',age>=15?'#ff5252':age>=10?'#ffd740':'#00e676'],
            ['Công suất (MVA)',r.Cong_suat,'#b388ff'],['Đội quản lý',r.Doi,'#888']
         ].map(([l,v,col])=>`<div style="background:rgba(255,255,255,.04);border-radius:7px;padding:8px 10px;border:1px solid rgba(255,255,255,.07)">
           <div style="font-size:8.5px;color:var(--text-muted);margin-bottom:3px">${l}</div>
@@ -5732,7 +6031,7 @@ function _tbShowLyLich(idx) {
 function _tbExportCSV() {
   const rows = _tbFiltered;
   if (!rows.length) return;
-  const hdr = ['Trạm','Cấp ĐA','Loại TB','Tên/Ký hiệu','Ngăn TB','Số lượng','Hãng SX','Năm SX','Năm VH','Thâm niên','CS(MVA)','Lý lịch','Thông số','Đội'].join(',');
+  const hdr = ['Trạm','Cấp ĐA','Loại TB','Tên/Ký hiệu','Ngăn TB','Số lượng','Hãng SX','Năm SX','Năm VH','Thời gian VH','CS(MVA)','Lý lịch','Thông số','Đội'].join(',');
   const body = rows.map(r=>{
     const age=_tbAge(r);
     return [r.Tram,_tbCapLbl[String(r.Cap_dien_ap??'')]||r.Cap_dien_ap,r.Phan_loai_thiet_bi,r.Ten_thiet_bi,r.Ngan_thiet_bi,r.So_luong,r.Hang_san_xuat,r.Nam_san_xuat,r.Nam_van_hanh,age>=0?age:'',r.Cong_suat,r.Ly_lich,r.Thong_so,r.Doi]
@@ -5745,7 +6044,7 @@ function _tbExportCSV() {
 
 function _tbExportOne(idx) {
   const r=_tbFiltered[idx]; if(!r) return;
-  const fields=[['Trạm',r.Tram],['Cấp ĐA',_tbCapLbl[String(r.Cap_dien_ap??'')]||r.Cap_dien_ap],['Loại TB',r.Phan_loai_thiet_bi],['Tên/Ký hiệu',r.Ten_thiet_bi],['Ngăn TB',r.Ngan_thiet_bi],['Số lượng',r.So_luong],['Hãng SX',r.Hang_san_xuat],['Năm SX',r.Nam_san_xuat],['Năm VH',r.Nam_van_hanh],['Thâm niên',_tbAge(r)>=0?_tbAge(r):''],['CS(MVA)',r.Cong_suat],['Thông số',r.Thong_so],['Lý lịch',r.Ly_lich],['Đội',r.Doi]];
+  const fields=[['Trạm',r.Tram],['Cấp ĐA',_tbCapLbl[String(r.Cap_dien_ap??'')]||r.Cap_dien_ap],['Loại TB',r.Phan_loai_thiet_bi],['Tên/Ký hiệu',r.Ten_thiet_bi],['Ngăn TB',r.Ngan_thiet_bi],['Số lượng',r.So_luong],['Hãng SX',r.Hang_san_xuat],['Năm SX',r.Nam_san_xuat],['Năm VH',r.Nam_van_hanh],['Thời gian VH',_tbAge(r)>=0?_tbAge(r):''],['CS(MVA)',r.Cong_suat],['Thông số',r.Thong_so],['Lý lịch',r.Ly_lich],['Đội',r.Doi]];
   const csv='\uFEFF'+fields.map(([k,v])=>`"${k}","${String(v||'').replace(/"/g,'""')}"`).join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
@@ -6867,11 +7166,15 @@ function _bcRenderByMonth(conf) {
 
   // Helper: build styled dropdown
   function mkBcDd(key, dflt, val, items, labelFn) {
-    const active = !!val;
-    const ddStyle = `display:inline-flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;border-radius:7px;border:1px solid ${active?'var(--accent)':'rgba(0,200,255,.4)'};background:${active?'rgba(0,200,255,.1)':'var(--bg-elevated)'};color:${active?'var(--accent)':'var(--text-primary)'};font-family:var(--font-mono);font-size:11px;cursor:pointer;outline:none;min-width:120px;white-space:nowrap;position:relative`;
-    const lbl = val ? (labelFn ? labelFn(val) : val) : dflt;
-    return `<button style="${ddStyle}" onclick="_bcBmDropdown(this,'${key}',${JSON.stringify(items)},${JSON.stringify(dflt)})">
-      <span>${lbl}</span><i class="fas fa-chevron-down" style="font-size:8px;opacity:.6"></i>
+    if(!window._bcDdStore)window._bcDdStore={};
+    window._bcDdStore[key]={items,dflt};
+    const active=!!val;
+    const lbl=val?(labelFn?labelFn(val):val):dflt;
+    const brd=active?'var(--accent)':'rgba(0,200,255,.4)';
+    const bg=active?'rgba(0,200,255,.1)':'var(--bg-elevated)';
+    const col=active?'var(--accent)':'var(--text-primary)';
+    return `<button data-bckey="${key}" style="display:inline-flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;border-radius:7px;border:1px solid ${brd};background:${bg};color:${col};font-family:var(--font-mono);font-size:11px;cursor:pointer;outline:none;min-width:115px;white-space:nowrap" onclick="event.stopPropagation();_bcBmDropdown(this,'${key}')">
+      <span>${lbl}</span><i class="fas fa-chevron-down" style="font-size:8px;opacity:.6;flex-shrink:0"></i>
     </button>`;
   }
 
@@ -6890,26 +7193,22 @@ function _bcRenderByMonth(conf) {
     <span style="margin-left:auto;font-size:10px;font-family:var(--font-mono);color:var(--text-muted)">${fmt(data.length)} bản ghi</span>
   </div>
 
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
-    <div style="background:rgba(0,200,255,.07);border:1px solid rgba(0,200,255,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
-      onclick="_bcStatClick('total',rawData)" onmouseenter="this.style.borderColor='rgba(0,200,255,.5)'" onmouseleave="this.style.borderColor='rgba(0,200,255,.2)'">
-      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-list" style="margin-right:4px"></i>Tổng bản ghi</div>
-      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:var(--accent);margin-bottom:6px">${fmt(data.length)}</div>
-      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:100%;background:#00c8ff;border-radius:2px"></div></div>
-    </div>
-    <div style="background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
-      onclick="_bcStatClick('done',rawData)" onmouseenter="this.style.borderColor='rgba(0,230,118,.5)'" onmouseleave="this.style.borderColor='rgba(0,230,118,.2)'">
-      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-check-circle" style="margin-right:4px"></i>Đã thí nghiệm (có ngày TN)</div>
-      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:#00e676;margin-bottom:6px">${fmt(totalDone)}</div>
-      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${data.length>0?Math.round(totalDone/data.length*100):0}%;background:#00e676;border-radius:2px;transition:width .4s"></div></div>
-    </div>
-    <div style="background:rgba(255,215,64,.07);border:1px solid rgba(255,215,64,.2);border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s"
-      onclick="_bcStatClick('months',rawData)" onmouseenter="this.style.borderColor='rgba(255,215,64,.5)'" onmouseleave="this.style.borderColor='rgba(255,215,64,.2)'">
-      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas fa-calendar" style="margin-right:4px"></i>Số tháng có TN</div>
-      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:#ffd740;margin-bottom:6px">${months.length}</div>
-      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${Math.min(100,months.length*8)}%;background:#ffd740;border-radius:2px"></div></div>
-    </div>
-  </div>
+  ${(()=>{
+    const _nd=new Date(),_ny=_nd.getFullYear(),_nm=_nd.getMonth()+1;
+    const _xm=_nm===12?1:_nm+1,_xy=_nm===12?_ny+1:_ny;
+    const _tc=rawData.filter(r=>{const ds=r.Thoi_gian_thi_nghiem_tiep_theo;if(!ds)return false;const d=new Date(ds);return d.getFullYear()===_ny&&d.getMonth()+1===_nm;}).length;
+    const _nc=rawData.filter(r=>{const ds=r.Thoi_gian_thi_nghiem_tiep_theo;if(!ds)return false;const d=new Date(ds);return d.getFullYear()===_xy&&d.getMonth()+1===_xm;}).length;
+    const _sc=(icon,col,bg,brd,lbl,val,pct,key)=>`<div style="background:${bg};border:1px solid ${brd};border-radius:8px;padding:10px 14px;cursor:pointer;transition:all .15s" onclick="_bcStatClick('${key}',rawData)" onmouseenter="this.style.borderColor='${col}'" onmouseleave="this.style.borderColor='${brd}'">
+      <div style="font-size:9px;color:var(--text-muted);margin-bottom:4px"><i class="fas ${icon}" style="margin-right:4px;color:${col}"></i>${lbl}</div>
+      <div style="font-size:22px;font-weight:800;font-family:var(--font-mono);color:${col};margin-bottom:6px">${fmt(val)}</div>
+      <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08)"><div style="height:100%;width:${Math.min(100,pct)}%;background:${col};border-radius:2px;transition:width .4s"></div></div>
+    </div>`;
+    return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+      ${_sc('fa-database','#00c8ff','rgba(0,200,255,.07)','rgba(0,200,255,.2)','Tổng số thiết bị',rawData.length,100,'total')}
+      ${_sc('fa-calendar-check','#00e676','rgba(0,230,118,.07)','rgba(0,230,118,.2)',`Phải TN tháng ${_nm}/${_ny}`,_tc,Math.min(100,_tc/Math.max(rawData.length,1)*1000),'thismon')}
+      ${_sc('fa-calendar-plus','#ffd740','rgba(255,215,64,.07)','rgba(255,215,64,.2)',`Phải TN tháng ${_xm}/${_xy}`,_nc,Math.min(100,_nc/Math.max(rawData.length,1)*1000),'nextmon')}
+    </div>`;
+  })()}
 
   <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:14px">
     <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:12px">BIỂU ĐỒ KHỐI LƯỢNG THEO THÁNG</div>
@@ -6918,6 +7217,147 @@ function _bcRenderByMonth(conf) {
       return age === 0 ? '#00e676' : age === 1 ? '#00c8ff' : '#607d8b';
     })}
   </div>
+
+  <!-- ── MẪU BÁO CÁO KL TN ĐỊNH KỲ THEO PDF ── -->
+  ${(()=>{
+    const nowY2=new Date().getFullYear(), nowM2=new Date().getMonth()+1;
+    // Group by device type + sub-cap: MBA > 220kV, MBA > 110kV, MBA > TD, MC > 110kV, MC > TA...
+    // Use Phan_loai_thiet_bi + Cap_dien_ap for rows
+    const CAP_LBL = {'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+    const DVT_MAP = {
+      'MBA':'máy','MC':'máy','DCL':'bộ','DTD':'bộ','CSV':'bộ','Cáp':'sợi',
+      'TU':'máy','TI':'máy','TBN':'quả','MBA điện áp':'máy','GIS':'bộ',
+    };
+    // Define display order from PDF
+    const PDF_ROWS = [
+      {type:'MBA',    cap:'2', label:'MBA 220kV',          dvt:'máy'},
+      {type:'MBA',    cap:'1', label:'MBA 110kV',          dvt:'máy'},
+      {type:'MBA',    cap:'0', label:'MBA Tự dùng (TD)',   dvt:'máy'},
+      {type:'MC',     cap:'1', label:'MC 110kV',           dvt:'máy'},
+      {type:'MC',     cap:null,label:'MC Trung áp',        dvt:'máy'},
+      {type:'GIS',    cap:null,label:'GIS',                dvt:'bộ'},
+      {type:'DCL',    cap:'1', label:'DCL 110kV',          dvt:'bộ'},
+      {type:'DCL',    cap:null,label:'DCL Trung áp',       dvt:'bộ'},
+      {type:'DTD',    cap:'1', label:'DTD 3pha 110kV',     dvt:'bộ'},
+      {type:'DTD',    cap:null,label:'DTD 3pha Trung áp',  dvt:'bộ'},
+      {type:'CSV',    cap:'1', label:'CSV 110kV',          dvt:'bộ'},
+      {type:'CSV',    cap:null,label:'CSV Trung áp',       dvt:'bộ'},
+      {type:'Cáp',    cap:null,label:'Cáp lực trung thế',  dvt:'sợi'},
+      {type:'TU',     cap:'1', label:'TU 110kV',           dvt:'máy'},
+      {type:'TU',     cap:null,label:'TU Trung áp',        dvt:'máy'},
+      {type:'TI',     cap:'1', label:'TI 110kV',           dvt:'máy'},
+      {type:'TI',     cap:null,label:'TI Trung áp',        dvt:'máy'},
+      {type:'TBN',    cap:null,label:'Tụ bù (TBN)',         dvt:'quả'},
+    ];
+
+    // For each PDF row, compute: tongDuKien (plan), thang[1..12] (done by month), luyKe, tyLe
+    function getPdfRowData(pdfRow) {
+      const yearFilter = _bcFYear ? Number(_bcFYear) : nowY2;
+      // Plan = Thoi_gian_thi_nghiem_tiep_theo in target year
+      // Done = Ngay_thi_nghiem in target year
+      const match = r => {
+        const pl = (r.Phan_loai_thiet_bi||'').trim();
+        if (pl !== pdfRow.type) return false;
+        if (pdfRow.cap !== null && String(r.Cap_dien_ap??'') !== pdfRow.cap) return false;
+        if (pdfRow.cap === null) {
+          // Trung áp = NOT the specific caps above for this type
+          const siblingCaps = PDF_ROWS.filter(p=>p.type===pdfRow.type&&p.cap!==null).map(p=>p.cap);
+          if (siblingCaps.includes(String(r.Cap_dien_ap??''))) return false;
+        }
+        return true;
+      };
+      const planRows = rawData.filter(r => {
+        if (!match(r)) return false;
+        const ds = r.Thoi_gian_thi_nghiem_tiep_theo;
+        if (!ds) return false;
+        const d = new Date(ds);
+        return d.getFullYear() === yearFilter;
+      });
+      const doneRows = rawData.filter(r => {
+        if (!match(r)) return false;
+        const ds = r.Ngay_thi_nghiem;
+        if (!ds) return false;
+        const d = new Date(ds);
+        return d.getFullYear() === yearFilter;
+      });
+      // Count by month (use So_luong if available, else 1)
+      const countQty = rows => rows.reduce((s,r)=>s+(Number(r.So_luong)||1),0);
+      const tongDuKien = countQty(planRows);
+      const byMonth = {};
+      for(let m=1;m<=12;m++) byMonth[m]=0;
+      doneRows.forEach(r=>{
+        const d=new Date(r.Ngay_thi_nghiem);
+        const m=d.getMonth()+1;
+        byMonth[m]+=(Number(r.So_luong)||1);
+      });
+      const luyKe = Object.values(byMonth).reduce((s,v)=>s+v,0);
+      const tyLe = tongDuKien>0?((luyKe/tongDuKien)*100).toFixed(1)+'%':'—';
+      const conLai = Math.max(0, tongDuKien - luyKe);
+      return { tongDuKien, byMonth, luyKe, tyLe, conLai };
+    }
+
+    const months12 = Array.from({length:12},(_,i)=>i+1);
+    const yearFilter2 = _bcFYear ? Number(_bcFYear) : nowY2;
+
+    const thStyle = 'padding:4px 6px;font-size:8.5px;font-weight:700;color:var(--text-muted);border:1px solid rgba(255,255,255,.08);text-align:center;white-space:nowrap;background:rgba(255,255,255,.04)';
+    const tdStyle = v => `padding:3px 6px;font-size:9px;font-family:var(--font-mono);border:1px solid rgba(255,255,255,.06);text-align:right;color:${v>0?'rgba(200,230,220,.9)':'rgba(255,255,255,.2)'}`;
+    const tdStylePlan = v => `padding:3px 6px;font-size:9px;font-family:var(--font-mono);border:1px solid rgba(255,255,255,.06);text-align:right;color:${v>0?'var(--accent)':'rgba(255,255,255,.2)'}`;
+    const tdStylePct = pct => {
+      const n = parseFloat(pct);
+      const col = isNaN(n)?'rgba(255,255,255,.3)':n>=100?'#00e676':n>=80?'var(--accent)':n>=50?'#ffd740':'#ff5252';
+      return `padding:3px 6px;font-size:9px;font-family:var(--font-mono);border:1px solid rgba(255,255,255,.06);text-align:right;font-weight:700;color:${col}`;
+    };
+
+    const tableRows = PDF_ROWS.map((row, i) => {
+      const d = getPdfRowData(row);
+      const monthCells = months12.map(m => {
+        const v = d.byMonth[m];
+        return `<td style="${tdStyle(v)}">${v||'—'}</td>`;
+      }).join('');
+      const highlight = d.tongDuKien===0 ? 'opacity:.45' : '';
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,.05);${highlight}">
+        <td style="padding:3px 6px;font-size:9px;border:1px solid rgba(255,255,255,.06);text-align:center;color:rgba(255,255,255,.4)">${i+1}</td>
+        <td style="padding:3px 8px;font-size:9px;border:1px solid rgba(255,255,255,.06);color:rgba(215,230,245,.9);white-space:nowrap">${row.label}</td>
+        <td style="padding:3px 6px;font-size:9px;border:1px solid rgba(255,255,255,.06);text-align:center;color:rgba(255,255,255,.4)">${row.dvt}</td>
+        <td style="${tdStylePlan(d.tongDuKien)}">${d.tongDuKien||'—'}</td>
+        ${monthCells}
+        <td style="${tdStylePlan(d.luyKe)}">${d.luyKe||'—'}</td>
+        <td style="${tdStylePct(d.tyLe)}">${d.tyLe}</td>
+        <td style="${tdStyle(d.conLai)}">${d.conLai||'—'}</td>
+      </tr>`;
+    }).join('');
+
+    return `<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em">
+          MẪU KHỐI LƯỢNG TN ĐỊNH KỲ NĂM ${yearFilter2}
+        </div>
+        <span style="font-size:9px;color:rgba(0,200,255,.6)">Cập nhật: ${new Date().toLocaleDateString('vi-VN')}</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:9px">
+          <thead>
+            <tr>
+              <th style="${thStyle}" rowspan="2">TT</th>
+              <th style="${thStyle}" rowspan="2">Thiết bị TN, kiểm định</th>
+              <th style="${thStyle}" rowspan="2">ĐVT</th>
+              <th style="${thStyle}" rowspan="2">Tổng số<br>dự kiến</th>
+              <th style="${thStyle}" colspan="12">Đã thực hiện trong tháng</th>
+              <th style="${thStyle}" rowspan="2">Lũy kế<br>thực hiện</th>
+              <th style="${thStyle}" rowspan="2">Tỷ lệ<br>hoàn thành</th>
+              <th style="${thStyle}" rowspan="2">Còn lại</th>
+            </tr>
+            <tr>
+              ${months12.map(m=>`<th style="${thStyle}">T${m}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  })()}
 
   <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px">
     <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:10px">CHI TIẾT THEO THÁNG × LOẠI THIẾT BỊ</div>
@@ -6952,7 +7392,9 @@ function _bcRenderByMonth(conf) {
 }
 
 // ── DROPDOWN HANDLER for by-month report ──────────────────────
-function _bcBmDropdown(btn, key, items, dflt) {
+function _bcBmDropdown(btn, key) {
+  const _s=(window._bcDdStore||{})[key]||{items:[],dflt:''};
+  const items=_s.items, dflt=_s.dflt;
   const ex = document.getElementById('_bcBmDdList');
   if (ex) { if (ex.dataset.key===key) { ex.remove(); return; } ex.remove(); }
   const list = document.createElement('div');
@@ -7115,7 +7557,7 @@ function _bcRenderEarlyPlan(conf) {
         const tiep  = r.Thoi_gian_thi_nghiem_tiep_theo ? new Date(r.Thoi_gian_thi_nghiem_tiep_theo) : null;
         const han   = (Number(r.Han_thi_nghiem)||0)*365;
         const interval = truoc && tiep ? Math.round((tiep-truoc)/86400000) : null;
-        const ratioStr = interval && han ? `${(interval/365).toFixed(1)}n / ${r.Han_thi_nghiem}n` : '';
+        const ratioStr = interval && han ? `${(interval/365).toFixed(1)} năm / ${r.Han_thi_nghiem} năm` : '';
         return `<span style="font-family:var(--font-mono);font-size:10px">${_bcFmtD(r.Thoi_gian_thi_nghiem_tiep_theo)}</span>
           ${ratioStr?`<span style="font-size:8px;color:#00c8ff;margin-left:4px">↑${ratioStr}</span>`:''}`;
       }
@@ -7144,7 +7586,28 @@ function _bcRenderEarlyPlan(conf) {
 function _bcStatClick(key, data) {
   const fmt = n => Number(n).toLocaleString('vi-VN');
   const fmtD = v => { if(!v) return '—'; const d=new Date(v); return isNaN(d)?v:d.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'}); };
+  const rawAll=_tnRawData.length?_tnRawData:(_tnAllData.length?_tnAllData:[]);
+  const _cL={'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+  const _cC={'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
   let title='', totalLine='', bodyHtml='', col='var(--accent)';
+
+  if(key==='thismon'||key==='nextmon'){
+    const now=new Date(),nowY=now.getFullYear(),nowM=now.getMonth()+1;
+    const tM=key==='thismon'?nowM:(nowM===12?1:nowM+1),tY=key==='thismon'?nowY:(nowM===12?nowY+1:nowY);
+    col=key==='thismon'?'#00e676':'#ffd740';
+    title=`📅 Phải TN tháng ${tM}/${tY}`;
+    const filtered=rawAll.filter(r=>{const ds=r.Thoi_gian_thi_nghiem_tiep_theo;if(!ds)return false;const d=new Date(ds);return d.getFullYear()===tY&&d.getMonth()+1===tM;});
+    const byType={};
+    filtered.forEach(r=>{const tp=(r.Phan_loai_thiet_bi||'Khác').trim(),t=(r.Tram||'—').trim();if(!byType[tp])byType[tp]={total:0,trams:{}};byType[tp].total++;if(!byType[tp].trams[t])byType[tp].trams[t]=[];byType[tp].trams[t].push(r);});
+    const types=Object.keys(byType).sort((a,b)=>byType[b].total-byType[a].total);
+    totalLine=`${fmt(filtered.length)} thiết bị · ${types.length} loại · ${new Set(filtered.map(r=>(r.Tram||'').trim())).size} trạm`;
+    const items2=types.map(tp=>{
+      const ti=byType[tp],trams=Object.keys(ti.trams).sort((a,b)=>a.localeCompare(b,'vi'));
+      const detail=trams.map(t=>{const rs=ti.trams[t];return `${t} [${_cL[String(rs[0]?.Cap_dien_ap??'')] ||''}] — ${rs.length} TB: ${rs.slice(0,3).map(r=>r.Ten_thiet_bi||r.Ngan_thiet_bi||'—').join(', ')}${rs.length>3?'…':''}`;});
+      return {text:tp,badge:`${fmt(ti.total)}`,color:col,detail};
+    });
+    _lytShowDetailPanel(title,col,totalLine,items2); return;
+  }
 
   if (key === 'total') {
     col='#00c8ff'; title='📋 Tổng bản ghi thí nghiệm';
@@ -7261,9 +7724,7 @@ function bcRenderPage(conf, title) {
 // ── TNDX — same as TNĐK but filters by dot xuat ──────────────
 // tnRenderPage already handles mode:'dotxuat' — no changes needed
 
-/* =======================================
-   AUTH SYSTEM
-======================================= */
+
 
 // AUTH -- Supabase Auth (signInWithPassword)
 // Cach su dung:
