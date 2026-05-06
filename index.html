@@ -1766,16 +1766,16 @@ body { font-size: var(--fs-base); }
 .hm-table tbody tr:hover td { filter:brightness(1.20); }
 .hm-th-grp,.hm-cell-grp  { position:sticky; left:0; z-index:3; background:var(--bg-elevated); text-align:left; overflow:hidden; white-space:nowrap; border-right:1px solid rgba(255,255,255,0.12); }
 .hm-cell-grp { background:var(--bg-base); z-index:2; font-size:8.5px; font-weight:700; padding:4px 8px; color:var(--text-muted); }
-.hm-th-grp   { font-size:8px; font-weight:700; padding:5px 8px; color:var(--text-muted); letter-spacing:.1em; border-bottom:1px solid rgba(255,255,255,0.10); }
+.hm-th-grp   { font-size:8px; font-weight:700; padding:5px 8px; color:rgba(200,218,235,.9); letter-spacing:.1em; border-bottom:1px solid rgba(255,255,255,0.10); }
 .hm-th-tram,.hm-cell-tram { position:sticky; z-index:3; background:var(--bg-elevated); text-align:left; overflow:hidden; white-space:nowrap; border-right:1px solid rgba(255,255,255,0.10); }
 .hm-cell-tram { background:var(--bg-base); z-index:2; font-size:9px; padding:4px 8px; color:var(--text-secondary); }
-.hm-th-tram   { font-size:8px; font-weight:700; padding:5px 8px; color:var(--text-muted); letter-spacing:.08em; border-bottom:1px solid rgba(255,255,255,0.10); }
+.hm-th-tram   { font-size:8px; font-weight:700; padding:5px 8px; color:rgba(200,218,235,.9); letter-spacing:.08em; border-bottom:1px solid rgba(255,255,255,0.10); }
 .hm-th-ngan-grp { text-align:center; font-size:8px; font-weight:700; padding:4px 4px; background:var(--bg-elevated); letter-spacing:.06em; border-bottom:1px solid rgba(255,255,255,0.06); border-left:2px solid rgba(255,255,255,0.12); }
 .hm-th-cap  { text-align:center; padding:4px 3px; font-size:7.5px; font-weight:600; background:var(--bg-elevated); overflow:hidden; white-space:nowrap; border-bottom:1px solid rgba(255,255,255,0.10); border-left:1px solid rgba(255,255,255,0.05); cursor:pointer; user-select:none; position:relative; }
 .hm-th-cap:hover { background:rgba(255,255,255,0.06); }
 .hm-th-cap.sort-asc::after  { content:' ↑'; font-size:7px; }
 .hm-th-cap.sort-desc::after { content:' ↓'; font-size:7px; }
-.hm-th-total { text-align:right; padding:5px 8px; font-size:8px; font-weight:700; color:var(--text-muted); background:var(--bg-elevated); white-space:nowrap; border-left:2px solid rgba(255,255,255,0.12); border-bottom:1px solid rgba(255,255,255,0.10); cursor:pointer; position:relative; }
+.hm-th-total { text-align:right; padding:5px 8px; font-size:8px; font-weight:700; color:rgba(200,218,235,.9); background:var(--bg-elevated); white-space:nowrap; border-left:2px solid rgba(255,255,255,0.12); border-bottom:1px solid rgba(255,255,255,0.10); cursor:pointer; position:relative; }
 .hm-cell-cap   { text-align:center; padding:3px 3px; font-size:9px; font-weight:700; border:1px solid rgba(255,255,255,0.06); cursor:pointer; }
 .hm-cell-cap:hover { filter:brightness(1.4); }
 .hm-cell-total { text-align:right; padding:3px 8px; font-size:9px; font-weight:800; color:#c0d0e8; border-left:2px solid rgba(255,255,255,0.12); }
@@ -2947,9 +2947,9 @@ body.light-mode .canvas-quick-nav {
 }
 body.light-mode .canvas-area::before { background: transparent; }
 body.light-mode .section-card { box-shadow: 0 2px 12px rgba(0,0,0,0.10); }
-body.light-mode .hm-table thead { background: #e8eef5; }
-body.light-mode .hm-cell-grp, body.light-mode .hm-th-grp { background: #e8eef5; }
-body.light-mode .hm-cell-tram, body.light-mode .hm-th-tram { background: #f0f4f8; color: #1e3a52; }
+body.light-mode .hm-table thead { background: var(--bg-elevated); }
+body.light-mode .hm-cell-grp, body.light-mode .hm-th-grp { background: var(--bg-elevated); }
+body.light-mode .hm-cell-tram, body.light-mode .hm-th-tram { background: var(--bg-elevated); color: rgba(200,220,240,.85); }
 body.light-mode .ic-card { background: #fff; border-color: rgba(0,0,0,0.10); }
 body.light-mode .ic-tech-bar-track { background: rgba(0,0,0,0.08); }
 body.light-mode .rpanel { background: #fff; border-left-color: rgba(0,0,0,0.10); }
@@ -7827,20 +7827,32 @@ function lytStatsCardClick(label, color) {
     }
     case 'Ngăn kháng': {
       title = '🧲 Ngăn Kháng';
-      const nganScope = lytBuildScopedNganSets(rows, _chipAllData);
-      const byTram = {};
-      nganScope.khang.forEach(key => {
-        const [tram, ngan] = key.split('|||');
-        if (!tram || !ngan) return;
-        if (!byTram[tram]) byTram[tram] = new Set();
-        byTram[tram].add(ngan);
+      // Use _chipAllData (full dataset) to find kháng ngăn, not just filtered rows
+      const khangSource = _chipAllData.length ? _chipAllData : rows;
+      const byTramK = {};
+      khangSource.forEach(d => {
+        const t = (d.Tram||'').trim(); if(!t) return;
+        const ng= (d.Ngan_thiet_bi||'').trim(); if(!ng) return;
+        const loai = lytNormalizeNganLoai(d.Loai_ngan_lo);
+        const pl   = (d.Phan_loai_thiet_bi||'').trim();
+        const isKhang = loai === 'Ngăn Kháng' || pl === 'K' || pl === 'Kháng';
+        if (!isKhang) return;
+        if (!byTramK[t]) byTramK[t] = new Set();
+        byTramK[t].add(ng);
       });
+      if (!Object.keys(byTramK).length) {
+        items.push({ text: 'Không tìm thấy Ngăn Kháng', sub: 'Kiểm tra trường Loai_ngan_lo hoặc Phan_loai_thiet_bi', color: '#ff9100' });
+        totalLine = 'Không có dữ liệu';
+        break;
+      }
       let total = 0;
-      filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort(); total += ngans.length;
-        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
+      // Only show trams matching current filter
+      const showTrams = filteredTrams.size ? [...filteredTrams] : Object.keys(byTramK);
+      showTrams.filter(t => byTramK[t]).forEach(t => {
+        const ngans = [...byTramK[t]].sort(); total += ngans.length;
+        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#e040fb', detail: ngans });
       });
-      totalLine = `${total} ngăn Kháng / ${Object.keys(byTram).length} trạm`;
+      totalLine = `${total} ngăn Kháng / ${Object.keys(byTramK).length} trạm`;
       break;
     }
     case 'Tổng số thiết bị': {
@@ -9782,6 +9794,30 @@ function _tnShowStatPanel(lvl) {
   _hmOpenPanel(p);
 }
 
+function _tnRowClick(e, row) {
+  // Ctrl+click or right-click = open update modal
+  if (e.ctrlKey || e.metaKey || e.shiftKey) {
+    e.preventDefault();
+    _tnOpenUpdateModal(row);
+    return;
+  }
+  // Normal click = show mini context menu
+  const existing = document.getElementById('_tnRowMenu');
+  if (existing) existing.remove();
+  const menu = document.createElement('div');
+  menu.id = '_tnRowMenu';
+  const x = Math.min(e.clientX, window.innerWidth - 220);
+  const y = Math.min(e.clientY, window.innerHeight - 100);
+  menu.style.cssText = `position:fixed;left:${x}px;top:${y}px;z-index:99990;background:#1a1f2e;border:1px solid rgba(0,200,255,.3);border-radius:8px;padding:6px;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,.5)`;
+  menu.innerHTML = `
+    <div style="padding:4px 10px 8px;font-size:9px;color:rgba(180,200,220,.6);border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:4px">${row.Tram||'—'} · ${row.Phan_loai_thiet_bi||'—'} · ${row.Ten_thiet_bi||row.Ngan_thiet_bi||'—'}</div>
+    <button onclick="document.getElementById('_tnRowMenu')?.remove();_tnOpenUpdateModal(${JSON.stringify(row).replace(/"/g,'&quot;')})" style="display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px;border-radius:5px;border:none;background:none;color:rgba(235,248,255,.9);font-size:11px;cursor:pointer;text-align:left" onmouseover="this.style.background='rgba(0,200,255,.08)'" onmouseout="this.style.background='none'">
+      <i class="fas fa-edit" style="color:var(--accent);width:16px"></i> Đề nghị cập nhật
+    </button>`;
+  document.body.appendChild(menu);
+  setTimeout(() => document.addEventListener('click', function rm(ev){if(!menu.contains(ev.target)){menu.remove();document.removeEventListener('click',rm);}},10));
+}
+
 function _tnStats() {
   const fmt = n => Number(n).toLocaleString('vi-VN');
   const f = _tnFiltered;
@@ -9856,7 +9892,7 @@ function _tnTable() {
 
   const mkTh = c => {
     const s = _tnSortCol === c.k;
-    return `<th style="padding:7px 9px;font-size:9px;font-weight:700;color:${s?'var(--accent)':'var(--text-muted)'};letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);cursor:pointer;white-space:nowrap;background:rgba(255,255,255,.03);user-select:none;min-width:${c.w};text-align:${c.num?'right':'left'};position:sticky;top:0;z-index:2" onclick="_tnSort('${c.k}')">${c.l}${s?`<span style="color:var(--accent)"> ${_tnSortAsc?'↑':'↓'}</span>`:''}</th>`;
+    return `<th style="padding:7px 9px;font-size:9px;font-weight:700;color:${s?'var(--accent)':'rgba(200,218,235,.9)'};letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);cursor:pointer;white-space:nowrap;background:rgba(255,255,255,.03);user-select:none;min-width:${c.w};text-align:${c.num?'right':'left'};position:sticky;top:0;z-index:2" onclick="_tnSort('${c.k}')">${c.l}${s?`<span style="color:var(--accent)"> ${_tnSortAsc?'↑':'↓'}</span>`:''}</th>`;
   };
 
   const tbody = rows.map(r => {
@@ -9879,7 +9915,7 @@ function _tnTable() {
       ? `<span style="font-family:var(--font-mono)">${han} năm</span>`
       : '<span style="color:rgba(255,255,255,.2);font-size:9px">—</span>';
 
-    return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);${rowBg}">
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);${rowBg};cursor:pointer" onclick="_tnRowClick(event, ${JSON.stringify(r).replace(/"/g,'&quot;')})">
       <td style="padding:6px 9px">${_tnAlertBadge(r)}</td>
       <td style="padding:6px 9px;font-weight:600">${r.Tram||'—'}</td>
       <td style="padding:6px 9px">${capBadge}</td>
@@ -9996,6 +10032,7 @@ function tnRenderPage(conf, title) {
         </button>
         <button onclick="_tnReset()" style="padding:5px 11px;border-radius:6px;border:1px solid rgba(255,82,82,.3);background:rgba(255,82,82,.1);color:#ff5252;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-times"></i> Xóa lọc</button>
         <button onclick="_tnExportCSV()" style="padding:5px 11px;border-radius:6px;border:1px solid rgba(0,230,118,.3);background:rgba(0,230,118,.1);color:#00e676;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-download"></i> CSV</button>
+              ${_authGetSession()?.role==='admin' ? `<button onclick="_tnShowPendingRequests()" style="padding:5px 11px;border-radius:6px;border:1px solid rgba(255,145,0,.3);background:rgba(255,145,0,.1);color:#ff9100;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-clipboard-check"></i> Phê duyệt ${(window._tnPendingRequests||[]).filter(r=>r.trang_thai==='cho_duyet').length ? '<span style="background:#ff5252;color:#fff;border-radius:8px;padding:1px 5px;font-size:8px;margin-left:3px">'+(window._tnPendingRequests||[]).filter(r=>r.trang_thai==='cho_duyet').length+'</span>' : ''}</button>` : ''  }
       </div>
 
       <div id="_tnTableArea">
@@ -10927,6 +10964,8 @@ async function _authLogin(){
     _authInitUserMenu();
     _authApplyRoleUI(role);
     showChangeNotif('success','Dang nhap thanh cong','Xin chao '+name+'!');
+    // Load pending requests for admin
+    if (role === 'admin') setTimeout(_tnLoadPendingRequests, 500);
   }catch(err){
     errEl.textContent='Loi ket noi: '+err.message;
   }finally{
@@ -11189,6 +11228,390 @@ function showChangeNotif(type,title,msg,duration){
   setTimeout(()=>{if(notif.parentNode)notif.remove();},duration||5000);
 }
 document.getElementById('adminPanel').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
+
+// ══════════════════════════════════════════════════════
+// CONFIG: NAS Synology
+// Đặt URL NAS của bạn tại đây
+// ══════════════════════════════════════════════════════
+const NAS_CONFIG = {
+  baseUrl: '',          // VD: 'http://192.168.1.100:5000' hoặc 'https://nas.evnhanoi.vn'
+  bbtnPath: '/sharing/BBTN',   // Thư mục BBTN trên NAS
+  photoPath: '/sharing/TNDK',  // Thư mục ảnh TNĐK trên NAS
+};
+function nasUrl(path) { return NAS_CONFIG.baseUrl ? NAS_CONFIG.baseUrl + path : ''; }
+
+// ══════════════════════════════════════════════════════
+// MODULE: QUẢN LÝ BBTN (với NAS link)
+// ══════════════════════════════════════════════════════
+function _bbtnRenderPage() {
+  const overlay = document.getElementById('tbPageOverlay');
+  if (!overlay) return;
+  const rd = _tnRawData.length ? _tnRawData : (_tnAllData.length ? _tnAllData : []);
+  const fmt = n => Number(n).toLocaleString('vi-VN');
+  const fmtD = v => { if(!v)return'—';const d=new Date(v);return isNaN(d)?v:d.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'}); };
+  const capLbl={'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+  const nowY = new Date().getFullYear();
+  const completed = rd.filter(r=>r.Ngay_thi_nghiem).sort((a,b)=>new Date(b.Ngay_thi_nghiem)-new Date(a.Ngay_thi_nghiem));
+  const byMonth={};
+  completed.forEach(r=>{
+    const d=new Date(r.Ngay_thi_nghiem);
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const lbl=`Tháng ${d.getMonth()+1}/${d.getFullYear()}`;
+    if(!byMonth[key])byMonth[key]={label:lbl,rows:[]};
+    byMonth[key].rows.push(r);
+  });
+  const months=Object.keys(byMonth).sort().reverse();
+  window._bbtnByMonth=byMonth; window._bbtnCompleted=completed;
+  const nasLinkHtml = NAS_CONFIG.baseUrl
+    ? `<a href="${nasUrl(NAS_CONFIG.bbtnPath)}" target="_blank" style="padding:5px 12px;border-radius:6px;border:1px solid rgba(0,200,255,.3);background:rgba(0,200,255,.08);color:var(--accent);font-size:10px;text-decoration:none;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-server"></i> Mở thư mục NAS</a>`
+    : `<button onclick="_bbtnConfigNAS()" style="padding:5px 12px;border-radius:6px;border:1px solid rgba(255,215,64,.3);background:rgba(255,215,64,.08);color:#ffd740;font-size:10px;cursor:pointer"><i class="fas fa-cog"></i> Cấu hình NAS</button>`;
+  const monthsHtml = months.slice(0,24).map(mk=>{
+    const m=byMonth[mk];
+    return `<div style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 14px;background:rgba(255,255,255,.04);border-radius:8px;margin-bottom:6px;border-left:3px solid var(--accent)">
+        <span style="font-size:13px;font-weight:700;color:var(--accent)">${m.label}</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:10px;font-family:var(--font-mono);color:rgba(200,218,235,.7)">${fmt(m.rows.length)} BBTN</span>
+          <button onclick="_bbtnExportMonth('${mk}')" style="padding:3px 10px;border-radius:5px;border:1px solid rgba(0,200,255,.3);background:rgba(0,200,255,.08);color:var(--accent);font-size:9px;cursor:pointer">CSV</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:10px">
+          <thead><tr style="border-bottom:1px solid rgba(255,255,255,.08)">
+            <th style="padding:5px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700;text-align:left">Trạm</th>
+            <th style="padding:5px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700;text-align:left">Cấp</th>
+            <th style="padding:5px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700;text-align:left">Loại TB</th>
+            <th style="padding:5px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700;text-align:left">Tên/Ngăn</th>
+            <th style="padding:5px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700;text-align:right">Ngày TN</th>
+            <th style="padding:5px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700;text-align:right">TN kế tiếp</th>
+          </tr></thead>
+          <tbody>${m.rows.map((r,i)=>{
+            const cap=String(r.Cap_dien_ap??'');
+            return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);${i%2?'background:rgba(255,255,255,.02)':''}">
+              <td style="padding:5px 10px;font-weight:600;color:rgba(235,248,255,.9)">${r.Tram||'—'}</td>
+              <td style="padding:5px 10px"><span style="font-size:9px;font-weight:700;color:${({2:'#1565c0',1:'#18ffff',3:'#00e676',4:'#e040fb',9:'#00e676',6:'#00e676',0:'#18ffff'})[cap]||'#888'}">${capLbl[cap]||'—'}</span></td>
+              <td style="padding:5px 10px;color:rgba(210,230,245,.85)">${r.Phan_loai_thiet_bi||'—'}</td>
+              <td style="padding:5px 10px;color:rgba(210,230,245,.85)">${r.Ten_thiet_bi||r.Ngan_thiet_bi||'—'}</td>
+              <td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);color:#00e676">${fmtD(r.Ngay_thi_nghiem)}</td>
+              <td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);color:var(--accent)">${fmtD(r.Thoi_gian_thi_nghiem_tiep_theo)}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+
+  overlay.innerHTML=`<div style="padding:0 0 32px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <div style="width:34px;height:34px;border-radius:8px;background:rgba(255,215,64,.15);color:#ffd740;display:flex;align-items:center;justify-content:center"><i class="fas fa-file-signature" style="font-size:15px"></i></div>
+      <div><div style="font-size:16px;font-weight:800;color:rgba(240,250,255,.97)">Quản lý Biên bản thí nghiệm (BBTN)</div></div>
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+        ${nasLinkHtml}
+        <button onclick="_bbtnExportAll()" style="padding:5px 12px;border-radius:6px;border:1px solid rgba(0,230,118,.3);background:rgba(0,230,118,.08);color:#00e676;font-size:10px;cursor:pointer">Xuất tất cả CSV</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+      <input id="_bbtnSearch" type="text" placeholder="Tìm trạm, tên TB..." oninput="_bbtnFilter()" style="flex:1;min-width:180px;padding:7px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:rgba(235,248,255,.9);font-size:11.5px;outline:none">
+      <select id="_bbtnYear" onchange="_bbtnFilter()" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:rgba(235,248,255,.9);font-size:11px;cursor:pointer;outline:none">
+        <option value="">— Tất cả năm —</option>
+        ${[...new Set(completed.map(r=>new Date(r.Ngay_thi_nghiem).getFullYear()))].sort().reverse().map(y=>`<option value="${y}">${y}</option>`).join('')}
+      </select>
+    </div>
+    <div id="_bbtnContent">${monthsHtml||'<div style="padding:30px;text-align:center;color:rgba(180,200,220,.6)">Chưa có dữ liệu BBTN</div>'}</div>
+  </div>`;
+  window._bbtnFilter=function(){
+    const q=(document.getElementById('_bbtnSearch')?.value||'').toLowerCase();
+    const yr=document.getElementById('_bbtnYear')?.value||'';
+    const f=(window._bbtnCompleted||[]).filter(r=>{
+      if(yr&&String(new Date(r.Ngay_thi_nghiem).getFullYear())!==yr)return false;
+      if(q&&![(r.Tram||''),(r.Ten_thiet_bi||''),(r.Ngan_thiet_bi||'')].join(' ').toLowerCase().includes(q))return false;
+      return true;
+    });
+    const el=document.getElementById('_bbtnContent');
+    if(el) el.innerHTML = f.length
+      ? `<div style="font-size:11px;color:rgba(180,200,220,.7);padding:4px 0 12px">${f.length} kết quả</div>
+         <table style="width:100%;border-collapse:collapse;font-size:10px">
+           <tbody>${f.slice(0,300).map((r,i)=>`<tr style="border-bottom:1px solid rgba(255,255,255,.04);${i%2?'background:rgba(255,255,255,.02)':''}">
+             <td style="padding:5px 10px;font-weight:600;color:rgba(235,248,255,.9)">${r.Tram||'—'}</td>
+             <td style="padding:5px 10px;color:rgba(210,230,245,.85)">${r.Phan_loai_thiet_bi||'—'}</td>
+             <td style="padding:5px 10px;color:rgba(210,230,245,.85)">${r.Ten_thiet_bi||r.Ngan_thiet_bi||'—'}</td>
+             <td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);color:#00e676">${fmtD(r.Ngay_thi_nghiem)}</td>
+           </tr>`).join('')}</tbody>
+         </table>`
+      : '<div style="padding:20px;text-align:center;color:rgba(180,200,220,.6)">Không có kết quả</div>';
+  };
+}
+function _bbtnExportMonth(mk){const m=(window._bbtnByMonth||{})[mk];if(m)_bbtnDoExport(m.rows,'BBTN_'+mk);}
+function _bbtnExportAll(){_bbtnDoExport(window._bbtnCompleted||[],'BBTN_ToanBo');}
+function _bbtnDoExport(rows,filename){
+  const capLbl={'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+  const esc=v=>'"'+(String(v||'').replace(/"/g,'""'))+'"';
+  const fD=v=>{if(!v)return'';const d=new Date(v);return isNaN(d)?v:d.toLocaleDateString('vi-VN');};
+  const hdr='Trạm,Cấp ĐA,Loại TB,Tên/KH,Ngăn TB,Ngày TN,Hạn TN,TN tiếp theo';
+  const body=rows.map(r=>[r.Tram,capLbl[String(r.Cap_dien_ap??'')]||r.Cap_dien_ap,r.Phan_loai_thiet_bi,r.Ten_thiet_bi,r.Ngan_thiet_bi,fD(r.Ngay_thi_nghiem),r.Han_thi_nghiem,fD(r.Thoi_gian_thi_nghiem_tiep_theo)].map(esc).join(','));
+  const csv='\uFEFF'+[hdr,...body].join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=filename+'.csv';a.click();
+}
+function _bbtnConfigNAS() {
+  const url = prompt('Nhập URL NAS Synology của bạn:\nVD: http://192.168.1.100:5000 hoặc https://nas.evnhanoi.vn', NAS_CONFIG.baseUrl||'');
+  if (url !== null) {
+    NAS_CONFIG.baseUrl = url.trim().replace(/\/$/,'');
+    try { localStorage.setItem('evn_nas_url', NAS_CONFIG.baseUrl); } catch(e){}
+    showChangeNotif('success','Đã lưu cấu hình NAS','URL: '+(NAS_CONFIG.baseUrl||'(trống)'));
+    if (typeof _bbtnRenderPage === 'function') _bbtnRenderPage();
+  }
+}
+// Load NAS URL from localStorage
+try { const saved=localStorage.getItem('evn_nas_url'); if(saved) NAS_CONFIG.baseUrl=saved; } catch(e){}
+
+// ══════════════════════════════════════════════════════
+// FIX 4: TNĐK - User Update Request System
+// User clicks row → modal form to request update
+// Admin approves/rejects in panel
+// Data stored in Supabase table: tn_update_requests
+// ══════════════════════════════════════════════════════
+
+// Pending requests state (in-memory + Supabase)
+window._tnPendingRequests = [];
+
+async function _tnLoadPendingRequests() {
+  if (!window._sbClient) return;
+  try {
+    const { data } = await window._sbClient
+      .from('tn_update_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
+    window._tnPendingRequests = data || [];
+  } catch(e) { console.warn('loadPending:', e); }
+}
+
+// ── Row click: open update request modal ──────────────
+function _tnOpenUpdateModal(row) {
+  const fmtD = v => { if(!v)return'';const d=new Date(v);return isNaN(d)?v:d.toISOString().split('T')[0]; };
+  const existing = { Ten_thiet_bi: row.Ten_thiet_bi||'', So_luong: row.So_luong||'', Ngay_thi_nghiem: fmtD(row.Ngay_thi_nghiem) };
+  const modal = document.createElement('div');
+  modal.id = '_tnUpdateModal';
+  modal.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.7);backdrop-filter:blur(4px)';
+  modal.innerHTML=`<div style="background:#1a1f2e;border:1px solid rgba(0,200,255,.3);border-radius:12px;padding:24px;width:min(520px,90vw);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <div style="font-size:15px;font-weight:800;color:rgba(240,250,255,.97)">📝 Đề nghị cập nhật thiết bị</div>
+        <div style="font-size:10px;color:rgba(180,200,220,.7);margin-top:3px">${row.Tram||'—'} · ${row.Phan_loai_thiet_bi||'—'} · ${row.Ngan_thiet_bi||row.Ten_thiet_bi||'—'}</div>
+      </div>
+      <button onclick="document.getElementById('_tnUpdateModal').remove()" style="background:none;border:none;color:rgba(200,220,235,.6);font-size:18px;cursor:pointer;padding:4px">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div>
+        <label style="font-size:10px;color:rgba(180,200,220,.8);display:block;margin-bottom:5px">Tên thiết bị (hiện: ${row.Ten_thiet_bi||'—'})</label>
+        <input id="_req_ten" type="text" value="${existing.Ten_thiet_bi}" placeholder="Tên thiết bị mới..."
+          style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(235,248,255,.9);font-size:11.5px;outline:none;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:10px;color:rgba(180,200,220,.8);display:block;margin-bottom:5px">Số lượng (hiện: ${row.So_luong||'—'})</label>
+        <input id="_req_sl" type="number" value="${existing.So_luong}" placeholder="Số lượng..."
+          style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(235,248,255,.9);font-size:11.5px;outline:none;box-sizing:border-box">
+      </div>
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:10px;color:rgba(180,200,220,.8);display:block;margin-bottom:5px">Ngày TN thực tế (hiện: ${row.Ngay_thi_nghiem ? new Date(row.Ngay_thi_nghiem).toLocaleDateString('vi-VN') : '—'})</label>
+      <input id="_req_ngay" type="date" value="${existing.Ngay_thi_nghiem}"
+        style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(235,248,255,.9);font-size:11.5px;outline:none;box-sizing:border-box">
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:10px;color:rgba(180,200,220,.8);display:block;margin-bottom:5px">Lý do / Ghi chú đề nghị cập nhật *</label>
+      <textarea id="_req_note" rows="3" placeholder="Mô tả lý do cập nhật..."
+        style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(235,248,255,.9);font-size:11.5px;outline:none;box-sizing:border-box;resize:vertical"></textarea>
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="font-size:10px;color:rgba(180,200,220,.8);display:block;margin-bottom:5px">
+        Hình ảnh thiết bị ${NAS_CONFIG.baseUrl ? '(tải lên NAS Synology)' : '(cần cấu hình NAS trước)'}
+      </label>
+      <div style="border:2px dashed rgba(0,200,255,.3);border-radius:8px;padding:16px;text-align:center;cursor:pointer;background:rgba(0,200,255,.03)" onclick="document.getElementById('_req_photo').click()">
+        <i class="fas fa-camera" style="font-size:20px;color:rgba(0,200,255,.5);margin-bottom:6px"></i>
+        <div style="font-size:11px;color:rgba(180,200,220,.7)" id="_req_photo_lbl">Nhấp để chọn ảnh (JPG, PNG, max 10MB)</div>
+        <input type="file" id="_req_photo" accept="image/*" style="display:none" onchange="_tnPhotoSelected(this)">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="document.getElementById('_tnUpdateModal').remove()" style="padding:8px 18px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:none;color:rgba(200,218,235,.8);cursor:pointer;font-size:12px">Hủy</button>
+      <button onclick="_tnSubmitRequest(${JSON.stringify(row).replace(/"/g,'&quot;')})" style="padding:8px 18px;border-radius:7px;border:none;background:var(--accent);color:#000;font-weight:700;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:6px"><i class="fas fa-paper-plane"></i> Gửi đề nghị</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+}
+
+function _tnPhotoSelected(input) {
+  const f = input.files[0]; if (!f) return;
+  const lbl = document.getElementById('_req_photo_lbl');
+  if (lbl) lbl.textContent = '✅ ' + f.name + ' (' + (f.size/1024/1024).toFixed(1) + 'MB)';
+}
+
+async function _tnSubmitRequest(origRow) {
+  const ten   = document.getElementById('_req_ten')?.value?.trim();
+  const sl    = document.getElementById('_req_sl')?.value?.trim();
+  const ngay  = document.getElementById('_req_ngay')?.value?.trim();
+  const note  = document.getElementById('_req_note')?.value?.trim();
+  const photo = document.getElementById('_req_photo')?.files?.[0];
+  if (!note) { alert('Vui lòng nhập lý do đề nghị cập nhật'); return; }
+  if (!ten && !sl && !ngay && !photo) { alert('Vui lòng cập nhật ít nhất một trường'); return; }
+
+  const btn = document.querySelector('#_tnUpdateModal button[onclick*="_tnSubmitRequest"]');
+  if (btn) { btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Đang gửi...'; }
+
+  // Upload photo to NAS if configured
+  let photoNasPath = '';
+  if (photo && NAS_CONFIG.baseUrl) {
+    try {
+      const fd = new FormData();
+      fd.append('file', photo);
+      const nasUploadUrl = nasUrl(NAS_CONFIG.photoPath + '/uploads');
+      // Note: actual NAS upload requires Synology File Station API setup
+      // This is a placeholder - real implementation needs API key
+      photoNasPath = `${NAS_CONFIG.photoPath}/${Date.now()}_${photo.name}`;
+      showChangeNotif('info','Ảnh đã được ghi nhận','Upload NAS cần cấu hình API Synology');
+    } catch(e) { console.warn('NAS upload:', e); }
+  }
+
+  // Save request to Supabase
+  const sess = _authGetSession();
+  const request = {
+    tram:              origRow.Tram || '',
+    ngan_thiet_bi:     origRow.Ngan_thiet_bi || '',
+    loai_tb:           origRow.Phan_loai_thiet_bi || '',
+    ten_cu:            origRow.Ten_thiet_bi || '',
+    ten_moi:           ten || null,
+    so_luong_cu:       origRow.So_luong || null,
+    so_luong_moi:      sl ? Number(sl) : null,
+    ngay_tn_cu:        origRow.Ngay_thi_nghiem || null,
+    ngay_tn_moi:       ngay || null,
+    ghi_chu:           note,
+    photo_path:        photoNasPath || null,
+    nguoi_gui:         sess?.email || 'anonymous',
+    trang_thai:        'cho_duyet',   // cho_duyet | da_duyet | tu_choi
+    created_at:        new Date().toISOString(),
+  };
+  try {
+    if (window._sbClient) {
+      const { error } = await window._sbClient.from('tn_update_requests').insert([request]);
+      if (error) throw error;
+    } else {
+      // Fallback: store locally
+      (window._tnPendingRequests = window._tnPendingRequests||[]).push(request);
+    }
+    document.getElementById('_tnUpdateModal')?.remove();
+    showChangeNotif('success','Đã gửi đề nghị cập nhật','Admin sẽ xem xét và phê duyệt');
+  } catch(e) {
+    console.error(e);
+    showChangeNotif('error','Lỗi gửi đề nghị', e.message||'');
+    if (btn) { btn.disabled=false; btn.innerHTML='<i class="fas fa-paper-plane"></i> Gửi đề nghị'; }
+  }
+}
+
+// ── Admin: Phê duyệt panel ──────────────────────────
+async function _tnShowPendingRequests() {
+  await _tnLoadPendingRequests();
+  const reqs = window._tnPendingRequests || [];
+  const fmtD = v => v ? new Date(v).toLocaleDateString('vi-VN') : '—';
+  const pending = reqs.filter(r=>r.trang_thai==='cho_duyet');
+  const modal = document.createElement('div');
+  modal.id = '_tnAdminModal';
+  modal.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.7);backdrop-filter:blur(4px)';
+  const rows_html = pending.length ? pending.map((r,i)=>`<tr style="border-bottom:1px solid rgba(255,255,255,.06)">
+    <td style="padding:7px 10px;font-size:10px;color:rgba(235,248,255,.9);font-weight:600">${r.tram}</td>
+    <td style="padding:7px 10px;font-size:10px;color:rgba(210,230,245,.85)">${r.ngan_thiet_bi}</td>
+    <td style="padding:7px 10px;font-size:10px;color:rgba(210,230,245,.85)">${r.loai_tb}</td>
+    <td style="padding:7px 10px;font-size:10px">
+      ${r.ten_moi?`<div><span style="color:rgba(180,200,215,.6);font-size:9px">Tên:</span> <span style="color:rgba(255,215,64,.9)">${r.ten_moi}</span> <span style="color:rgba(150,170,190,.5)">(cũ: ${r.ten_cu||'—'})</span></div>`:''}
+      ${r.so_luong_moi!=null?`<div><span style="color:rgba(180,200,215,.6);font-size:9px">SL:</span> <span style="color:#00e676">${r.so_luong_moi}</span> <span style="color:rgba(150,170,190,.5)">(cũ: ${r.so_luong_cu||'—'})</span></div>`:''}
+      ${r.ngay_tn_moi?`<div><span style="color:rgba(180,200,215,.6);font-size:9px">Ngày TN:</span> <span style="color:#00c8ff">${fmtD(r.ngay_tn_moi)}</span></div>`:''}
+    </td>
+    <td style="padding:7px 10px;font-size:10px;color:rgba(200,220,235,.7)">${r.ghi_chu}</td>
+    <td style="padding:7px 10px;font-size:10px;color:rgba(180,200,215,.6)">${r.nguoi_gui}<br>${fmtD(r.created_at)}</td>
+    <td style="padding:7px 10px">
+      <div style="display:flex;gap:5px">
+        <button onclick="_tnApproveRequest('${r.id||i}',true,${JSON.stringify(r).replace(/"/g,'&quot;')})" style="padding:3px 10px;border-radius:5px;border:none;background:#00e676;color:#000;font-size:9px;font-weight:700;cursor:pointer">✓ Duyệt</button>
+        <button onclick="_tnApproveRequest('${r.id||i}',false,${JSON.stringify(r).replace(/"/g,'&quot;')})" style="padding:3px 10px;border-radius:5px;border:none;background:#ff5252;color:#fff;font-size:9px;font-weight:700;cursor:pointer">✗ Từ chối</button>
+      </div>
+    </td>
+  </tr>`).join('') : `<tr><td colspan="7" style="padding:30px;text-align:center;color:rgba(180,200,220,.6)">Không có đề nghị chờ duyệt</td></tr>`;
+
+  modal.innerHTML=`<div style="background:#1a1f2e;border:1px solid rgba(0,200,255,.3);border-radius:12px;padding:24px;width:min(900px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div style="font-size:15px;font-weight:800;color:rgba(240,250,255,.97)">🔐 Phê duyệt đề nghị cập nhật TNĐK <span style="font-size:12px;font-weight:400;color:${pending.length?'#ff9100':'#00e676'}">(${pending.length} chờ duyệt)</span></div>
+      <button onclick="document.getElementById('_tnAdminModal').remove()" style="background:none;border:none;color:rgba(200,220,235,.6);font-size:18px;cursor:pointer">✕</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:10px">
+        <thead><tr style="border-bottom:1px solid rgba(255,255,255,.1)">
+          <th style="padding:7px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700;text-align:left">Trạm</th>
+          <th style="padding:7px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700;text-align:left">Ngăn</th>
+          <th style="padding:7px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700;text-align:left">Loại TB</th>
+          <th style="padding:7px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700;text-align:left">Thay đổi đề nghị</th>
+          <th style="padding:7px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700;text-align:left">Lý do</th>
+          <th style="padding:7px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700;text-align:left">Người gửi</th>
+          <th style="padding:7px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700">Hành động</th>
+        </tr></thead>
+        <tbody>${rows_html}</tbody>
+      </table>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e=>{if(e.target===modal)modal.remove();});
+}
+
+async function _tnApproveRequest(reqId, approved, reqData) {
+  const action = approved ? 'da_duyet' : 'tu_choi';
+  const reason = approved ? '' : (prompt('Lý do từ chối (tùy chọn):') || '');
+  try {
+    if (window._sbClient && reqData.id) {
+      // Update request status
+      await window._sbClient.from('tn_update_requests').update({ trang_thai: action, admin_note: reason }).eq('id', reqData.id);
+      // If approved, update actual data
+      if (approved) {
+        const updates = {};
+        if (reqData.ten_moi)        updates.Ten_thiet_bi     = reqData.ten_moi;
+        if (reqData.so_luong_moi)   updates.So_luong         = reqData.so_luong_moi;
+        if (reqData.ngay_tn_moi)    updates.Ngay_thi_nghiem  = reqData.ngay_tn_moi;
+        if (Object.keys(updates).length) {
+          await window._sbClient.from('CongTacThiNghiem').update(updates)
+            .eq('Tram', reqData.tram)
+            .eq('Ngan_thiet_bi', reqData.ngan_thiet_bi)
+            .eq('Phan_loai_thiet_bi', reqData.loai_tb);
+        }
+      }
+    } else {
+      // Local fallback
+      const idx = (window._tnPendingRequests||[]).findIndex(r=>r===reqData);
+      if (idx>=0) window._tnPendingRequests[idx].trang_thai = action;
+    }
+    document.getElementById('_tnAdminModal')?.remove();
+    showChangeNotif(approved?'success':'info', approved?'Đã duyệt và cập nhật dữ liệu':'Đã từ chối đề nghị', '');
+    if (approved && typeof _tnFetchData === 'function') _tnFetchData();
+  } catch(e) {
+    showChangeNotif('error','Lỗi xử lý', e.message||'');
+  }
+}
+
+// NavExtMap for BBTN
+const _navExtMapBBTN = { 'Quản lý BBTN': _bbtnRenderPage };
+(function(){
+  const orig = window.navActivate;
+  window.navActivate = function(el) {
+    const text = (el.querySelector('span')?.textContent||el.textContent||'').trim();
+    if (_navExtMapBBTN[text]) {
+      document.querySelectorAll('.nav-item.active,.nav-sub-item.active').forEach(e=>e.classList.remove('active'));
+      el.classList.add('active');
+      const ov=document.getElementById('tbPageOverlay'),cv=document.getElementById('canvasArea'),rp=document.querySelector('.props-panel');
+      if(ov){if(cv)cv.style.display='none';if(rp)rp.style.display='none';ov.style.display='block';}
+      if(_tnRawData.length||_tnAllData.length){_bbtnRenderPage();}
+      else{if(ov)ov.innerHTML='<div style="padding:40px;text-align:center;color:rgba(180,200,220,.6)"><i class="fas fa-spinner fa-spin" style="color:var(--accent);margin-right:8px"></i>Đang tải...</div>';if(typeof _tnFetchData==='function')_tnFetchData().then(()=>_bbtnRenderPage());}
+      return;
+    }
+    if(orig) orig.call(this,el);
+  };
+})();
+
 
 </script>
 
