@@ -3047,16 +3047,7 @@ function renderChartsSection() {
       </div>
       <div class="hm-sub-bar">${subFast}</div>
       <div class="chart-preview-note"><i class="fas fa-bolt" style="color:var(--accent);margin-right:6px"></i>Đang dùng chế độ xem nhanh để mở layout mượt hơn. Heatmap đầy đủ hiện có <b>${viewSt.length.toLocaleString('vi-VN')}</b> trạm và khoảng <b>${NGAN_DEFS.length * Math.max(1, capsUsedFast.length)}</b> cột dữ liệu. Chỉ dựng bảng heatmap khi bạn bấm <b>Xem bảng chi tiết</b>.</div>
-      <div style="display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start;margin-top:10px">
-        <div>${buildChartMiniPreview(viewSt, nganMap)}</div>
-        <div>
-          <div style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.08em;margin-bottom:8px">TỶ LỆ PHÂN LOẠI THIẾT BỊ <span id="lytPieTramLbl_${uid}" style="color:var(--accent);font-weight:400;margin-left:4px"></span></div>
-          <div style="display:grid;grid-template-columns:160px 1fr;gap:10px;align-items:start">
-            <div style="position:relative;height:180px"><canvas id="lytPieChart_${uid}"></canvas></div>
-            <div id="lytPieLegend_${uid}" style="display:grid;gap:4px;align-content:start;padding-top:2px;max-height:180px;overflow-y:auto;font-size:9.5px"></div>
-          </div>
-        </div>
-      </div>`;
+      <div style="margin-top:10px;width:100%">${buildChartMiniPreview(viewSt, nganMap)}</div>>`;
     lytRenderPieChart(uid, baseRows, selTram);
     // Lưu signature cho fast mode
     if (mainElFast) mainElFast._renderSig = currentSig;
@@ -3255,8 +3246,8 @@ function renderChartsSection() {
 
       </div>
     <div class="hm-sub-bar">${sub}</div>
-    <div style="display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start;margin-top:10px">
-      <div>
+    
+      <div style="margin-top:10px"><div>
         ${detailOpen ? `
           <div class="hm-filter-bar" style="padding:0"></div>
           <div class="hm-wrap" id="lytHW_${uid}">
@@ -3267,18 +3258,8 @@ function renderChartsSection() {
             </table>
           </div>
         ` : `<div class="chart-preview-note"><i class="fas fa-eye-slash" style="color:var(--accent);margin-right:6px"></i>Bảng chi tiết theo trạm/cấp đang được ẩn để màn hình dễ đọc hơn. Chỉ mở khi cần rà soát từng cột hoặc xuất CSV.</div>`}
-      </div>
-      <div>
-        <div style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.08em;margin-bottom:8px">
-          TỶ LỆ PHÂN LOẠI THIẾT BỊ
-          <span id="lytPieTramLbl_${uid}" style="color:var(--accent);font-weight:400;margin-left:4px"></span>
-        </div>
-        <div style="display:grid;grid-template-columns:160px 1fr;gap:10px;align-items:start">
-          <div style="position:relative;height:180px"><canvas id="lytPieChart_${uid}"></canvas></div>
-          <div id="lytPieLegend_${uid}" style="display:grid;gap:4px;align-content:start;padding-top:2px;max-height:180px;overflow-y:auto;font-size:9.5px"></div>
-        </div>
-      </div>
-    </div>`;
+      </div
+      </div>>`;
 
 
   if (ddListEl.parentElement !== ddRoot) ddRoot.appendChild(ddListEl);
@@ -3622,9 +3603,14 @@ function lytFddReset(uid) {
   Object.assign(_lf, {tram:'',cap:'',type:'',year:'',opyr:'',search:''});
   const si = document.getElementById(`lf_search_${uid||_lfUid()}`);
   if (si) si.value = '';
-  _chipFiltered = [..._chipAllData];
   _selectedChips.clear();
   _lytNganCache = null; _lytNganSig = '';
+  if (!_chipAllData.length) {
+    showChangeNotif('info','Đang tải lại dữ liệu...','');
+    if (typeof loadStatsFromSupabase === 'function') loadStatsFromSupabase();
+    return;
+  }
+  _chipFiltered = [..._chipAllData];
   renderLiveFilterSection();
   _recomputeStatsWithFilter();
   renderChipsSection();
@@ -3850,28 +3836,65 @@ function _lytShowDetailPanel(title, color, totalLine, items, mbaSection) {
     p.className = 'hm-detail-panel';
     document.body.appendChild(p);
   }
-  let _pIdx=0;
+
+  let _pIdx = 0;
+  const mkTogBtn = (uid, col) =>
+    `<button onclick="event.stopPropagation();(function(btn,id){var el=document.getElementById(id);if(!el)return;var op=el.style.display!=='none';el.style.display=op?'none':'block';btn.textContent=op?'+':'-';btn.style.background=op?'rgba(255,255,255,.06)':'rgba(0,200,255,.15)';btn.style.color=op?'rgba(220,235,250,.8)':'var(--accent)';})(this,'${uid}')"
+       style="width:20px;height:20px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(220,235,250,.8);font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;transition:all .15s">+</button>`;
+  const mkSpacer = () => `<span style="width:20px;flex-shrink:0;display:inline-block"></span>`;
+
+  // Build leaf string list into HTML rows
+  const mkLeafRows = (lines, col, indent) =>
+    lines.map(n => `<div style="padding:4px 12px 4px ${indent}px;font-size:10.5px;color:rgba(175,205,225,.85);display:flex;align-items:flex-start;gap:5px;border-bottom:1px solid rgba(255,255,255,.03)">
+      <span style="color:${col};opacity:.7;flex-shrink:0;margin-top:1px">▸</span>
+      <span style="color:rgba(235,248,255,.9)">${n}</span>
+    </div>`).join('');
+
   const bodyHtml = items.map(item => {
-    if (item.isGroup) return `<div style="padding:9px 16px 4px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${item.color};border-bottom:1px solid rgba(255,255,255,.06);opacity:.9">${item.text}</div>`;
+    if (item.isGroup) return `<div style="padding:9px 16px 4px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${item.color};border-bottom:1px solid rgba(255,255,255,.1)">${item.text}</div>`;
+
     const badge = item.badge || item.sub || '';
+    const col   = item.color || color || 'var(--accent)';
+    const uid1  = 'pd'+(++_pIdx);
+
+    // ── 2-LEVEL: item.children = [{text, sub, detail:[]}]
+    if (Array.isArray(item.children) && item.children.length > 0) {
+      const childrenHtml = item.children.map(ch => {
+        const uid2  = 'pd'+(++_pIdx);
+        const chCol = ch.color || col;
+        const hasLeaf = Array.isArray(ch.detail) && ch.detail.length > 0;
+        const leafBlock = hasLeaf
+          ? `<div id="${uid2}" style="display:none;border-bottom:1px solid rgba(255,255,255,.04)">${mkLeafRows(ch.detail, chCol, 52)}</div>`
+          : '';
+        return `<div style="border-bottom:1px solid rgba(255,255,255,.04)">
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 14px 6px 32px">
+            ${hasLeaf ? mkTogBtn(uid2, chCol) : mkSpacer()}
+            <span style="font-size:11.5px;color:rgba(230,245,255,.92);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ch.text}</span>
+            ${ch.sub ? `<span style="background:${chCol}22;color:${chCol};font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;white-space:nowrap;flex-shrink:0">${ch.sub}</span>` : ''}
+          </div>
+          ${leafBlock}
+        </div>`;
+      }).join('');
+      return `<div style="border-bottom:1px solid rgba(255,255,255,.05)">
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 14px">
+          ${mkTogBtn(uid1, col)}
+          <span style="font-size:12px;color:rgba(240,250,255,.97);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600">${item.text}</span>
+          <span style="background:${col}25;color:${col};font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0">${badge}</span>
+        </div>
+        <div id="${uid1}" style="display:none;border-bottom:1px solid rgba(255,255,255,.06)">${childrenHtml}</div>
+      </div>`;
+    }
+
+    // ── 1-LEVEL: item.detail = ['string', ...]
     const hasDetail = Array.isArray(item.detail) && item.detail.length > 0;
-    const uid = 'pd'+(++_pIdx);
     const detHtml = hasDetail
-      ? `<div id="${uid}" style="display:none;border-bottom:1px solid rgba(255,255,255,.06)">${
-          item.detail.map(n=>`<div style="padding:4px 12px 4px 32px;font-size:10.5px;color:rgba(175,205,225,.85);display:flex;align-items:flex-start;gap:5px;border-bottom:1px solid rgba(255,255,255,.03)">
-            <span style="color:${item.color};opacity:.55;flex-shrink:0;margin-top:1px">▸</span>
-            <span>${n}</span>
-          </div>`).join('')
-        }</div>`
+      ? `<div id="${uid1}" style="display:none;border-bottom:1px solid rgba(255,255,255,.06)">${mkLeafRows(item.detail, col, 32)}</div>`
       : '';
-    const togBtn = hasDetail
-      ? `<button onclick="event.stopPropagation();(function(btn,id){var el=document.getElementById(id);if(!el)return;var op=el.style.display!=='none';el.style.display=op?'none':'block';btn.textContent=op?'+':'-';btn.style.background=op?'rgba(255,255,255,.06)':'rgba(0,200,255,.15)';btn.style.color=op?'rgba(220,235,250,.8)':'var(--accent)';})(this,'${uid}')" style="width:20px;height:20px;border-radius:4px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(220,235,250,.8);font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;transition:all .15s">+</button>`
-      : `<span style="width:20px;flex-shrink:0;display:inline-block"></span>`;
     return `<div style="border-bottom:1px solid rgba(255,255,255,.05)">
       <div style="display:flex;align-items:center;gap:8px;padding:7px 14px">
-        ${togBtn}
-        <span style="font-size:12px;color:rgba(215,232,248,.92);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${item.text}</span>
-        <span style="background:${item.color}25;color:${item.color};font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0">${badge}</span>
+        ${hasDetail ? mkTogBtn(uid1, col) : mkSpacer()}
+        <span style="font-size:12px;color:rgba(240,250,255,.97);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${item.text}</span>
+        <span style="background:${col}25;color:${col};font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap;flex-shrink:0">${badge}</span>
       </div>
       ${detHtml}
     </div>`;
@@ -3879,135 +3902,20 @@ function _lytShowDetailPanel(title, color, totalLine, items, mbaSection) {
 
   p.innerHTML = `
     <div class="hm-resize-grip" id="hm-resize-grip"></div>
-    <div class="hm-detail-hd" style="border-left:3px solid ${color||'var(--accent)'}" id="hm-detail-hd-drag">
-      <span style="color:${color||'var(--accent)'}">${title}</span>
-      <span class="hm-detail-close"
-        onclick="this.closest('.hm-detail-panel').classList.remove('open');let b=document.getElementById('hm-detail-backdrop');if(b)b.style.display='none'">✕</span>
+    <div class="hm-detail-hd" style="border-left:3px solid ${color||'var(--accent)'}">
+      <span style="color:rgba(255,255,255,.97)">${title}</span>
+      <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span>
     </div>
-    <div style="padding:6px 16px 8px;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0">
-      <div style="font-size:9px;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:6px">${totalLine}</div>
-      <input type="text" placeholder="🔍 Tìm kiếm..." id="hm-detail-search"
-        style="width:100%;box-sizing:border-box;padding:5px 9px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--text-primary);font-size:10px;outline:none"
-        oninput="_lytDetailSearchFn(this.value)"/>
+    <div style="padding:6px 16px 6px;font-size:9px;color:rgba(180,210,230,.7);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">${totalLine||''}</div>
+    <div style="padding:6px 14px 4px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">
+      <input type="text" placeholder="🔍 Tìm kiếm..." oninput="_hmPanelSearch(this.value)"
+        style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:5px 10px;color:rgba(235,248,255,.9);font-size:11px;outline:none;box-sizing:border-box">
     </div>
-    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;overscroll-behavior:contain;-webkit-overflow-scrolling:touch">${bodyHtml}</div>`;
+    <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;overscroll-behavior:contain">${bodyHtml}</div>`;
+
   p.classList.add('open');
   _hmOpenPanel(p);
-  let bd = document.getElementById('hm-detail-backdrop');
-  if (!bd) {
-    bd = document.createElement('div');
-    bd.id = 'hm-detail-backdrop';
-    bd.style.cssText = 'position:fixed;inset:0;z-index:9190;background:rgba(0,0,0,.35);display:none;backdrop-filter:blur(1px)';
-    bd.onclick = () => { p.classList.remove('open'); bd.style.display='none'; };
-    document.body.appendChild(bd);
-  }
-  bd.style.display = 'block';
-  setTimeout(()=>{ const s=document.getElementById('hm-detail-search'); if(s)s.focus(); }, 80);
 }
-
-
-// ═══════════════════════════════════════════════════════════════
-//  DETAIL PANEL – EVENT DELEGATION (không dùng _dragInited flag)
-//  Bind một lần vào document khi trang load. Hoạt động đúng
-//  ngay cả khi innerHTML bị ghi đè nhiều lần.
-// ═══════════════════════════════════════════════════════════════
-(function _initPanelSystem() {
-  let _resizing = false, _resizeStartX = 0, _resizeStartW = 0;
-  let _dragging  = false, _dragStartY  = 0, _dragStartTop = 0;
-
-  // ── RESIZE (kéo cạnh trái) ──
-  document.addEventListener('mousedown', e => {
-    const grip = e.target.closest('.hm-resize-grip');
-    if (!grip) return;
-    const panel = grip.closest('.hm-detail-panel');
-    if (!panel) return;
-    e.preventDefault();
-    _resizing = true;
-    _resizeStartX = e.clientX;
-    _resizeStartW = panel.offsetWidth;
-    grip.classList.add('dragging');
-    document.body.style.userSelect = 'none';
-  });
-
-  document.addEventListener('mousemove', e => {
-    if (_resizing) {
-      const panel = document.querySelector('.hm-detail-panel.open');
-      if (!panel) { _resizing = false; return; }
-      const newW = Math.max(280, Math.min(window.innerWidth * 0.75, _resizeStartW + (_resizeStartX - e.clientX)));
-      panel.style.width = newW + 'px';
-    }
-    if (_dragging) {
-      const panel = document.querySelector('.hm-detail-panel.open');
-      if (!panel) { _dragging = false; return; }
-      const newTop = Math.max(0, Math.min(window.innerHeight - 100, _dragStartTop + (e.clientY - _dragStartY)));
-      panel.style.top    = newTop + 'px';
-      panel.style.bottom = 'auto';
-      panel.style.height = (window.innerHeight - newTop) + 'px';
-    }
-  });
-
-  document.addEventListener('mouseup', () => {
-    if (_resizing) {
-      document.querySelectorAll('.hm-resize-grip').forEach(g => g.classList.remove('dragging'));
-      _resizing = false;
-      document.body.style.userSelect = '';
-    }
-    if (_dragging) {
-      _dragging = false;
-      document.body.style.userSelect = '';
-    }
-  });
-
-  // ── DRAG HEADER (kéo lên/xuống) ──
-  document.addEventListener('mousedown', e => {
-    if (e.target.classList.contains('hm-detail-close')) return;
-    if (e.target.closest('.hm-resize-grip')) return;
-    const hd = e.target.closest('.hm-detail-hd');
-    if (!hd) return;
-    const panel = hd.closest('.hm-detail-panel');
-    if (!panel) return;
-    e.preventDefault();
-    _dragging = true;
-    _dragStartY   = e.clientY;
-    _dragStartTop = panel.style.top ? parseInt(panel.style.top, 10) : 0;
-    document.body.style.userSelect = 'none';
-  });
-
-  // ── TOUCH RESIZE ──
-  document.addEventListener('touchstart', e => {
-    const grip = e.target.closest('.hm-resize-grip');
-    if (!grip) return;
-    const panel = grip.closest('.hm-detail-panel');
-    if (!panel) return;
-    _resizing = true;
-    _resizeStartX = e.touches[0].clientX;
-    _resizeStartW = panel.offsetWidth;
-  }, { passive: true });
-
-  document.addEventListener('touchmove', e => {
-    if (!_resizing) return;
-    const panel = document.querySelector('.hm-detail-panel.open');
-    if (!panel) { _resizing = false; return; }
-    const newW = Math.max(280, Math.min(window.innerWidth * 0.75, _resizeStartW + (_resizeStartX - e.touches[0].clientX)));
-    panel.style.width = newW + 'px';
-  }, { passive: true });
-
-  document.addEventListener('touchend', () => { _resizing = false; });
-
-  // ── ESCAPE để đóng ──
-  document.addEventListener('keydown', e => {
-    if (e.key !== 'Escape') return;
-    const panel = document.getElementById('hm-detail-panel');
-    if (panel && panel.classList.contains('open')) {
-      panel.classList.remove('open');
-      panel.style.top = ''; panel.style.bottom = ''; panel.style.height = '';
-      const bd = document.getElementById('hm-detail-backdrop');
-      if (bd) bd.style.display = 'none';
-    }
-  });
-})();
-
-// Không cần _hmPanelInitDrag nữa – giữ stub để không lỗi các lần gọi cũ
 function _hmPanelInitDrag(panel) {
   if (!panel || panel._dragInited) return;
   panel._dragInited = true;
@@ -4153,191 +4061,7 @@ function _lytDetailSearchFn(val) {
 // Render device chips vào canvas section có id='deviceByType'
 // Đồng bộ logic với app.js renderTypeChips()
 
-let _chipAllData   = [];    // toàn bộ rows từ Supabase
-let _chipFiltered  = [];    // filtered rows (= _chipAllData khi không filter)
-let _selectedChips = new Set(); // chip filter state
 
-function isExcludedChip(pl) {
-  if (!pl) return true;
-  const n = pl.trim().toUpperCase().replace(/\s+/g, '').normalize('NFC');
-  if (n.startsWith('TICHAN') || n.startsWith('TI-CHAN') ||
-      n === 'TICHANSỨ' || n === 'TICHÂNSỨ' ||
-      n.includes('TICHÂN') || n.includes('TICHAN')) return true;
-  if (n === 'HTTĐ' || n === 'HTTD' ||
-      n.startsWith('HTTĐ') || n.startsWith('HTTD')) return true;
-  return false;
-}
-
-function buildChipData(rows) {
-  const typeMap = {};
-  rows.forEach(d => {
-    const pl = (d.Phan_loai_thiet_bi || '').trim();
-    if (!pl || isExcludedChip(pl)) return;
-    if (!typeMap[pl]) typeMap[pl] = { totalCount: 0, soLuong: 0, hangs: new Set() };
-    typeMap[pl].totalCount++;
-    typeMap[pl].soLuong += Number(d.So_luong) || 0;
-    const h = (d.Hang_san_xuat || '').trim();
-    if (h) typeMap[pl].hangs.add(h);
-  });
-  return typeMap;
-}
-
-function renderChipsSection() {
-  const chipsItem = layout.find(l => l.type === 'chips');
-  if (!chipsItem) return;
-  const wrapper = document.querySelector(`.section-wrapper[data-uid="${chipsItem.uid}"]`);
-  if (!wrapper) return;
-  const preview = wrapper.querySelector('.card-preview');
-  if (!preview) return;
-  if (!_chipAllData.length) return;
-
-  const fmt = n => Number(n).toLocaleString('vi-VN');
-
-  // Exclude list
-  const isExcl = pl => {
-    if (!pl) return true;
-    const n = pl.trim().toUpperCase().replace(/\s+/g,'').normalize('NFC');
-    return n.startsWith('TICHAN') || n.includes('TICHÂN') ||
-           n === 'HTTD' || n.startsWith('HTTD') ||
-           n === 'DAU' || n.startsWith('DẦU') || n.startsWith('DAU');
-  };
-
-  // Base rows = filtered or all
-  const baseRows = _chipFiltered.length ? _chipFiltered : _chipAllData;
-
-  // Tram linkage: if tram selected via filter → determine cap group
-  const selTram = _lf?.tram || '';
-  const selCap  = _lf?.cap  || '';
-  const capPrio = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
-
-  // Build tramMaxCap to determine which group a tram belongs to
-  const tramMaxCap = {};
-  _chipAllData.forEach(d => {
-    const t=(d.Tram||'').trim(); if(!t)return;
-    const cv=String(d.Cap_dien_ap??''); if(!cv||cv==='null')return;
-    if(!tramMaxCap[t]||(capPrio[cv]??9)<(capPrio[tramMaxCap[t]]??9)) tramMaxCap[t]=cv;
-  });
-
-  // Determine which groups to show based on tram/cap filter linkage
-  const HV_CAPS = new Set(['2','1']);       // 220kV, 110kV
-  const LV_CAPS = new Set(['3','4','9','6','0']); // 35kV, 22kV, 10kV, 6kV, TT
-
-  // Always show both groups — hide only if group has 0 devices after filtering
-  // (Cap filter via dropdown still applies via baseRows, but don't hide whole group by tram cap)
-  let showHV = true, showLV = true;
-  // Only restrict when user explicitly selects a cap via dropdown
-  if (selCap) {
-    showHV = HV_CAPS.has(selCap);
-    showLV = LV_CAPS.has(selCap);
-  }
-
-  // Build chip data per group
-  function buildGroupChips(capFilter) {
-    const typeMap = {};
-    baseRows.forEach(d => {
-      const cap = String(d.Cap_dien_ap??'');
-      if (!capFilter.has(cap)) return;
-      const pl = (d.Phan_loai_thiet_bi||'').trim();
-      if (!pl || isExcl(pl)) return;
-      if (!typeMap[pl]) typeMap[pl] = { soLuong:0, totalCount:0 };
-      typeMap[pl].soLuong    += Number(d.So_luong)||0;
-      typeMap[pl].totalCount += 1;
-    });
-    return typeMap;
-  }
-
-  // Total from ALL data (for /total display)
-  function buildGroupTotal(capFilter) {
-    const typeMap = {};
-    _chipAllData.forEach(d => {
-      const cap = String(d.Cap_dien_ap??'');
-      if (!capFilter.has(cap)) return;
-      const pl = (d.Phan_loai_thiet_bi||'').trim();
-      if (!pl || isExcl(pl)) return;
-      if (!typeMap[pl]) typeMap[pl] = { soLuong:0 };
-      typeMap[pl].soLuong += Number(d.So_luong)||0;
-    });
-    return typeMap;
-  }
-
-  const hvMap  = buildGroupChips(HV_CAPS);
-  const lvMap  = buildGroupChips(LV_CAPS);
-  const hvAll  = buildGroupTotal(HV_CAPS);
-  const lvAll  = buildGroupTotal(LV_CAPS);
-
-  // Sort by soLuong desc, active chips first
-  function sortTypes(map) {
-    return Object.entries(map).sort((a,b) => {
-      const aA = _selectedChips.has(a[0]) ? 1:0, bA = _selectedChips.has(b[0]) ? 1:0;
-      if (bA!==aA) return bA-aA;
-      return (b[1].soLuong||0) - (a[1].soLuong||0);
-    });
-  }
-
-  function chipHtml(type, info, allInfo) {
-    const isActive = _selectedChips.has(type);
-    const cur = info.soLuong||0;
-    const tot = allInfo?.[type]?.soLuong||cur;
-    const isFiltered = cur !== tot;
-    const safeType = type.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-    return `<div class="device-chip${isActive?' active':''}"
-      title="${type} — ${fmt(cur)}${isFiltered?'/'+fmt(tot):''}TB"
-      data-chip-type="${safeType}"
-      onmousedown="this._md=true" onmousemove="this._md=false"
-      onmouseup="if(this._md){event.stopPropagation();lytChipClick(this)}">
-      <div class="device-chip-header">
-        <span class="device-chip-name">${type}</span>
-        <span class="device-chip-count">${isActive?'<i class="fas fa-check" style="font-size:8px;margin-right:2px"></i>':''}${fmt(cur)}${isFiltered?'<span class="device-chip-total">/'+fmt(tot)+'</span>':''}</span>
-      </div>
-    </div>`;
-  }
-
-  const numTypes = Object.keys(hvMap).length + Object.keys(lvMap).length;
-  const totalSL  = [...Object.values(hvMap),...Object.values(lvMap)].reduce((s,v)=>s+(v.soLuong||0),0);
-
-  let html = `<div class="chips-header-row">
-    <span class="chips-active-info${_selectedChips.size>0?' visible':''}" id="lyt_chipsInfo">
-      ${_selectedChips.size>0?`<i class="fas fa-filter"></i> Đang lọc: ${[..._selectedChips].join(', ')}`:''}
-    </span>
-    <span style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono)">${numTypes} loại · ${fmt(totalSL)} thiết bị</span>
-    <button class="chips-reset-btn" id="lyt_chipsReset"
-      style="display:${_selectedChips.size>0?'inline-flex':'none'}"
-      onclick="lytChipReset()">
-      <i class="fas fa-times-circle"></i> Bỏ lựa chọn
-    </button>
-  </div>`;
-
-  // Group HV
-  if (showHV && Object.keys(hvMap).length) {
-    const hvTotal = Object.values(hvMap).reduce((s,v)=>s+(v.soLuong||0),0);
-    html += `<div style="font-size:9px;font-weight:800;color:#ff9100;letter-spacing:.08em;margin:10px 0 6px;display:flex;align-items:center;gap:8px">
-      <span style="width:8px;height:8px;border-radius:50%;background:#ff9100;flex-shrink:0"></span>
-      220kV – 110kV
-      <span style="font-weight:400;color:var(--text-muted)">${Object.keys(hvMap).length} loại · ${fmt(hvTotal)} thiết bị</span>
-    </div><div class="device-chips-grid">`;
-    sortTypes(hvMap).forEach(([t,info]) => { html += chipHtml(t, info, hvAll); });
-    html += `</div>`;
-  }
-
-  // Group LV
-  if (showLV && Object.keys(lvMap).length) {
-    const lvTotal = Object.values(lvMap).reduce((s,v)=>s+(v.soLuong||0),0);
-    html += `<div style="font-size:9px;font-weight:800;color:#00c8ff;letter-spacing:.08em;margin:14px 0 6px;display:flex;align-items:center;gap:8px">
-      <span style="width:8px;height:8px;border-radius:50%;background:#00c8ff;flex-shrink:0"></span>
-      35kV – 22kV – 10kV – 6kV
-      <span style="font-weight:400;color:var(--text-muted)">${Object.keys(lvMap).length} loại · ${fmt(lvTotal)} thiết bị</span>
-    </div><div class="device-chips-grid">`;
-    sortTypes(lvMap).forEach(([t,info]) => { html += chipHtml(t, info, lvAll); });
-    html += `</div>`;
-  }
-
-  // No data for selected filter
-  if (!showHV && !showLV) {
-    html += `<div style="color:var(--text-muted);font-size:11px;padding:20px;text-align:center">Không có thiết bị cho bộ lọc hiện tại</div>`;
-  }
-
-  preview.innerHTML = html;
-}
 
 
 function lytChipClick(el) {
@@ -4453,7 +4177,7 @@ function lytChipReset() {
   _recomputeStatsWithFilter();
 }
 
-// ── Stats card click — hiện detail panel bên phải ──────────────
+// ── Helper: build grouped ngăn by type for a tram ──────────────
 function lytStatsCardClick(label, color) {
   // Guard: data chưa load
   if (!_chipAllData || !_chipAllData.length) {
@@ -4503,22 +4227,68 @@ function lytStatsCardClick(label, color) {
     }
     case 'TBA 220kV': {
       title = '⚡ TBA 220kV';
-      const list = filteredTrams.filter(t => tramMaxCap[t] === '2');
-      list.forEach(t => {
-        const ngans=[...new Set(rows.filter(r=>(r.Tram||'').trim()===t).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))].sort();
-        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS['2'], detail: ngans });
+      const list_220 = filteredTrams.filter(t => tramMaxCap[t] === '2');
+      const scope_220 = lytBuildScopedNganSets(rows, _chipAllData);
+      const NGAN_GROUPS__220 = [
+        { label:'Ngăn ĐZ',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn ĐZ' },
+        { label:'Ngăn MBA',          fn: r=>lytIsMBARow(r) },
+        { label:'Ngăn XT',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn XT' },
+        { label:'Ngăn LL',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn LL' },
+        { label:'Ngăn Tụ bù (TBN)', fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn TBN'||((r.Phan_loai_thiet_bi||'').trim().toUpperCase().includes('TBN')) },
+        { label:'Ngăn Tự dùng (TD)',fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='NgănTD'||((r.Phan_loai_thiet_bi||'').trim().toUpperCase()==='MBATD') },
+        { label:'Ngăn Kháng',        fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn Kháng' },
+      ];
+      list_220.forEach(t => {
+        const tRows_220 = scope_220.scopedRows.filter(r=>(r.Tram||'').trim()===t);
+        const allNgans_220 = [...new Set(tRows_220.map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))];
+        // Build 2-level children: each group is a child with its ngăn as detail
+        const catSet_220 = new Set();
+        const children_220 = [];
+        NGAN_GROUPS__220.forEach(g => {
+          const gNgans = [...new Set(tRows_220.filter(g.fn).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))].sort();
+          if (!gNgans.length) return;
+          gNgans.forEach(n => catSet_220.add(n));
+          children_220.push({ text: g.label, sub: `${gNgans.length} ngăn`, color: LYT_CAP_COLORS['2'], detail: gNgans });
+        });
+        // Uncategorized ngăn
+        const uncat_220 = allNgans_220.filter(n=>!catSet_220.has(n)).sort();
+        if (uncat_220.length) children_220.push({ text: 'Ngăn khác', sub: `${uncat_220.length} ngăn`, color: LYT_CAP_COLORS['2'], detail: uncat_220 });
+        items.push({ text: t, sub: `${allNgans_220.length} ngăn`, color: LYT_CAP_COLORS['2'], children: children_220 });
       });
-      totalLine = `${list.length} trạm`;
+      totalLine = `${list_220.length} trạm`;
       break;
     }
     case 'TBA 110kV': {
       title = '⚡ TBA 110kV';
-      const list = filteredTrams.filter(t => tramMaxCap[t] === '1');
-      list.forEach(t => {
-        const ngans=[...new Set(rows.filter(r=>(r.Tram||'').trim()===t).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))].sort();
-        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS['1'], detail: ngans });
+      const list_110 = filteredTrams.filter(t => tramMaxCap[t] === '1');
+      const scope_110 = lytBuildScopedNganSets(rows, _chipAllData);
+      const NGAN_GROUPS__110 = [
+        { label:'Ngăn ĐZ',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn ĐZ' },
+        { label:'Ngăn MBA',          fn: r=>lytIsMBARow(r) },
+        { label:'Ngăn XT',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn XT' },
+        { label:'Ngăn LL',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn LL' },
+        { label:'Ngăn Tụ bù (TBN)', fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn TBN'||((r.Phan_loai_thiet_bi||'').trim().toUpperCase().includes('TBN')) },
+        { label:'Ngăn Tự dùng (TD)',fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='NgănTD'||((r.Phan_loai_thiet_bi||'').trim().toUpperCase()==='MBATD') },
+        { label:'Ngăn Kháng',        fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn Kháng' },
+      ];
+      list_110.forEach(t => {
+        const tRows_110 = scope_110.scopedRows.filter(r=>(r.Tram||'').trim()===t);
+        const allNgans_110 = [...new Set(tRows_110.map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))];
+        // Build 2-level children: each group is a child with its ngăn as detail
+        const catSet_110 = new Set();
+        const children_110 = [];
+        NGAN_GROUPS__110.forEach(g => {
+          const gNgans = [...new Set(tRows_110.filter(g.fn).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))].sort();
+          if (!gNgans.length) return;
+          gNgans.forEach(n => catSet_110.add(n));
+          children_110.push({ text: g.label, sub: `${gNgans.length} ngăn`, color: LYT_CAP_COLORS['1'], detail: gNgans });
+        });
+        // Uncategorized ngăn
+        const uncat_110 = allNgans_110.filter(n=>!catSet_110.has(n)).sort();
+        if (uncat_110.length) children_110.push({ text: 'Ngăn khác', sub: `${uncat_110.length} ngăn`, color: LYT_CAP_COLORS['1'], detail: uncat_110 });
+        items.push({ text: t, sub: `${allNgans_110.length} ngăn`, color: LYT_CAP_COLORS['1'], children: children_110 });
       });
-      totalLine = `${list.length} trạm`;
+      totalLine = `${list_110.length} trạm`;
       break;
     }
     case 'Tổng số ngăn': {
@@ -4718,44 +4488,78 @@ function lytStatsCardClick(label, color) {
     }
     case 'Ngăn kháng': {
       title = '🧲 Ngăn Kháng';
-      const nganScope = lytBuildScopedNganSets(rows, _chipAllData);
-      const byTram = {};
-      nganScope.khang.forEach(key => {
-        const [tram, ngan] = key.split('|||');
-        if (!tram || !ngan) return;
-        if (!byTram[tram]) byTram[tram] = new Set();
-        byTram[tram].add(ngan);
+      // Use _chipAllData (full dataset) to find kháng ngăn, not just filtered rows
+      const khangSource = _chipAllData.length ? _chipAllData : rows;
+      const byTramK = {};
+      khangSource.forEach(d => {
+        const t = (d.Tram||'').trim(); if(!t) return;
+        const ng= (d.Ngan_thiet_bi||'').trim(); if(!ng) return;
+        const loai = lytNormalizeNganLoai(d.Loai_ngan_lo);
+        const pl   = (d.Phan_loai_thiet_bi||'').trim();
+        const isKhang = loai === 'Ngăn Kháng' || pl === 'K' || pl === 'Kháng';
+        if (!isKhang) return;
+        if (!byTramK[t]) byTramK[t] = new Set();
+        byTramK[t].add(ng);
       });
+      if (!Object.keys(byTramK).length) {
+        items.push({ text: 'Không tìm thấy Ngăn Kháng', sub: 'Kiểm tra trường Loai_ngan_lo hoặc Phan_loai_thiet_bi', color: '#ff9100' });
+        totalLine = 'Không có dữ liệu';
+        break;
+      }
       let total = 0;
-      filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort(); total += ngans.length;
-        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
+      // Only show trams matching current filter
+      const showTrams = filteredTrams.size ? [...filteredTrams] : Object.keys(byTramK);
+      showTrams.filter(t => byTramK[t]).forEach(t => {
+        const ngans = [...byTramK[t]].sort(); total += ngans.length;
+        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#e040fb', detail: ngans });
       });
-      totalLine = `${total} ngăn Kháng / ${Object.keys(byTram).length} trạm`;
+      totalLine = `${total} ngăn Kháng / ${Object.keys(byTramK).length} trạm`;
       break;
     }
     case 'Tổng số thiết bị': {
       title = '📦 Tổng số thiết bị';
       const byType = {};
-      const nowY3=new Date().getFullYear();
       rows.forEach(r => {
         const pl = (r.Phan_loai_thiet_bi||'Khác').trim();
         if (!byType[pl]) byType[pl] = { qty: 0, trams: {} };
         byType[pl].qty += Number(r.So_luong)||1;
-        const t=(r.Tram||'').trim();
-        if(t){if(!byType[pl].trams[t])byType[pl].trams[t]=[];byType[pl].trams[t].push(r);}
+        const t = (r.Tram||'').trim();
+        if (t) {
+          if (!byType[pl].trams[t]) byType[pl].trams[t] = [];
+          byType[pl].trams[t].push(r);
+        }
       });
-      const sorted = Object.entries(byType).sort((a,b) => b[1].qty - a[1].qty);
-      const total = sorted.reduce((s,[,v]) => s + v.qty, 0);
+      const sorted = Object.entries(byType).sort((a,b)=>a[0].localeCompare(b[0],'vi'));
+      const total  = sorted.reduce((s,[,v]) => s + v.qty, 0);
       sorted.forEach(([pl, v]) => {
-        const tramList=Object.entries(v.trams).sort((a,b)=>b[1].length-a[1].length);
-        const detail=tramList.map(([t,rs])=>{
-          const cap=tramMaxCap[t]||'';
-          const capTag=cap?` [${capLbl[cap]||cap}]`:'';
-          const devNames=[...new Set(rs.map(r=>(r.Ten_thiet_bi||r.Ngan_thiet_bi||'').trim()).filter(Boolean))].slice(0,4).join(', ');
-          return `${t}${capTag} — ${rs.length} TB${devNames?': '+devNames:''}`;
+        const tramList = Object.entries(v.trams).sort((a,b)=>a[0].localeCompare(b[0],'vi'));
+        // Use dominant cap for type color (most common cap among trạm)
+        const capCounts = {};
+        tramList.forEach(([t]) => { const c = tramMaxCap[t]||'1'; capCounts[c]=(capCounts[c]||0)+1; });
+        const domCap = Object.entries(capCounts).sort((a,b)=>b[1]-a[1])[0]?.[0]||'1';
+        const typeColor = LYT_CAP_COLORS[domCap]||'#18ffff';
+        // Build 2-level children: each child = 1 trạm with devices as leaf detail
+        const children = tramList.map(([t, rs]) => {
+          const cap    = tramMaxCap[t]||'';
+          const capTag = cap ? ` [${capLbl[cap]||cap}]` : '';
+          // Leaf: each device name A-Z, deduplicated
+          const devNames = [...new Set(
+            rs.map(r=>(r.Ten_thiet_bi||r.Ngan_thiet_bi||r.Phan_loai_thiet_bi||'').trim()).filter(Boolean)
+          )].sort((a,b)=>a.localeCompare(b,'vi'));
+          const qty = rs.reduce((s,r)=>s+(Number(r.So_luong)||1),0);
+          return {
+            text: `${t}${capTag}`,
+            sub:  `${qty} TB`,
+            color: LYT_CAP_COLORS[cap]||typeColor,
+            detail: devNames,
+          };
         });
-        items.push({ text: pl, sub: `${v.qty.toLocaleString('vi-VN')} TB · ${tramList.length} trạm`, color: LYT_CAP_COLORS['1']||'#18ffff', detail });
+        items.push({
+          text:     pl,
+          sub:      `${v.qty.toLocaleString('vi-VN')} TB · ${tramList.length} trạm`,
+          color:    typeColor,
+          children,
+        });
       });
       totalLine = `${total.toLocaleString('vi-VN')} thiết bị · ${sorted.length} loại`;
       break;
@@ -6725,7 +6529,7 @@ function _tnTable() {
 
   const mkTh = c => {
     const s = _tnSortCol === c.k;
-    return `<th style="padding:7px 9px;font-size:9px;font-weight:700;color:${s?'var(--accent)':'var(--text-muted)'};letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);cursor:pointer;white-space:nowrap;background:rgba(255,255,255,.03);user-select:none;min-width:${c.w};text-align:${c.num?'right':'left'};position:sticky;top:0;z-index:2" onclick="_tnSort('${c.k}')">${c.l}${s?`<span style="color:var(--accent)"> ${_tnSortAsc?'↑':'↓'}</span>`:''}</th>`;
+    return `<th style="padding:7px 9px;font-size:9px;font-weight:700;color:${s?'var(--accent)':'rgba(200,218,235,.9)'};letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);cursor:pointer;white-space:nowrap;background:rgba(255,255,255,.03);user-select:none;min-width:${c.w};text-align:${c.num?'right':'left'};position:sticky;top:0;z-index:2" onclick="_tnSort('${c.k}')">${c.l}${s?`<span style="color:var(--accent)"> ${_tnSortAsc?'↑':'↓'}</span>`:''}</th>`;
   };
 
   const tbody = rows.map(r => {
@@ -6748,7 +6552,7 @@ function _tnTable() {
       ? `<span style="font-family:var(--font-mono)">${han} năm</span>`
       : '<span style="color:rgba(255,255,255,.2);font-size:9px">—</span>';
 
-    return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);${rowBg}">
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);${rowBg};cursor:pointer" onclick="_tnRowClick(event, ${JSON.stringify(r).replace(/"/g,'&quot;')})">
       <td style="padding:6px 9px">${_tnAlertBadge(r)}</td>
       <td style="padding:6px 9px;font-weight:600">${r.Tram||'—'}</td>
       <td style="padding:6px 9px">${capBadge}</td>
@@ -6865,6 +6669,7 @@ function tnRenderPage(conf, title) {
         </button>
         <button onclick="_tnReset()" style="padding:5px 11px;border-radius:6px;border:1px solid rgba(255,82,82,.3);background:rgba(255,82,82,.1);color:#ff5252;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-times"></i> Xóa lọc</button>
         <button onclick="_tnExportCSV()" style="padding:5px 11px;border-radius:6px;border:1px solid rgba(0,230,118,.3);background:rgba(0,230,118,.1);color:#00e676;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-download"></i> CSV</button>
+              ${_authGetSession()?.role==='admin' ? `<button onclick="_tnShowPendingRequests()" style="padding:5px 11px;border-radius:6px;border:1px solid rgba(255,145,0,.3);background:rgba(255,145,0,.1);color:#ff9100;font-size:10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-clipboard-check"></i> Phê duyệt ${(window._tnPendingRequests||[]).filter(r=>r.trang_thai==='cho_duyet').length ? '<span style="background:#ff5252;color:#fff;border-radius:8px;padding:1px 5px;font-size:8px;margin-left:3px">'+(window._tnPendingRequests||[]).filter(r=>r.trang_thai==='cho_duyet').length+'</span>' : ''}</button>` : ''  }
       </div>
 
       <div id="_tnTableArea">
@@ -7266,14 +7071,14 @@ function _bcRenderByMonth(conf) {
         }
         return true;
       };
-      const planRows = rawData.filter(r => {
+      const planRows = data.filter(r => {
         if (!match(r)) return false;
         const ds = r.Thoi_gian_thi_nghiem_tiep_theo;
         if (!ds) return false;
         const d = new Date(ds);
         return d.getFullYear() === yearFilter;
       });
-      const doneRows = rawData.filter(r => {
+      const doneRows = data.filter(r => {
         if (!match(r)) return false;
         const ds = r.Ngay_thi_nghiem;
         if (!ds) return false;
@@ -7330,7 +7135,7 @@ function _bcRenderByMonth(conf) {
     return `<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em">
-          MẪU KHỐI LƯỢNG TN ĐỊNH KỲ NĂM ${yearFilter2}
+          MẪU KHỐI LƯỢNG TN ĐỊNH KỲ NĂM ${_bcFYear || yearFilter2}
         </div>
         <span style="font-size:9px;color:rgba(0,200,255,.6)">Cập nhật: ${new Date().toLocaleDateString('vi-VN')}</span>
       </div>
@@ -7358,37 +7163,7 @@ function _bcRenderByMonth(conf) {
       </div>
     </div>`;
   })()}
-
-  <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px">
-    <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.06em;margin-bottom:10px">CHI TIẾT THEO THÁNG × LOẠI THIẾT BỊ</div>
-    <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:10px">
-        <thead><tr style="background:rgba(255,255,255,.03)">
-          <th style="padding:6px 10px;font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:left;position:sticky;top:0;min-width:100px">Tháng</th>
-          ${filteredTypes.slice(0,12).map((t,i)=>`<th style="padding:6px 10px;font-size:9px;font-weight:700;color:${COLORS[i%COLORS.length]};text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:right;position:sticky;top:0;white-space:nowrap">${t}</th>`).join('')}
-          <th style="padding:6px 10px;font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);text-align:right;position:sticky;top:0">Tổng</th>
-        </tr></thead>
-        <tbody>${Object.keys(monthMap).sort().reverse().map(k=>{
-          const tMap = monthTypeMap[k]||{};
-          const total = monthMap[k].v;
-          const maxVal = Math.max(...filteredTypes.map(t=>tMap[t]||0),1);
-          return `<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
-            <td style="padding:5px 10px;font-weight:600;font-family:var(--font-mono)">${monthMap[k].label}</td>
-            ${filteredTypes.slice(0,12).map((t,i)=>{
-              const v = tMap[t]||0;
-              const barW = v > 0 ? Math.max(2,Math.round((v/maxVal)*60)) : 0;
-              return `<td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);color:${v?COLORS[i%COLORS.length]:'rgba(255,255,255,.15)'}">
-                ${v ? `<span style="display:inline-flex;align-items:center;gap:5px">
-                  <span style="display:inline-block;height:3px;width:${barW}px;background:${COLORS[i%COLORS.length]};border-radius:2px;opacity:.6;vertical-align:middle"></span>${v}
-                </span>` : '—'}
-              </td>`;
-            }).join('')}
-            <td style="padding:5px 10px;text-align:right;font-family:var(--font-mono);font-weight:700;color:var(--accent)">${total}</td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table>
-    </div>
-  </div>`;
+>`;
 }
 
 // ── DROPDOWN HANDLER for by-month report ──────────────────────
@@ -7771,6 +7546,8 @@ async function _authLogin(){
     _authInitUserMenu();
     _authApplyRoleUI(role);
     showChangeNotif('success','Dang nhap thanh cong','Xin chao '+name+'!');
+    // Load pending requests for admin
+    if (role === 'admin') setTimeout(_tnLoadPendingRequests, 500);
   }catch(err){
     errEl.textContent='Loi ket noi: '+err.message;
   }finally{
@@ -7832,6 +7609,7 @@ function _authInitUserMenu(){
     <div class="um-header"><div class="um-name">${sess.name}</div><div class="um-email">${sess.email}</div></div>
     <div class="um-item" onclick="_openChangePassword()"><i class="fas fa-key"></i> Doi mat khau</div>
     ${adminBtn}
+    ${sess.role==='admin'?'<div class="um-item" onclick="_toggleUserMenu();_nasOpenSettings()"><i class="fas fa-server" style="color:var(--accent)"></i> Cài đặt NAS <span style="font-size:8px;margin-left:4px;padding:1px 5px;border-radius:4px;background:'+(NAS_CONFIG.enabled?'rgba(0,230,118,.15)':'rgba(255,145,0,.15)')+';color:'+(NAS_CONFIG.enabled?'#00e676':'#ff9100')+'">'+(NAS_CONFIG.enabled?'●':'○')+'</span></div>':''}
     <div class="um-sep"></div>
     <div class="um-item danger" onclick="_authLogout()"><i class="fas fa-sign-out-alt"></i> Dang xuat</div>
   </div>`;
@@ -8033,3 +7811,1369 @@ function showChangeNotif(type,title,msg,duration){
   setTimeout(()=>{if(notif.parentNode)notif.remove();},duration||5000);
 }
 document.getElementById('adminPanel').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
+
+// ══════════════════════════════════════════════════════════════
+// YÊU CẦU 2: btnUpload addEventListener (per spec)
+// Flow: User nhập form + file → Base64 → fetch('/api/submit')
+//       → Backend (Supabase Edge Function) decode → NAS WebDAV PUT
+//       → Supabase UpdateRequests (status=pending)
+//       → Admin approve → update TongHopThietBi / CongTacThiNghiem
+// ══════════════════════════════════════════════════════════════
+
+// Cấu hình URL backend (Supabase Edge Function hoặc Node.js)
+const BACKEND_URL = (() => {
+  // Thử đọc từ Supabase project URL nếu có
+  const sbUrl = (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : '') ||
+                document.querySelector('[data-sb-url]')?.dataset?.sbUrl || '';
+  // Edge Function endpoint: <supabase-url>/functions/v1/upload-tndk
+  if (sbUrl) return sbUrl.replace(/\/$/,'') + '/functions/v1/upload-tndk';
+  // Fallback: dùng direct NAS nếu không có backend
+  return '';
+})();
+
+/** Hiển thị uploadSection và reset form */
+
+
+function _hmPanelSearch(q) {
+  const body = document.getElementById('hm-detail-body');
+  if (!body) return;
+  const term = (q||'').toLowerCase().trim();
+  body.querySelectorAll('[style*="border-bottom"][style*="padding:7px 14px"]').forEach(row => {
+    const g = row.closest('div[style*="border-bottom:1px solid rgba(255,255,255,.05)"]');
+    if (!g) return;
+    const any = !term || g.textContent.toLowerCase().includes(term);
+    g.style.display = any ? '' : 'none';
+  });
+}
+
+// ── LIVE CHIPS RENDERER ──────────────────────────────────────
+// Render device chips vào canvas section có id='deviceByType'
+// Đồng bộ logic với app.js renderTypeChips()
+
+let _chipAllData   = [];    // toàn bộ rows từ Supabase
+let _chipFiltered  = [];    // filtered rows (= _chipAllData khi không filter)
+let _selectedChips = new Set(); // chip filter state
+
+
+function _buildTramNganGroups(tramName, tRows, allNgans) {
+  const NGAN_GROUPS = [
+    { label:'Ngăn ĐZ',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn ĐZ' },
+    { label:'Ngăn MBA',          fn: r=>lytIsMBARow(r) },
+    { label:'Ngăn XT',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn XT' },
+    { label:'Ngăn LL',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn LL' },
+    { label:'Ngăn Tụ bù (TBN)', fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn TBN'||((r.Phan_loai_thiet_bi||'').trim().toUpperCase().includes('TBN')) },
+    { label:'Ngăn Tự dùng (TD)',fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='NgănTD'||((r.Phan_loai_thiet_bi||'').trim().toUpperCase()==='MBATD') },
+    { label:'Ngăn Kháng',        fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn Kháng' },
+  ];
+  const catSet = new Set();
+  const result = [];
+  NGAN_GROUPS.forEach(g => {
+    const gNgans = [...new Set(tRows.filter(g.fn).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))].sort();
+    if (!gNgans.length) return;
+    gNgans.forEach(n=>catSet.add(n));
+    result.push(`${g.label}: ${gNgans.length} ngăn → ${gNgans.join(', ')}`);
+  });
+  const uncat = allNgans.filter(n=>!catSet.has(n)).sort();
+  if (uncat.length) result.push(`Ngăn khác: ${uncat.length} → ${uncat.join(', ')}`);
+  return result;
+}
+
+// ── Stats card click — hiện detail panel bên phải ──────────────
+
+function _tnRowClick(e, row) {
+  // Ctrl+click or right-click = open update modal
+  if (e.ctrlKey || e.metaKey || e.shiftKey) {
+    e.preventDefault();
+    _tnOpenUpdateModal(row);
+    return;
+  }
+  // Normal click = show mini context menu
+  const existing = document.getElementById('_tnRowMenu');
+  if (existing) existing.remove();
+  const menu = document.createElement('div');
+  menu.id = '_tnRowMenu';
+  const x = Math.min(e.clientX, window.innerWidth - 220);
+  const y = Math.min(e.clientY, window.innerHeight - 100);
+  menu.style.cssText = `position:fixed;left:${x}px;top:${y}px;z-index:99990;background:#1a1f2e;border:1px solid rgba(0,200,255,.3);border-radius:8px;padding:6px;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,.5)`;
+  menu.innerHTML = `
+    <div style="padding:4px 10px 8px;font-size:9px;color:rgba(180,200,220,.6);border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:4px">${row.Tram||'—'} · ${row.Phan_loai_thiet_bi||'—'} · ${row.Ten_thiet_bi||row.Ngan_thiet_bi||'—'}</div>
+    <button onclick="document.getElementById('_tnRowMenu')?.remove();_tnOpenUpdateModal(${JSON.stringify(row).replace(/"/g,'&quot;')})" style="display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px;border-radius:5px;border:none;background:none;color:rgba(235,248,255,.9);font-size:11px;cursor:pointer;text-align:left" onmouseover="this.style.background='rgba(0,200,255,.08)'" onmouseout="this.style.background='none'">
+      <i class="fas fa-edit" style="color:var(--accent);width:16px"></i> Đề nghị cập nhật (modal)
+    </button>
+    <button onclick="document.getElementById('_tnRowMenu')?.remove();openUploadSection({tram:'${row.Tram||''}',ngan:'${row.Ngan_thiet_bi||''}',loaiTb:'${row.Phan_loai_thiet_bi||''}',tenCu:'${row.Ten_thiet_bi||''}',deviceName:'${row.Ten_thiet_bi||''}',slCu:'${row.So_luong||''}',ngayCu:'${row.Ngay_thi_nghiem||''}',date:'${row.Ngay_thi_nghiem?new Date(row.Ngay_thi_nghiem).toISOString().split('T')[0]:''  }'})" style="display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px;border-radius:5px;border:none;background:none;color:rgba(235,248,255,.9);font-size:11px;cursor:pointer;text-align:left" onmouseover="this.style.background='rgba(0,230,118,.08)'" onmouseout="this.style.background='none'">
+      <i class="fas fa-upload" style="color:#00e676;width:16px"></i> Upload ảnh + cập nhật
+    </button>`;
+  document.body.appendChild(menu);
+  setTimeout(() => document.addEventListener('click', function rm(ev){if(!menu.contains(ev.target)){menu.remove();document.removeEventListener('click',rm);}},10));
+}
+
+function nasFileUrl(path) {
+  if (!NAS_CONFIG.baseUrl || !path) return '';
+  return NAS_CONFIG.baseUrl.replace(/\/$/,'') + path;
+}
+
+/** Authorization header cho WebDAV Basic Auth */
+
+function nasAuthHeader() {
+  if (!NAS_CONFIG.username) return {};
+  const cred = btoa(NAS_CONFIG.username + ':' + NAS_CONFIG.password);
+  return { 'Authorization': 'Basic ' + cred };
+}
+
+/**
+ * Upload file lên NAS Synology qua WebDAV
+ * Theo diagram: Encode file → HTTP PUT → NAS trả URL
+ * @param {File} file - File cần upload
+ * @param {string} folder - Thư mục đích trên NAS (vd: NAS_CONFIG.photoPath)
+ * @param {string} [prefix] - Prefix cho tên file
+ * @returns {Promise<{url:string, path:string}>}
+ */
+
+async function nasUploadFile(file, folder, prefix='') {
+  if (!NAS_CONFIG.baseUrl || !NAS_CONFIG.enabled) {
+    throw new Error('NAS chưa được cấu hình hoặc chưa bật. Vào Cài đặt NAS để cấu hình.');
+  }
+  const ext  = file.name.split('.').pop();
+  const ts   = Date.now();
+  const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const fileName = `${prefix}_${ts}_${safe}`;
+  const destPath = `${folder.replace(/\/$/,'')}/${fileName}`;
+  const destUrl  = nasFileUrl(destPath);
+
+  // Read file as ArrayBuffer
+  const buf = await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsArrayBuffer(file);
+  });
+
+  // HTTP PUT to WebDAV
+  const resp = await fetch(destUrl, {
+    method:  'PUT',
+    headers: {
+      'Content-Type': file.type || 'application/octet-stream',
+      ...nasAuthHeader(),
+    },
+    body: buf,
+    credentials: 'omit',  // avoid CORS preflight caching issues
+  });
+
+  if (!resp.ok && resp.status !== 201 && resp.status !== 204) {
+    let msg = `HTTP ${resp.status}`;
+    try { msg += ' — ' + (await resp.text()).slice(0,200); } catch(e2){}
+    throw new Error('NAS upload thất bại: ' + msg);
+  }
+  return { url: destUrl, path: destPath };
+}
+
+/**
+ * Tạo thư mục trên NAS WebDAV nếu chưa tồn tại
+ */
+
+async function nasMkdir(folderPath) {
+  if (!NAS_CONFIG.baseUrl) return;
+  const url = nasFileUrl(folderPath);
+  try {
+    await fetch(url, {
+      method: 'MKCOL',
+      headers: nasAuthHeader(),
+      credentials: 'omit',
+    });
+  } catch(e) { /* ignore — folder may already exist */ }
+}
+
+/** Lưu NAS config vào localStorage */
+
+function nasSaveConfig(cfg) {
+  Object.assign(NAS_CONFIG, cfg);
+  NAS_CONFIG.enabled = !!(cfg.baseUrl && cfg.username);
+  try { localStorage.setItem('evn_nas_cfg', JSON.stringify(NAS_CONFIG)); } catch(e){}
+}
+
+/** Test kết nối WebDAV */
+
+async function nasTestConnection() {
+  if (!NAS_CONFIG.baseUrl) return { ok: false, msg: 'Chưa nhập URL NAS' };
+  try {
+    const url = nasFileUrl(NAS_CONFIG.webdavPath || '/webdav');
+    const resp = await fetch(url, {
+      method: 'OPTIONS',
+      headers: nasAuthHeader(),
+      credentials: 'omit',
+      signal: AbortSignal.timeout(5000),
+    });
+    // WebDAV trả 200/207 khi thành công
+    if (resp.ok || resp.status === 207) return { ok: true, msg: 'Kết nối thành công ✓' };
+    if (resp.status === 401) return { ok: false, msg: 'Sai tài khoản/mật khẩu (401)' };
+    if (resp.status === 404) return { ok: false, msg: 'Đường dẫn WebDAV không tồn tại (404)' };
+    return { ok: false, msg: `HTTP ${resp.status}` };
+  } catch(e) {
+    if (e.name === 'AbortError') return { ok: false, msg: 'Timeout — kiểm tra URL và network' };
+    if (e.message?.includes('CORS')) return { ok: false, msg: 'CORS blocked — cần enable CORS trên NAS hoặc dùng proxy' };
+    return { ok: false, msg: e.message || 'Lỗi kết nối' };
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// MODULE: QUẢN LÝ BBTN (với NAS link)
+// ══════════════════════════════════════════════════════
+
+function _bbtnRenderPage() {
+  const overlay = document.getElementById('tbPageOverlay');
+  if (!overlay) return;
+
+  // Initial render (loading + path breadcrumb)
+  overlay.innerHTML = `<div style="padding:0 0 32px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <div style="width:34px;height:34px;border-radius:8px;background:rgba(255,215,64,.15);color:#ffd740;display:flex;align-items:center;justify-content:center"><i class="fas fa-folder-open" style="font-size:15px"></i></div>
+      <div>
+        <div style="font-size:16px;font-weight:800;color:rgba(240,250,255,.97)">Quản lý Biên bản thí nghiệm (BBTN)</div>
+        <div style="font-size:10px;color:rgba(180,200,220,.65);margin-top:3px">Trình duyệt thư mục NAS Synology • Cấu trúc: <code style="color:var(--accent);font-size:9.5px">BBTN/Đơn vị/Năm/Trạm/File</code></div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button onclick="_bbtnRefresh()" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(0,200,255,.3);background:rgba(0,200,255,.08);color:var(--accent);font-size:10.5px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-sync-alt"></i> Tải lại</button>
+        ${(_authGetSession()?.role==='admin') ? `<button onclick="_nasOpenSettings()" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(255,215,64,.3);background:rgba(255,215,64,.08);color:#ffd740;font-size:10.5px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-cog"></i> Cài đặt NAS</button>` : ''}
+      </div>
+    </div>
+    <div id="_bbtnBreadcrumb" style="display:flex;align-items:center;gap:6px;padding:10px 14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:8px;margin-bottom:14px;font-size:11px;color:rgba(200,220,235,.85);flex-wrap:wrap"></div>
+    <div id="_bbtnContent" style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:10px;min-height:240px"></div>
+  </div>`;
+
+  // Init state
+  if (!window._bbtnState) window._bbtnState = { path: '', stack: [] };
+  _bbtnLoadPath(NAS_CONFIG.bbtnPath || '/BBTN');
+}
+
+/**
+ * Load 1 directory level từ NAS WebDAV
+ * Dùng PROPFIND Depth: 1 để lấy danh sách file/folder
+ * Hiển thị breadcrumb + grid card cho mỗi item
+ */
+
+function _bbtnExportMonth(mk){const m=(window._bbtnByMonth||{})[mk];if(m)_bbtnDoExport(m.rows,'BBTN_'+mk);}
+
+function _bbtnExportAll(){_bbtnDoExport(window._bbtnCompleted||[],'BBTN_ToanBo');}
+
+function _bbtnDoExport(rows,filename){
+  const capLbl={'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
+  const esc=v=>'"'+(String(v||'').replace(/"/g,'""'))+'"';
+  const fD=v=>{if(!v)return'';const d=new Date(v);return isNaN(d)?v:d.toLocaleDateString('vi-VN');};
+  const hdr='Trạm,Cấp ĐA,Loại TB,Tên/KH,Ngăn TB,Ngày TN,Hạn TN,TN tiếp theo';
+  const body=rows.map(r=>[r.Tram,capLbl[String(r.Cap_dien_ap??'')]||r.Cap_dien_ap,r.Phan_loai_thiet_bi,r.Ten_thiet_bi,r.Ngan_thiet_bi,fD(r.Ngay_thi_nghiem),r.Han_thi_nghiem,fD(r.Thoi_gian_thi_nghiem_tiep_theo)].map(esc).join(','));
+  const csv='\uFEFF'+[hdr,...body].join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=filename+'.csv';a.click();
+}
+// ── Cài đặt NAS — mở modal cấu hình đầy đủ ─────────────
+
+function _bbtnConfigNAS() { _nasOpenSettings(); }
+
+function _nasOpenSettings() {
+  const existing = document.getElementById('_nasSettingsModal');
+  if (existing) { existing.remove(); return; }
+
+  const modal = document.createElement('div');
+  modal.id = '_nasSettingsModal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.75);backdrop-filter:blur(4px)';
+
+  const f = NAS_CONFIG;
+  modal.innerHTML = `<div style="background:#1a1f2e;border:1px solid rgba(0,200,255,.3);border-radius:12px;padding:24px;width:min(560px,92vw);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <div style="font-size:15px;font-weight:800;color:rgba(240,250,255,.97)"><i class="fas fa-server" style="color:var(--accent);margin-right:8px"></i>Cài đặt NAS Synology</div>
+        <div style="font-size:10px;color:rgba(180,200,220,.6);margin-top:3px">Kết nối qua WebDAV Protocol</div>
+      </div>
+      <button onclick="document.getElementById('_nasSettingsModal').remove()" style="background:none;border:none;color:rgba(200,220,235,.6);font-size:18px;cursor:pointer">✕</button>
+    </div>
+
+    <!-- Connection status -->
+    <div id="_nas_status" style="margin-bottom:16px;padding:8px 12px;border-radius:7px;background:rgba(255,255,255,.04);font-size:11px;color:rgba(180,200,220,.7)">
+      ${f.enabled ? '<span style="color:#00e676">● Đã kết nối — ' + f.baseUrl + '</span>' : '● Chưa cấu hình'}
+    </div>
+
+    <div style="display:grid;gap:12px">
+      <div>
+        <label style="font-size:10px;color:rgba(180,200,220,.8);display:block;margin-bottom:5px">URL NAS <span style="color:rgba(255,82,82,.8)">*</span></label>
+        <input id="_nas_url" type="text" value="${f.baseUrl||''}" placeholder="http://192.168.1.100:5005 hoặc https://nas.domain.vn"
+          style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(235,248,255,.9);font-size:11.5px;outline:none;box-sizing:border-box">
+        <div style="font-size:9px;color:rgba(180,200,220,.5);margin-top:3px">Port mặc định WebDAV Synology: 5005 (HTTP) / 5006 (HTTPS)</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:10px;color:rgba(180,200,220,.8);display:block;margin-bottom:5px">Tên đăng nhập NAS <span style="color:rgba(255,82,82,.8)">*</span></label>
+          <input id="_nas_user" type="text" value="${f.username||''}" placeholder="admin"
+            style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(235,248,255,.9);font-size:11.5px;outline:none;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:10px;color:rgba(180,200,220,.8);display:block;margin-bottom:5px">Mật khẩu</label>
+          <div style="position:relative">
+            <input id="_nas_pass" type="password" value="${f.password||''}" placeholder="••••••••"
+              style="width:100%;padding:8px 30px 8px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(235,248,255,.9);font-size:11.5px;outline:none;box-sizing:border-box">
+            <button onclick="const i=document.getElementById('_nas_pass');i.type=i.type==='password'?'text':'password'" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(180,200,220,.6);cursor:pointer;padding:0"><i class="fas fa-eye"></i></button>
+          </div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:10px;color:rgba(180,200,220,.8);display:block;margin-bottom:5px">Thư mục BBTN</label>
+          <input id="_nas_bbtn" type="text" value="${f.bbtnPath||'/webdav/EVNHANOI/BBTN'}" placeholder="/webdav/EVNHANOI/BBTN"
+            style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(235,248,255,.9);font-size:11.5px;outline:none;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:10px;color:rgba(180,200,220,.8);display:block;margin-bottom:5px">Thư mục ảnh TNĐK</label>
+          <input id="_nas_photo" type="text" value="${f.photoPath||'/webdav/EVNHANOI/TNDK'}" placeholder="/webdav/EVNHANOI/TNDK"
+            style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(235,248,255,.9);font-size:11.5px;outline:none;box-sizing:border-box">
+        </div>
+      </div>
+
+      <!-- Hướng dẫn -->
+      <details style="margin-top:4px">
+        <summary style="font-size:10px;color:rgba(0,200,255,.7);cursor:pointer;user-select:none">ℹ️ Hướng dẫn bật WebDAV trên Synology</summary>
+        <div style="margin-top:8px;padding:10px;background:rgba(0,0,0,.2);border-radius:7px;font-size:10px;color:rgba(180,200,220,.75);line-height:1.7">
+          1. Mở <b>DSM > Control Panel > File Services > WebDAV</b><br>
+          2. Tích <b>Enable WebDAV</b> (port 5005) hoặc <b>WebDAV HTTPS</b> (port 5006)<br>
+          3. Tạo Shared Folder tên <b>EVNHANOI</b> → tạo sub-folder <b>BBTN</b>, <b>TNDK</b><br>
+          4. Cấp quyền Read/Write cho user NAS vào folder trên<br>
+          5. Nếu dùng từ mạng ngoài: cần port-forward hoặc QuickConnect/DDNS<br>
+          <span style="color:rgba(255,215,64,.7)">⚠ CORS: Nếu bị lỗi CORS, bật <b>Reverse Proxy</b> trên NAS và thêm header Access-Control-Allow-Origin</span>
+        </div>
+      </details>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:20px;align-items:center">
+      <button onclick="_nasTestAndShow()" id="_nas_test_btn" style="padding:8px 16px;border-radius:7px;border:1px solid rgba(0,200,255,.3);background:rgba(0,200,255,.08);color:var(--accent);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:6px"><i class="fas fa-plug"></i> Kiểm tra kết nối</button>
+      <div style="flex:1"></div>
+      <button onclick="document.getElementById('_nasSettingsModal').remove()" style="padding:8px 16px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:none;color:rgba(200,218,235,.8);cursor:pointer;font-size:11px">Hủy</button>
+      <button onclick="_nasSaveAndClose()" style="padding:8px 18px;border-radius:7px;border:none;background:var(--accent);color:#000;font-weight:700;cursor:pointer;font-size:11px;display:flex;align-items:center;gap:6px"><i class="fas fa-save"></i> Lưu cấu hình</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+}
+
+async function _nasTestAndShow() {
+  const btn = document.getElementById('_nas_test_btn');
+  const statusEl = document.getElementById('_nas_status');
+  // Read current form values
+  const testCfg = {
+    baseUrl:   document.getElementById('_nas_url')?.value?.trim() || '',
+    username:  document.getElementById('_nas_user')?.value?.trim() || '',
+    password:  document.getElementById('_nas_pass')?.value || '',
+    webdavPath: document.getElementById('_nas_bbtn')?.value?.split('/').slice(0,2).join('/') || '/webdav',
+  };
+  if (!testCfg.baseUrl) { if(statusEl) statusEl.innerHTML='<span style="color:#ff9100">⚠ Nhập URL NAS trước</span>'; return; }
+  if (btn) { btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Đang kiểm tra...'; }
+  // Temporarily apply for test
+  const prevCfg = {...NAS_CONFIG};
+  Object.assign(NAS_CONFIG, testCfg);
+  const result = await nasTestConnection();
+  Object.assign(NAS_CONFIG, prevCfg); // restore
+  if (btn) { btn.disabled=false; btn.innerHTML='<i class="fas fa-plug"></i> Kiểm tra kết nối'; }
+  if (statusEl) statusEl.innerHTML = result.ok
+    ? `<span style="color:#00e676">● ${result.msg}</span>`
+    : `<span style="color:#ff5252">✗ ${result.msg}</span>`;
+}
+
+function _nasSaveAndClose() {
+  const baseUrl  = document.getElementById('_nas_url')?.value?.trim() || '';
+  const username = document.getElementById('_nas_user')?.value?.trim() || '';
+  const password = document.getElementById('_nas_pass')?.value || '';
+  const bbtnPath = document.getElementById('_nas_bbtn')?.value?.trim() || '/webdav/EVNHANOI/BBTN';
+  const photoPath= document.getElementById('_nas_photo')?.value?.trim() || '/webdav/EVNHANOI/TNDK';
+  nasSaveConfig({ baseUrl, username, password, bbtnPath, photoPath,
+                  webdavPath: bbtnPath.split('/').slice(0,2).join('/') || '/webdav' });
+  document.getElementById('_nasSettingsModal')?.remove();
+  showChangeNotif('success', 'Đã lưu cấu hình NAS',
+    baseUrl ? `${baseUrl} · User: ${username}` : 'Đã xóa cấu hình NAS');
+  if (typeof _bbtnRenderPage === 'function') _bbtnRenderPage();
+}
+
+// ══════════════════════════════════════════════════════
+// FIX 4: TNĐK - User Update Request System
+// User clicks row → modal form to request update
+// Admin approves/rejects in panel
+// Data stored in Supabase table: tn_update_requests
+// ══════════════════════════════════════════════════════
+
+// Pending requests state (in-memory + Supabase)
+window._tnPendingRequests = [];
+
+async function _tnLoadPendingRequests() {
+  if (!window._sbClient) return;
+  try {
+    const { data } = await window._sbClient
+      .from('tn_update_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
+    window._tnPendingRequests = data || [];
+  } catch(e) { console.warn('loadPending:', e); }
+}
+
+// ── Row click: open update request modal ──────────────
+
+function _tnOpenUpdateModal(row) {
+  const fmtD = v => { if(!v)return'';const d=new Date(v);return isNaN(d)?v:d.toISOString().split('T')[0]; };
+  const existing = { Ten_thiet_bi: row.Ten_thiet_bi||'', So_luong: row.So_luong||'', Ngay_thi_nghiem: fmtD(row.Ngay_thi_nghiem) };
+  const modal = document.createElement('div');
+  modal.id = '_tnUpdateModal';
+  modal.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.7);backdrop-filter:blur(4px)';
+  modal.innerHTML=`<div style="background:#1a1f2e;border:1px solid rgba(0,200,255,.3);border-radius:12px;padding:24px;width:min(520px,90vw);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <div style="font-size:15px;font-weight:800;color:rgba(240,250,255,.97)">📝 Đề nghị cập nhật thiết bị</div>
+        <div style="font-size:10px;color:rgba(180,200,220,.7);margin-top:3px">${row.Tram||'—'} · ${row.Phan_loai_thiet_bi||'—'} · ${row.Ngan_thiet_bi||row.Ten_thiet_bi||'—'}</div>
+      </div>
+      <button onclick="document.getElementById('_tnUpdateModal').remove()" style="background:none;border:none;color:rgba(200,220,235,.6);font-size:18px;cursor:pointer;padding:4px">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div>
+        <label style="font-size:10px;color:rgba(180,200,220,.8);display:block;margin-bottom:5px">Tên thiết bị (hiện: ${row.Ten_thiet_bi||'—'})</label>
+        <input id="_req_ten" type="text" value="${existing.Ten_thiet_bi}" placeholder="Tên thiết bị mới..."
+          style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(235,248,255,.9);font-size:11.5px;outline:none;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:10px;color:rgba(180,200,220,.8);display:block;margin-bottom:5px">Số lượng (hiện: ${row.So_luong||'—'})</label>
+        <input id="_req_sl" type="number" value="${existing.So_luong}" placeholder="Số lượng..."
+          style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(235,248,255,.9);font-size:11.5px;outline:none;box-sizing:border-box">
+      </div>
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:10px;color:rgba(180,200,220,.8);display:block;margin-bottom:5px">Ngày TN thực tế (hiện: ${row.Ngay_thi_nghiem ? new Date(row.Ngay_thi_nghiem).toLocaleDateString('vi-VN') : '—'})</label>
+      <input id="_req_ngay" type="date" value="${existing.Ngay_thi_nghiem}"
+        style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(235,248,255,.9);font-size:11.5px;outline:none;box-sizing:border-box">
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:10px;color:rgba(180,200,220,.8);display:block;margin-bottom:5px">Lý do / Ghi chú đề nghị cập nhật *</label>
+      <textarea id="_req_note" rows="3" placeholder="Mô tả lý do cập nhật..."
+        style="width:100%;padding:8px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(235,248,255,.9);font-size:11.5px;outline:none;box-sizing:border-box;resize:vertical"></textarea>
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="font-size:10px;color:rgba(180,200,220,.8);display:block;margin-bottom:5px">
+        Hình ảnh thiết bị
+        ${NAS_CONFIG.enabled
+          ? '<span style=\"color:#00e676;margin-left:4px\">● NAS đã kết nối — sẽ tải lên WebDAV</span>'
+          : '<span style=\"color:#ff9100;margin-left:4px\">⚠ NAS chưa cấu hình — <a onclick=\"_nasOpenSettings()\" style=\"color:var(--accent);cursor:pointer;text-decoration:underline\">Cấu hình NAS</a></span>'}
+      </label>
+      <div style="border:2px dashed ${NAS_CONFIG.enabled?'rgba(0,230,118,.3)':'rgba(255,145,0,.25)'};border-radius:8px;padding:16px;text-align:center;cursor:pointer;background:${NAS_CONFIG.enabled?'rgba(0,230,118,.03)':'rgba(255,145,0,.03)'}" onclick="document.getElementById('_req_photo').click()">
+        <i class="fas fa-cloud-upload-alt" style="font-size:20px;color:rgba(0,200,255,.5);margin-bottom:6px"></i>
+        <div style="font-size:11px;color:rgba(180,200,220,.7)" id="_req_photo_lbl">
+          ${NAS_CONFIG.enabled ? 'Nhấp để chọn ảnh → tải lên NAS WebDAV' : 'Nhấp để chọn ảnh (JPG, PNG, max 10MB)'}
+        </div>
+        <input type="file" id="_req_photo" accept="image/*" style="display:none" onchange="_tnPhotoSelected(this)">
+      </div></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="document.getElementById('_tnUpdateModal').remove()" style="padding:8px 18px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:none;color:rgba(200,218,235,.8);cursor:pointer;font-size:12px">Hủy</button>
+      <button onclick="_tnSubmitRequest(${JSON.stringify(row).replace(/"/g,'&quot;')})" style="padding:8px 18px;border-radius:7px;border:none;background:var(--accent);color:#000;font-weight:700;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:6px"><i class="fas fa-paper-plane"></i> Gửi đề nghị</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+}
+
+function _tnPhotoSelected(input) {
+  const f = input.files[0]; if (!f) return;
+  const lbl = document.getElementById('_req_photo_lbl');
+  const mb = (f.size/1024/1024).toFixed(1);
+  if (mb > 10) {
+    showChangeNotif('error','File quá lớn', `${mb}MB — tối đa 10MB`);
+    input.value = '';
+    if (lbl) lbl.innerHTML = 'Nhấp để chọn ảnh (JPG, PNG, max 10MB)';
+    return;
+  }
+  const dest = NAS_CONFIG.enabled
+    ? `→ NAS: ${NAS_CONFIG.photoPath.split('/').slice(-1)[0]}/<trạm>/`
+    : '(NAS chưa cấu hình)';
+  if (lbl) lbl.innerHTML = `<span style="color:#00e676">✅ ${f.name}</span> <span style="color:rgba(180,200,220,.6)">${mb}MB ${dest}</span>`;
+}
+
+async function _tnSubmitRequest(origRow) {
+  const ten   = document.getElementById('_req_ten')?.value?.trim();
+  const sl    = document.getElementById('_req_sl')?.value?.trim();
+  const ngay  = document.getElementById('_req_ngay')?.value?.trim();
+  const note  = document.getElementById('_req_note')?.value?.trim();
+  const photo = document.getElementById('_req_photo')?.files?.[0];
+
+  if (!note) { showChangeNotif('error','Thiếu thông tin','Vui lòng nhập lý do đề nghị cập nhật'); return; }
+  if (!ten && !sl && !ngay && !photo) { showChangeNotif('error','Thiếu thông tin','Vui lòng cập nhật ít nhất một trường'); return; }
+
+  const btn = document.querySelector('#_tnUpdateModal button[onclick*="_tnSubmitRequest"]');
+  const setLoading = (msg) => { if (btn) { btn.disabled=true; btn.innerHTML=`<i class="fas fa-spinner fa-spin"></i> ${msg}`; }};
+  const setIdle    = () => { if (btn) { btn.disabled=false; btn.innerHTML='<i class="fas fa-paper-plane"></i> Gửi đề nghị'; }};
+
+  setLoading('Đang xử lý...');
+
+  // ── BƯỚC 1: Upload ảnh lên NAS WebDAV ──────────────────
+  // Theo diagram: User → HTTP PUT (binary) → NAS → return URL
+  let photoNasUrl  = '';
+  let photoNasPath = '';
+  if (photo) {
+    if (!NAS_CONFIG.enabled) {
+      // NAS chưa cấu hình → hỏi user có muốn cấu hình không
+      const go = confirm('Ảnh không thể tải lên vì NAS chưa được cấu hình.\nBấm OK để mở Cài đặt NAS ngay, hoặc Cancel để gửi không kèm ảnh.');
+      if (go) { setIdle(); document.getElementById('_tnUpdateModal')?.remove(); _nasOpenSettings(); return; }
+    } else {
+      setLoading('Đang tải ảnh lên NAS...');
+      try {
+        // Tạo thư mục nếu chưa có
+        const tramFolder = `${NAS_CONFIG.photoPath}/${(origRow.Tram||'').replace(/[^a-zA-Z0-9_-]/g,'_')}`;
+        await nasMkdir(tramFolder);
+        // Upload file → HTTP PUT → NAS trả 201/204 khi thành công
+        const prefix = `${(origRow.Tram||'').replace(/\s/g,'_')}_${(origRow.Ngan_thiet_bi||'').replace(/\s/g,'_')}`;
+        const result  = await nasUploadFile(photo, tramFolder, prefix);
+        photoNasUrl   = result.url;
+        photoNasPath  = result.path;
+        showChangeNotif('success','Ảnh đã tải lên NAS', result.path.split('/').pop());
+      } catch(e) {
+        console.error('NAS upload error:', e);
+        const skip = confirm(`Không tải được ảnh lên NAS:\n${e.message}\n\nBấm OK để gửi đề nghị KHÔNG có ảnh, Cancel để hủy.`);
+        if (!skip) { setIdle(); return; }
+      }
+    }
+  }
+
+  // ── BƯỚC 2: Lưu metadata + URL vào Supabase ─────────────
+  // Theo diagram: Insert metadata & file URL → Supabase UpdateRequests
+  setLoading('Đang lưu đề nghị...');
+  const sess = _authGetSession();
+  const request = {
+    tram:              origRow.Tram              || '',
+    ngan_thiet_bi:     origRow.Ngan_thiet_bi     || '',
+    loai_tb:           origRow.Phan_loai_thiet_bi|| '',
+    ten_cu:            origRow.Ten_thiet_bi       || '',
+    ten_moi:           ten  || null,
+    so_luong_cu:       origRow.So_luong           || null,
+    so_luong_moi:      sl   ? Number(sl)  : null,
+    ngay_tn_cu:        origRow.Ngay_thi_nghiem    || null,
+    ngay_tn_moi:       ngay || null,
+    ghi_chu:           note,
+    photo_path:        photoNasPath               || null,  // path trên NAS
+    photo_url:         photoNasUrl                || null,  // full URL có thể xem
+    nguoi_gui:         sess?.email                || 'anonymous',
+    trang_thai:        'cho_duyet',
+    created_at:        new Date().toISOString(),
+  };
+
+  try {
+    if (window._sbClient) {
+      const { error } = await window._sbClient.from('tn_update_requests').insert([request]);
+      if (error) throw error;
+    } else {
+      (window._tnPendingRequests = window._tnPendingRequests||[]).push({...request, id: Date.now()+'_local'});
+    }
+    document.getElementById('_tnUpdateModal')?.remove();
+    showChangeNotif('success','Đã gửi đề nghị cập nhật',
+      photoNasUrl ? 'Kèm ảnh từ NAS · Admin sẽ phê duyệt' : 'Admin sẽ xem xét và phê duyệt');
+  } catch(e) {
+    console.error('Supabase insert error:', e);
+    showChangeNotif('error','Lỗi lưu đề nghị', e.message||'');
+    setIdle();
+  }
+}
+
+// ── Admin: Phê duyệt panel ──────────────────────────
+
+async function _tnShowPendingRequests() {
+  await _tnLoadPendingRequests();
+  const reqs = window._tnPendingRequests || [];
+  const fmtD = v => v ? new Date(v).toLocaleDateString('vi-VN') : '—';
+  const pending = reqs.filter(r=>r.trang_thai==='cho_duyet');
+  const modal = document.createElement('div');
+  modal.id = '_tnAdminModal';
+  modal.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.7);backdrop-filter:blur(4px)';
+  const rows_html = pending.length ? pending.map((r,i)=>`<tr style="border-bottom:1px solid rgba(255,255,255,.06)">
+    <td style="padding:7px 10px;font-size:10px;color:rgba(235,248,255,.9);font-weight:600">${r.tram}</td>
+    <td style="padding:7px 10px;font-size:10px;color:rgba(210,230,245,.85)">${r.ngan_thiet_bi}</td>
+    <td style="padding:7px 10px;font-size:10px;color:rgba(210,230,245,.85)">${r.loai_tb}</td>
+    <td style="padding:7px 10px;font-size:10px">
+      ${r.ten_moi?`<div><span style="color:rgba(180,200,215,.6);font-size:9px">Tên:</span> <span style="color:rgba(255,215,64,.9)">${r.ten_moi}</span> <span style="color:rgba(150,170,190,.5)">(cũ: ${r.ten_cu||'—'})</span></div>`:''}
+      ${r.so_luong_moi!=null?`<div><span style="color:rgba(180,200,215,.6);font-size:9px">SL:</span> <span style="color:#00e676">${r.so_luong_moi}</span> <span style="color:rgba(150,170,190,.5)">(cũ: ${r.so_luong_cu||'—'})</span></div>`:''}
+      ${r.ngay_tn_moi?`<div><span style="color:rgba(180,200,215,.6);font-size:9px">Ngày TN:</span> <span style="color:#00c8ff">${fmtD(r.ngay_tn_moi)}</span></div>`:''}
+    </td>
+    <td style="padding:7px 10px;font-size:10px;color:rgba(200,220,235,.7)">${r.ghi_chu}</td>
+    <td style="padding:7px 10px;font-size:10px">
+      ${r.photo_url ? `<a href="${r.photo_url}" target="_blank" style="color:var(--accent);font-size:9px;display:flex;align-items:center;gap:4px"><i class="fas fa-image"></i> Xem ảnh</a>` : '<span style="color:rgba(180,200,220,.4)">—</span>'}
+    </td>
+    <td style="padding:7px 10px;font-size:10px;color:rgba(180,200,215,.6)">${r.nguoi_gui}<br>${fmtD(r.created_at)}</td>
+    <td style="padding:7px 10px">
+      <div style="display:flex;gap:5px">
+        <button onclick="_tnApproveRequest('${r.id||i}',true,${JSON.stringify(r).replace(/"/g,'&quot;')})" style="padding:3px 10px;border-radius:5px;border:none;background:#00e676;color:#000;font-size:9px;font-weight:700;cursor:pointer">✓ Duyệt</button>
+        <button onclick="_tnApproveRequest('${r.id||i}',false,${JSON.stringify(r).replace(/"/g,'&quot;')})" style="padding:3px 10px;border-radius:5px;border:none;background:#ff5252;color:#fff;font-size:9px;font-weight:700;cursor:pointer">✗ Từ chối</button>
+      </div>
+    </td>
+  </tr>`).join('') : `<tr><td colspan="7" style="padding:30px;text-align:center;color:rgba(180,200,220,.6)">Không có đề nghị chờ duyệt</td></tr>`;
+
+  modal.innerHTML=`<div style="background:#1a1f2e;border:1px solid rgba(0,200,255,.3);border-radius:12px;padding:24px;width:min(900px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div style="font-size:15px;font-weight:800;color:rgba(240,250,255,.97)">🔐 Phê duyệt đề nghị cập nhật TNĐK <span style="font-size:12px;font-weight:400;color:${pending.length?'#ff9100':'#00e676'}">(${pending.length} chờ duyệt)</span></div>
+      <button onclick="document.getElementById('_tnAdminModal').remove()" style="background:none;border:none;color:rgba(200,220,235,.6);font-size:18px;cursor:pointer">✕</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:10px">
+        <thead><tr style="border-bottom:1px solid rgba(255,255,255,.1)">
+          <th style="padding:7px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700;text-align:left">Trạm</th>
+          <th style="padding:7px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700;text-align:left">Ngăn</th>
+          <th style="padding:7px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700;text-align:left">Loại TB</th>
+          <th style="padding:7px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700;text-align:left">Thay đổi đề nghị</th>
+          <th style="padding:7px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700;text-align:left">Lý do</th>
+          <th style="padding:7px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700;text-align:left">Người gửi</th>
+          <th style="padding:7px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700;text-align:center">Ảnh NAS</th>
+          <th style="padding:7px 10px;font-size:9px;color:rgba(200,218,235,.9);font-weight:700">Hành động</th>
+        </tr></thead>
+        <tbody>${rows_html}</tbody>
+      </table>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e=>{if(e.target===modal)modal.remove();});
+}
+
+async function _tnApproveRequest(reqId, approved, reqData) {
+  const action = approved ? 'da_duyet' : 'tu_choi';
+  const reason = approved ? '' : (prompt('Lý do từ chối (tùy chọn):') || '');
+  try {
+    if (window._sbClient && reqData.id) {
+      // Update request status
+      await window._sbClient.from('tn_update_requests').update({ trang_thai: action, admin_note: reason }).eq('id', reqData.id);
+      // If approved, update CongTacThiNghiem + TongHopThietBi
+        if (approved) {
+          const updates = {};
+          if (reqData.ten_moi)        updates.Ten_thiet_bi     = reqData.ten_moi;
+          if (reqData.so_luong_moi)   updates.So_luong         = reqData.so_luong_moi;
+          if (reqData.ngay_tn_moi)    updates.Ngay_thi_nghiem  = reqData.ngay_tn_moi;
+          if (reqData.photo_url)      updates.photo_url        = reqData.photo_url;
+          if (Object.keys(updates).length) {
+            await window._sbClient.from('CongTacThiNghiem').update(updates)
+              .eq('Tram', reqData.tram).eq('Ngan_thiet_bi', reqData.ngan_thiet_bi).eq('Phan_loai_thiet_bi', reqData.loai_tb);
+            if (reqData.ten_moi || reqData.so_luong_moi) {
+              const tb2 = {};
+              if (reqData.ten_moi)      tb2.Ten_thiet_bi = reqData.ten_moi;
+              if (reqData.so_luong_moi) tb2.So_luong     = reqData.so_luong_moi;
+              await window._sbClient.from('TongHopThietBi').update(tb2)
+                .eq('Tram', reqData.tram).eq('Ngan_thiet_bi', reqData.ngan_thiet_bi).eq('Phan_loai_thiet_bi', reqData.loai_tb).limit(1);
+            }
+          }
+      }
+    } else {
+      // Local fallback
+      const idx = (window._tnPendingRequests||[]).findIndex(r=>r===reqData);
+      if (idx>=0) window._tnPendingRequests[idx].trang_thai = action;
+    }
+    document.getElementById('_tnAdminModal')?.remove();
+    showChangeNotif(approved?'success':'info', approved?'Đã duyệt và cập nhật dữ liệu':'Đã từ chối đề nghị', '');
+    if (approved && typeof _tnFetchData === 'function') _tnFetchData();
+  } catch(e) {
+    showChangeNotif('error','Lỗi xử lý', e.message||'');
+  }
+}
+
+// NavExtMap for BBTN
+// Define which nav items each role can access
+const _navUserAllowed = ['Dashboard','Quản lý BBTN'];
+
+const _navExtMapBBTN = {
+  'Quản lý BBTN': _bbtnRenderPage,
+  'Upload TNĐK': () => {
+    // Show uploadSection, hide overlay/canvas
+    const ov=document.getElementById('tbPageOverlay');
+    const cv=document.getElementById('canvasArea');
+    const rp=document.querySelector('.props-panel');
+    const sec=document.getElementById('uploadSection');
+    if(ov){ov.style.display='none';}
+    if(cv){cv.style.display='none';}
+    if(rp){rp.style.display='none';}
+    if(sec){sec.style.display='block'; _uploadUpdateNasStatus();}
+  },
+};
+(function(){
+  const orig = window.navActivate;
+  window.navActivate = function(el) {
+    const text = (el.querySelector('span')?.textContent||el.textContent||'').trim();
+    // Role gate: user chỉ được vào allowed list
+    const sess = (typeof _authGetSession==='function') ? _authGetSession() : null;
+    if (sess?.role === 'user' && !_navUserAllowed.includes(text)) {
+      if (typeof showChangeNotif === 'function') showChangeNotif('warn','Truy cập bị giới hạn','Tài khoản user chỉ xem được Dashboard và Quản lý BBTN');
+      return;
+    }
+    if (_navExtMapBBTN[text]) {
+      document.querySelectorAll('.nav-item.active,.nav-sub-item.active').forEach(e=>e.classList.remove('active'));
+      el.classList.add('active');
+      const ov=document.getElementById('tbPageOverlay'),cv=document.getElementById('canvasArea'),rp=document.querySelector('.props-panel');
+      if(ov){if(cv)cv.style.display='none';if(rp)rp.style.display='none';ov.style.display='block';}
+      if(_tnRawData.length||_tnAllData.length){_bbtnRenderPage();}
+      else{if(ov)ov.innerHTML='<div style="padding:40px;text-align:center;color:rgba(180,200,220,.6)"><i class="fas fa-spinner fa-spin" style="color:var(--accent);margin-right:8px"></i>Đang tải...</div>';if(typeof _tnFetchData==='function')_tnFetchData().then(()=>_bbtnRenderPage());}
+      return;
+    }
+    if(orig) orig.call(this,el);
+  };
+})();
+
+function isExcludedChip(pl) {
+  if (!pl) return true;
+  const n = pl.trim().toUpperCase().replace(/\s+/g, '').normalize('NFC');
+  if (n.startsWith('TICHAN') || n.startsWith('TI-CHAN') ||
+      n === 'TICHANSỨ' || n === 'TICHÂNSỨ' ||
+      n.includes('TICHÂN') || n.includes('TICHAN')) return true;
+  if (n === 'HTTĐ' || n === 'HTTD' ||
+      n.startsWith('HTTĐ') || n.startsWith('HTTD')) return true;
+  return false;
+}
+
+function buildChipData(rows) {
+  const typeMap = {};
+  rows.forEach(d => {
+    const pl = (d.Phan_loai_thiet_bi || '').trim();
+    if (!pl || isExcludedChip(pl)) return;
+    if (!typeMap[pl]) typeMap[pl] = { totalCount: 0, soLuong: 0, hangs: new Set() };
+    typeMap[pl].totalCount++;
+    typeMap[pl].soLuong += Number(d.So_luong) || 0;
+    const h = (d.Hang_san_xuat || '').trim();
+    if (h) typeMap[pl].hangs.add(h);
+  });
+  return typeMap;
+}
+
+function renderChipsSection() {
+  const chipsItem = layout.find(l => l.type === 'chips');
+  if (!chipsItem) return;
+  const wrapper = document.querySelector(`.section-wrapper[data-uid="${chipsItem.uid}"]`);
+  if (!wrapper) return;
+  const preview = wrapper.querySelector('.card-preview');
+  if (!preview) return;
+  if (!_chipAllData.length) return;
+
+  const fmt = n => Number(n).toLocaleString('vi-VN');
+
+  // Exclude list
+  const isExcl = pl => {
+    if (!pl) return true;
+    const n = pl.trim().toUpperCase().replace(/\s+/g,'').normalize('NFC');
+    return n.startsWith('TICHAN') || n.includes('TICHÂN') ||
+           n === 'HTTD' || n.startsWith('HTTD') ||
+           n === 'DAU' || n.startsWith('DẦU') || n.startsWith('DAU');
+  };
+
+  // Base rows = filtered or all
+  const baseRows = _chipFiltered.length ? _chipFiltered : _chipAllData;
+
+  // Tram linkage: if tram selected via filter → determine cap group
+  const selTram = _lf?.tram || '';
+  const selCap  = _lf?.cap  || '';
+  const capPrio = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
+
+  // Build tramMaxCap to determine which group a tram belongs to
+  const tramMaxCap = {};
+  _chipAllData.forEach(d => {
+    const t=(d.Tram||'').trim(); if(!t)return;
+    const cv=String(d.Cap_dien_ap??''); if(!cv||cv==='null')return;
+    if(!tramMaxCap[t]||(capPrio[cv]??9)<(capPrio[tramMaxCap[t]]??9)) tramMaxCap[t]=cv;
+  });
+
+  // Determine which groups to show based on tram/cap filter linkage
+  const HV_CAPS = new Set(['2','1']);       // 220kV, 110kV
+  const LV_CAPS = new Set(['3','4','9','6','0']); // 35kV, 22kV, 10kV, 6kV, TT
+
+  // Always show both groups — hide only if group has 0 devices after filtering
+  // (Cap filter via dropdown still applies via baseRows, but don't hide whole group by tram cap)
+  let showHV = true, showLV = true;
+  // Only restrict when user explicitly selects a cap via dropdown
+  if (selCap) {
+    showHV = HV_CAPS.has(selCap);
+    showLV = LV_CAPS.has(selCap);
+  }
+
+  // Build chip data per group
+  function buildGroupChips(capFilter) {
+    const typeMap = {};
+    baseRows.forEach(d => {
+      const cap = String(d.Cap_dien_ap??'');
+      if (!capFilter.has(cap)) return;
+      const pl = (d.Phan_loai_thiet_bi||'').trim();
+      if (!pl || isExcl(pl)) return;
+      if (!typeMap[pl]) typeMap[pl] = { soLuong:0, totalCount:0 };
+      typeMap[pl].soLuong    += Number(d.So_luong)||0;
+      typeMap[pl].totalCount += 1;
+    });
+    return typeMap;
+  }
+
+  // Total from ALL data (for /total display)
+  function buildGroupTotal(capFilter) {
+    const typeMap = {};
+    _chipAllData.forEach(d => {
+      const cap = String(d.Cap_dien_ap??'');
+      if (!capFilter.has(cap)) return;
+      const pl = (d.Phan_loai_thiet_bi||'').trim();
+      if (!pl || isExcl(pl)) return;
+      if (!typeMap[pl]) typeMap[pl] = { soLuong:0 };
+      typeMap[pl].soLuong += Number(d.So_luong)||0;
+    });
+    return typeMap;
+  }
+
+  const hvMap  = buildGroupChips(HV_CAPS);
+  const lvMap  = buildGroupChips(LV_CAPS);
+  const hvAll  = buildGroupTotal(HV_CAPS);
+  const lvAll  = buildGroupTotal(LV_CAPS);
+
+  // Sort by soLuong desc, active chips first
+  function sortTypes(map) {
+    return Object.entries(map).sort((a,b) => {
+      const aA = _selectedChips.has(a[0]) ? 1:0, bA = _selectedChips.has(b[0]) ? 1:0;
+      if (bA!==aA) return bA-aA;
+      return (b[1].soLuong||0) - (a[1].soLuong||0);
+    });
+  }
+
+  function chipHtml(type, info, allInfo) {
+    const isActive = _selectedChips.has(type);
+    const cur = info.soLuong||0;
+    const tot = allInfo?.[type]?.soLuong||cur;
+    const isFiltered = cur !== tot;
+    const safeType = type.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    return `<div class="device-chip${isActive?' active':''}"
+      title="${type} — ${fmt(cur)}${isFiltered?'/'+fmt(tot):''}TB"
+      data-chip-type="${safeType}"
+      onmousedown="this._md=true" onmousemove="this._md=false"
+      onmouseup="if(this._md){event.stopPropagation();lytChipClick(this)}">
+      <div class="device-chip-header">
+        <span class="device-chip-name">${type}</span>
+        <span class="device-chip-count">${isActive?'<i class="fas fa-check" style="font-size:8px;margin-right:2px"></i>':''}${fmt(cur)}${isFiltered?'<span class="device-chip-total">/'+fmt(tot)+'</span>':''}</span>
+      </div>
+    </div>`;
+  }
+
+  const numTypes = Object.keys(hvMap).length + Object.keys(lvMap).length;
+  const totalSL  = [...Object.values(hvMap),...Object.values(lvMap)].reduce((s,v)=>s+(v.soLuong||0),0);
+
+  let html = `<div class="chips-header-row">
+    <span class="chips-active-info${_selectedChips.size>0?' visible':''}" id="lyt_chipsInfo">
+      ${_selectedChips.size>0?`<i class="fas fa-filter"></i> Đang lọc: ${[..._selectedChips].join(', ')}`:''}
+    </span>
+    <span style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono)">${numTypes} loại · ${fmt(totalSL)} thiết bị</span>
+    <button class="chips-reset-btn" id="lyt_chipsReset"
+      style="display:${_selectedChips.size>0?'inline-flex':'none'}"
+      onclick="lytChipReset()">
+      <i class="fas fa-times-circle"></i> Bỏ lựa chọn
+    </button>
+  </div>`;
+
+  // Group HV
+  if (showHV && Object.keys(hvMap).length) {
+    const hvTotal = Object.values(hvMap).reduce((s,v)=>s+(v.soLuong||0),0);
+    html += `<div style="font-size:9px;font-weight:800;color:#ff9100;letter-spacing:.08em;margin:10px 0 6px;display:flex;align-items:center;gap:8px">
+      <span style="width:8px;height:8px;border-radius:50%;background:#ff9100;flex-shrink:0"></span>
+      220kV – 110kV
+      <span style="font-weight:400;color:var(--text-muted)">${Object.keys(hvMap).length} loại · ${fmt(hvTotal)} thiết bị</span>
+    </div><div class="device-chips-grid">`;
+    sortTypes(hvMap).forEach(([t,info]) => { html += chipHtml(t, info, hvAll); });
+    html += `</div>`;
+  }
+
+  // Group LV
+  if (showLV && Object.keys(lvMap).length) {
+    const lvTotal = Object.values(lvMap).reduce((s,v)=>s+(v.soLuong||0),0);
+    html += `<div style="font-size:9px;font-weight:800;color:#00c8ff;letter-spacing:.08em;margin:14px 0 6px;display:flex;align-items:center;gap:8px">
+      <span style="width:8px;height:8px;border-radius:50%;background:#00c8ff;flex-shrink:0"></span>
+      35kV – 22kV – 10kV – 6kV
+      <span style="font-weight:400;color:var(--text-muted)">${Object.keys(lvMap).length} loại · ${fmt(lvTotal)} thiết bị</span>
+    </div><div class="device-chips-grid">`;
+    sortTypes(lvMap).forEach(([t,info]) => { html += chipHtml(t, info, lvAll); });
+    html += `</div>`;
+  }
+
+  // No data for selected filter
+  if (!showHV && !showLV) {
+    html += `<div style="color:var(--text-muted);font-size:11px;padding:20px;text-align:center">Không có thiết bị cho bộ lọc hiện tại</div>`;
+  }
+
+  preview.innerHTML = html;
+}
+
+function openUploadSection(prefill = {}) {
+  const sec = document.getElementById('uploadSection');
+  if (!sec) return;
+  // Prefill from row context nếu được gọi từ _tnRowClick
+  if (prefill.deviceName) {
+    const di = document.getElementById('deviceNameInput');
+    if (di) di.value = prefill.deviceName;
+  }
+  if (prefill.date) {
+    const dd = document.getElementById('dateInput');
+    if (dd) dd.value = prefill.date;
+  }
+  // Store context row for Supabase metadata
+  sec.dataset.tram       = prefill.tram       || '';
+  sec.dataset.ngan       = prefill.ngan       || '';
+  sec.dataset.loaiTb     = prefill.loaiTb     || '';
+  sec.dataset.tenCu      = prefill.tenCu      || '';
+  sec.dataset.slCu       = prefill.slCu       || '';
+  sec.dataset.ngayCu     = prefill.ngayCu     || '';
+  // Update NAS status
+  _uploadUpdateNasStatus();
+  // Show section
+  sec.style.display = 'block';
+  document.getElementById('deviceNameInput')?.focus();
+}
+
+function _uploadUpdateNasStatus() {
+  const el = document.getElementById('uploadNasStatus');
+  if (!el) return;
+  if (NAS_CONFIG.enabled) {
+    el.style.color = '#00e676';
+    el.innerHTML = `● NAS đã kết nối (<b>${NAS_CONFIG.baseUrl}</b>) — ảnh sẽ được tải lên <code>${NAS_CONFIG.photoPath}</code>`;
+  } else if (BACKEND_URL) {
+    el.style.color = 'rgba(0,200,255,.8)';
+    el.innerHTML = `● Backend: <b>${BACKEND_URL.replace(/https?:\/\/[^/]+/, '…')}</b> — ảnh tải qua Supabase Edge Function`;
+  } else {
+    el.style.color = '#ff9100';
+    el.innerHTML = '⚠ NAS chưa cấu hình — ảnh sẽ không được lưu. <a onclick="_nasOpenSettings()" style="color:var(--accent);cursor:pointer;text-decoration:underline">Cấu hình NAS</a>';
+  }
+}
+
+function _uploadFileSelected() {
+  const inp = document.getElementById('fileInput');
+  const lbl = document.getElementById('uploadFileLbl');
+  const f = inp?.files?.[0];
+  if (!f) return;
+  const mb = (f.size/1024/1024).toFixed(1);
+  if (parseFloat(mb) > 10) {
+    if (lbl) lbl.innerHTML = '<span style="color:#ff5252">⚠ File quá lớn (' + mb + 'MB) — tối đa 10MB</span>';
+    inp.value = '';
+    return;
+  }
+  if (lbl) lbl.innerHTML = `<span style="color:#00e676">✅ ${f.name}</span> <span style="color:rgba(180,200,220,.5)">${mb}MB</span>`;
+}
+
+// ── CORE: btnUpload click handler (per spec) ──────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const btnUpload = document.getElementById('btnUpload');
+  if (!btnUpload) return;
+
+  btnUpload.addEventListener('click', async () => {
+    const fileEl      = document.getElementById('fileInput');
+    const deviceName  = document.getElementById('deviceNameInput')?.value?.trim();
+    const quantity    = parseInt(document.getElementById('quantityInput')?.value || '0', 10);
+    const date        = document.getElementById('dateInput')?.value;
+    const note        = document.getElementById('uploadNoteInput')?.value?.trim();
+    const statusEl    = document.getElementById('uploadStatus');
+    const sec         = document.getElementById('uploadSection');
+
+    // Reset status
+    if (statusEl) { statusEl.style.color = '#ffd740'; statusEl.textContent = ''; }
+
+    // ── Validate (per spec) ──
+    if (!fileEl?.files?.length) { if(statusEl){statusEl.textContent='Chưa chọn file';} return; }
+    if (!deviceName)             { if(statusEl){statusEl.textContent='Chưa nhập tên thiết bị';} return; }
+    if (!quantity || quantity <= 0){ if(statusEl){statusEl.textContent='Số lượng không hợp lệ';} return; }
+    if (!date)                   { if(statusEl){statusEl.textContent='Chưa chọn ngày TN';} return; }
+    if (!note)                   { if(statusEl){statusEl.textContent='Chưa nhập lý do cập nhật';} return; }
+
+    const file = fileEl.files[0];
+    btnUpload.disabled = true;
+    btnUpload.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang gửi...';
+    if (statusEl) { statusEl.style.color = '#ffd740'; statusEl.textContent = 'Đang xử lý...'; }
+
+    // ── BƯỚC 1: Encode file Base64 (per spec: FileReader.readAsDataURL) ──
+    let fileBase64 = '', photoUrl = '', photoPath = '';
+    if (file) {
+      fileBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]); // strip data:...;base64,
+        reader.onerror = reject;
+        reader.readAsDataURL(file); // per spec
+      });
+    }
+
+    // ── BƯỚC 2: Gửi lên backend (per spec: fetch POST với JSON body) ──
+    // Backend = Supabase Edge Function hoặc Node.js server
+    // Backend sẽ: decode Base64 → HTTP PUT lên NAS WebDAV → return file URL
+    let uploadSuccess = false;
+    if (BACKEND_URL && fileBase64) {
+      if (statusEl) statusEl.textContent = 'Đang tải ảnh lên NAS qua backend...';
+      try {
+        const response = await fetch(BACKEND_URL, {   // per spec: fetch('https://YOUR_BACKEND_URL/api/submit')
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({                       // per spec: JSON body
+            deviceName,
+            quantity,
+            date,
+            fileName:   file.name,
+            fileBase64,                                // per spec: Base64
+            mimeType:   file.type,
+            // Context metadata
+            tram:     sec?.dataset?.tram     || '',
+            ngan:     sec?.dataset?.ngan     || '',
+            loaiTb:   sec?.dataset?.loaiTb   || '',
+            note,
+          })
+        });
+        const result = await response.json();
+        if (result.success) {
+          photoUrl  = result.fileUrl  || '';
+          photoPath = result.filePath || '';
+          uploadSuccess = true;
+        } else {
+          throw new Error(result.error || 'Backend trả lỗi không xác định');
+        }
+      } catch (err) {
+        console.error('Backend upload error:', err);
+        // Fallback: thử direct WebDAV nếu backend không available
+        if (NAS_CONFIG.enabled && file) {
+          if (statusEl) statusEl.textContent = 'Backend lỗi — thử direct NAS WebDAV...';
+          try {
+            const tramFolder = `${NAS_CONFIG.photoPath}/${(sec?.dataset?.tram||'unknown').replace(/[^a-zA-Z0-9_-]/g,'_')}`;
+            await nasMkdir(tramFolder);
+            const prefix = `${deviceName.replace(/\s/g,'_')}_${(sec?.dataset?.tram||'').replace(/\s/g,'_')}`;
+            const r2 = await nasUploadFile(file, tramFolder, prefix);
+            photoUrl = r2.url; photoPath = r2.path;
+            uploadSuccess = true;
+          } catch(e2) { console.warn('Direct NAS also failed:', e2); }
+        }
+        if (!uploadSuccess) {
+          // Cho phép gửi đề nghị không kèm ảnh
+          const skip = confirm(`Không tải được ảnh lên:\n${err.message}\n\nBấm OK để gửi đề nghị KHÔNG có ảnh.`);
+          if (!skip) {
+            btnUpload.disabled = false;
+            btnUpload.innerHTML = '<i class="fas fa-paper-plane"></i> Gửi cập nhật';
+            if (statusEl) { statusEl.style.color='#ff5252'; statusEl.textContent='Đã hủy'; }
+            return;
+          }
+        }
+      }
+    } else if (NAS_CONFIG.enabled && file) {
+      // Không có backend → dùng direct WebDAV (NAS_CONFIG đã cấu hình)
+      if (statusEl) statusEl.textContent = 'Đang tải ảnh lên NAS WebDAV...';
+      try {
+        const tramFolder = `${NAS_CONFIG.photoPath}/${(sec?.dataset?.tram||'upload').replace(/[^a-zA-Z0-9_-]/g,'_')}`;
+        await nasMkdir(tramFolder);
+        const r3 = await nasUploadFile(file, tramFolder, deviceName.replace(/\s/g,'_'));
+        photoUrl = r3.url; photoPath = r3.path;
+        uploadSuccess = true;
+      } catch(e3) { console.warn('Direct NAS failed:', e3); }
+    }
+
+    // ── BƯỚC 3: Insert metadata + file URL vào Supabase UpdateRequests ──
+    // per spec: status = 'pending' (mapped to 'cho_duyet')
+    if (statusEl) statusEl.textContent = 'Đang lưu đề nghị vào Supabase...';
+    const sess = (typeof _authGetSession === 'function') ? _authGetSession() : null;
+    const request = {
+      tram:           sec?.dataset?.tram    || '',
+      ngan_thiet_bi:  sec?.dataset?.ngan    || '',
+      loai_tb:        sec?.dataset?.loaiTb  || '',
+      ten_cu:         sec?.dataset?.tenCu   || '',
+      ten_moi:        deviceName,
+      so_luong_cu:    sec?.dataset?.slCu ? Number(sec.dataset.slCu) : null,
+      so_luong_moi:   quantity,
+      ngay_tn_cu:     sec?.dataset?.ngayCu  || null,
+      ngay_tn_moi:    date,
+      ghi_chu:        note,
+      photo_path:     photoPath || null,
+      photo_url:      photoUrl  || null,   // URL NAS trả về
+      nguoi_gui:      sess?.email || 'anonymous',
+      trang_thai:     'cho_duyet',          // per spec: status = 'pending'
+      created_at:     new Date().toISOString(),
+    };
+
+    try {
+      if (window._sbClient) {
+        const { error } = await window._sbClient.from('tn_update_requests').insert([request]);
+        if (error) throw error;
+      } else {
+        (window._tnPendingRequests = window._tnPendingRequests || []).push({...request, id: Date.now()+'_local'});
+      }
+
+      // ── THÀNH CÔNG ──
+      if (statusEl) {
+        statusEl.style.color = '#00e676';
+        statusEl.textContent = photoUrl
+          ? '✅ Upload thành công! Đang chờ admin phê duyệt.'   // per spec
+          : '✅ Đề nghị đã gửi (không kèm ảnh). Đang chờ admin phê duyệt.';
+      }
+      // Reset form sau 2.5s
+      setTimeout(() => {
+        ['fileInput','deviceNameInput','quantityInput','dateInput','uploadNoteInput']
+          .forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+        const lbl = document.getElementById('uploadFileLbl');
+        if (lbl) lbl.textContent = 'Kéo thả hoặc nhấp để chọn ảnh';
+        if (statusEl) statusEl.textContent = '';
+      }, 2500);
+
+    } catch(e) {
+      console.error('Supabase insert error:', e);
+      if (statusEl) {
+        statusEl.style.color = '#ff5252';
+        statusEl.textContent = 'Upload thất bại: ' + (e.message || 'unknown error'); // per spec
+      }
+    }
+
+    btnUpload.disabled = false;
+    btnUpload.innerHTML = '<i class="fas fa-paper-plane"></i> Gửi cập nhật';
+  });
+});
+
+// ══════════════════════════════════════════════════════
+// CONFIG: NAS Synology
+// Đặt URL NAS của bạn tại đây
+// ══════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
+// NAS SYNOLOGY — WEBDAV CONFIG
+// Sơ đồ: User → HTTP PUT (Base64) → NAS WebDAV → Return URL
+//         → Insert metadata + URL vào Supabase
+// ══════════════════════════════════════════════════════
+const NAS_CONFIG = (() => {
+  let cfg = {
+    baseUrl:   '',                  // VD: 'https://192.168.1.13:5006'
+    webdavPath:'',                  // Root WebDAV (rỗng nếu base đã có /)
+    bbtnPath:  '/BBTN',             // Cấu trúc: BBTN/Đơn vị/Năm/Trạm/File
+    photoPath: '/TNDK',             // Thư mục ảnh TNĐK
+    username:  '',                  // Tài khoản NAS
+    password:  '',                  // Mật khẩu NAS
+    enabled:   false,
+  };
+  try {
+    const saved = localStorage.getItem('evn_nas_cfg');
+    if (saved) Object.assign(cfg, JSON.parse(saved));
+  } catch(e) {}
+  return cfg;
+})();
+
+/** Trả về full URL của file trên NAS WebDAV */
+
+async function _bbtnLoadPath(path) {
+  const cont   = document.getElementById('_bbtnContent');
+  const crumb  = document.getElementById('_bbtnBreadcrumb');
+  if (!cont) return;
+  window._bbtnState.path = path;
+
+  // Render breadcrumb từ path (BBTN/Đơn vị/Năm/Trạm)
+  const rootPath = NAS_CONFIG.bbtnPath || '/BBTN';
+  const segments = path.replace(rootPath,'').split('/').filter(Boolean);
+  const labels   = ['Đơn vị', 'Năm', 'Trạm', 'Thư mục'];
+  let crumbHtml  = `<i class="fas fa-server" style="color:rgba(180,200,220,.5)"></i>
+    <a onclick="_bbtnLoadPath('${rootPath.replace(/'/g,"\\'")}')" style="color:var(--accent);cursor:pointer;font-weight:600;text-decoration:none">BBTN</a>`;
+  let cumulative = rootPath;
+  segments.forEach((seg, i) => {
+    cumulative += '/' + seg;
+    const isLast = i === segments.length - 1;
+    crumbHtml += `<span style="color:rgba(180,200,220,.4)">/</span>
+      <span style="font-size:9px;color:rgba(180,200,220,.5);text-transform:uppercase">${labels[i]||''}:</span>
+      ${isLast ? `<span style="color:rgba(240,250,255,.95);font-weight:600">${seg}</span>`
+               : `<a onclick="_bbtnLoadPath('${cumulative.replace(/'/g,"\\'")}')" style="color:rgba(0,200,255,.85);cursor:pointer;text-decoration:none">${seg}</a>`}`;
+  });
+  if (crumb) crumb.innerHTML = crumbHtml;
+
+  // Loading state
+  cont.innerHTML = `<div style="padding:40px;text-align:center;color:rgba(180,200,220,.6)">
+    <i class="fas fa-spinner fa-spin" style="font-size:20px;color:var(--accent);margin-bottom:8px;display:block"></i>
+    Đang tải danh sách từ NAS...
+  </div>`;
+
+  // Check NAS config
+  if (!NAS_CONFIG.enabled || !NAS_CONFIG.baseUrl) {
+    cont.innerHTML = `<div style="padding:40px;text-align:center">
+      <i class="fas fa-exclamation-triangle" style="font-size:28px;color:#ff9100;margin-bottom:12px;display:block"></i>
+      <div style="font-size:13px;color:rgba(240,250,255,.9);font-weight:600;margin-bottom:6px">NAS chưa được cấu hình</div>
+      <div style="font-size:10.5px;color:rgba(180,200,220,.65);margin-bottom:16px">Cần cấu hình URL NAS và tài khoản trước khi xem BBTN</div>
+      ${(_authGetSession()?.role==='admin') ? '<button onclick="_nasOpenSettings()" style="padding:8px 18px;border-radius:7px;border:none;background:var(--accent);color:#000;font-weight:700;cursor:pointer;font-size:11.5px">Cấu hình NAS ngay</button>' : '<div style="font-size:10px;color:rgba(255,145,0,.7)">Liên hệ admin để cấu hình NAS</div>'}
+    </div>`;
+    return;
+  }
+
+  // Fetch directory listing via WebDAV PROPFIND
+  try {
+    const items = await _bbtnPropfind(path);
+    _bbtnRenderItems(items, path, rootPath, segments.length);
+  } catch (err) {
+    console.error('PROPFIND error:', err);
+    cont.innerHTML = `<div style="padding:40px;text-align:center">
+      <i class="fas fa-times-circle" style="font-size:28px;color:#ff5252;margin-bottom:12px;display:block"></i>
+      <div style="font-size:13px;color:rgba(240,250,255,.9);font-weight:600;margin-bottom:6px">Không kết nối được NAS</div>
+      <div style="font-size:10.5px;color:rgba(180,200,220,.65);margin-bottom:8px;font-family:var(--font-mono)">${err.message||'Unknown error'}</div>
+      <div style="font-size:10px;color:rgba(255,145,0,.7);max-width:480px;margin:0 auto;line-height:1.6">
+        <b>Khắc phục:</b><br>
+        1. Kiểm tra URL NAS, username/password trong Cài đặt NAS<br>
+        2. Bật WebDAV trên DSM (Control Panel → File Services → WebDAV)<br>
+        3. Nếu lỗi CORS: cấu hình Reverse Proxy với Access-Control-Allow-Origin trên NAS<br>
+        4. Nếu HTTPS với cert tự ký: truy cập <a href="${NAS_CONFIG.baseUrl}" target="_blank" style="color:var(--accent)">${NAS_CONFIG.baseUrl}</a> để chấp nhận chứng chỉ trước
+      </div>
+    </div>`;
+  }
+}
+
+/**
+ * WebDAV PROPFIND request - lấy danh sách items trong thư mục
+ * Returns: [{ name, isFolder, size, modified, href, fullUrl }]
+ */
+
+async function _bbtnPropfind(path) {
+  const fullUrl = NAS_CONFIG.baseUrl.replace(/\/$/,'') + path;
+  const propfindBody = `<?xml version="1.0" encoding="utf-8"?>
+<d:propfind xmlns:d="DAV:">
+  <d:prop>
+    <d:displayname/>
+    <d:resourcetype/>
+    <d:getcontentlength/>
+    <d:getlastmodified/>
+  </d:prop>
+</d:propfind>`;
+
+  const resp = await fetch(fullUrl, {
+    method: 'PROPFIND',
+    headers: {
+      'Content-Type': 'application/xml; charset=utf-8',
+      'Depth':        '1',
+      ...nasAuthHeader(),
+    },
+    body: propfindBody,
+    credentials: 'omit',
+  });
+
+  if (!resp.ok && resp.status !== 207) {
+    if (resp.status === 401) throw new Error('Sai tài khoản/mật khẩu (401)');
+    if (resp.status === 404) throw new Error('Đường dẫn không tồn tại (404): ' + path);
+    throw new Error('HTTP ' + resp.status);
+  }
+
+  const xmlText = await resp.text();
+  const parser  = new DOMParser();
+  const doc     = parser.parseFromString(xmlText, 'text/xml');
+  const responses = doc.getElementsByTagNameNS('DAV:', 'response');
+  const items = [];
+  for (let i = 0; i < responses.length; i++) {
+    const r = responses[i];
+    const href = r.getElementsByTagNameNS('DAV:', 'href')[0]?.textContent || '';
+    // Skip self entry (the directory itself)
+    const decodedHref = decodeURIComponent(href);
+    const normalized  = decodedHref.replace(/\/$/,'');
+    const pathNormalized = path.replace(/\/$/,'');
+    if (normalized.endsWith(pathNormalized) || normalized === pathNormalized) continue;
+
+    const isFolder = !!r.getElementsByTagNameNS('DAV:', 'collection').length;
+    const sizeNode = r.getElementsByTagNameNS('DAV:', 'getcontentlength')[0];
+    const dateNode = r.getElementsByTagNameNS('DAV:', 'getlastmodified')[0];
+    const nameRaw  = decodedHref.replace(/\/$/,'').split('/').pop();
+    items.push({
+      name:     nameRaw,
+      isFolder,
+      size:     sizeNode ? parseInt(sizeNode.textContent,10) : 0,
+      modified: dateNode ? new Date(dateNode.textContent) : null,
+      href:     decodedHref,
+      fullUrl:  NAS_CONFIG.baseUrl.replace(/\/$/,'') + (decodedHref.startsWith('/') ? decodedHref : '/' + decodedHref),
+    });
+  }
+  // Sort: folders first, then alphabetically
+  items.sort((a,b) => {
+    if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
+    return a.name.localeCompare(b.name, 'vi', { numeric: true });
+  });
+  return items;
+}
+
+/**
+ * Render danh sách items (folder + file)
+ * Folders → click vào _bbtnLoadPath
+ * Files (PDF, DOC, image) → click mở trong tab mới
+ */
+
+function _bbtnRenderItems(items, path, rootPath, depth) {
+  const cont = document.getElementById('_bbtnContent');
+  if (!cont) return;
+  const fmtSize = b => {
+    if (!b) return '—';
+    if (b < 1024) return b + ' B';
+    if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+    return (b/1024/1024).toFixed(1) + ' MB';
+  };
+  const fmtDate = d => d ? d.toLocaleDateString('vi-VN', {day:'2-digit',month:'2-digit',year:'numeric'}) + ' ' + d.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}) : '';
+  const folders = items.filter(it => it.isFolder);
+  const files   = items.filter(it => !it.isFolder);
+
+  if (!items.length) {
+    cont.innerHTML = `<div style="padding:40px;text-align:center;color:rgba(180,200,220,.55)">
+      <i class="fas fa-folder-open" style="font-size:28px;margin-bottom:10px;display:block;opacity:.4"></i>
+      Thư mục trống
+    </div>`;
+    return;
+  }
+
+  // Get folder type label based on depth
+  const folderTypes = ['Đơn vị', 'Năm', 'Trạm', 'Loại tài liệu', 'Thư mục con'];
+  const folderTypeLbl = folderTypes[depth] || 'Thư mục';
+
+  // Build grid
+  let html = '<div style="padding:14px">';
+  if (folders.length) {
+    html += `<div style="font-size:10px;font-weight:700;color:rgba(180,200,220,.7);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">
+      <i class="fas fa-folder" style="color:#ffd740;margin-right:6px"></i>${folderTypeLbl} (${folders.length})
+    </div>`;
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:18px">';
+    folders.forEach(f => {
+      const newPath = path.replace(/\/$/,'') + '/' + f.name;
+      html += `<div onclick="_bbtnLoadPath('${newPath.replace(/'/g,"\\'")}')"
+        style="padding:14px 16px;border-radius:9px;border:1px solid rgba(255,215,64,.18);background:rgba(255,215,64,.04);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:10px"
+        onmouseover="this.style.borderColor='rgba(255,215,64,.5)';this.style.background='rgba(255,215,64,.08)'"
+        onmouseout="this.style.borderColor='rgba(255,215,64,.18)';this.style.background='rgba(255,215,64,.04)'">
+        <i class="fas fa-folder" style="font-size:20px;color:#ffd740;flex-shrink:0"></i>
+        <div style="min-width:0;flex:1">
+          <div style="font-size:11.5px;font-weight:700;color:rgba(240,250,255,.95);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</div>
+          <div style="font-size:9px;color:rgba(180,200,220,.55);margin-top:2px">${fmtDate(f.modified)}</div>
+        </div>
+        <i class="fas fa-chevron-right" style="font-size:10px;color:rgba(180,200,220,.4);flex-shrink:0"></i>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  if (files.length) {
+    html += `<div style="font-size:10px;font-weight:700;color:rgba(180,200,220,.7);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">
+      <i class="fas fa-file" style="color:#00c8ff;margin-right:6px"></i>Tài liệu (${files.length})
+    </div>`;
+    html += `<div style="border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.06)">
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead><tr style="background:rgba(255,255,255,.04)">
+          <th style="padding:8px 12px;text-align:left;font-size:9.5px;color:rgba(200,218,235,.9);font-weight:700;letter-spacing:.05em">Tên file</th>
+          <th style="padding:8px 12px;text-align:right;font-size:9.5px;color:rgba(200,218,235,.9);font-weight:700;letter-spacing:.05em">Dung lượng</th>
+          <th style="padding:8px 12px;text-align:right;font-size:9.5px;color:rgba(200,218,235,.9);font-weight:700;letter-spacing:.05em">Sửa đổi</th>
+          <th style="padding:8px 12px;text-align:center;font-size:9.5px;color:rgba(200,218,235,.9);font-weight:700;letter-spacing:.05em">Hành động</th>
+        </tr></thead>
+        <tbody>`;
+    files.forEach((f, i) => {
+      const ext = (f.name.split('.').pop() || '').toLowerCase();
+      const iconMap = { pdf:['fa-file-pdf','#ff5252'], doc:['fa-file-word','#1565c0'], docx:['fa-file-word','#1565c0'],
+                        xls:['fa-file-excel','#00e676'], xlsx:['fa-file-excel','#00e676'],
+                        png:['fa-file-image','#e040fb'], jpg:['fa-file-image','#e040fb'], jpeg:['fa-file-image','#e040fb'],
+                        zip:['fa-file-archive','#ffd740'], rar:['fa-file-archive','#ffd740'] };
+      const [iconCls, iconCol] = iconMap[ext] || ['fa-file','#90a4ae'];
+      const safeUrl = f.fullUrl.replace(/'/g,"\\'");
+      html += `<tr style="border-top:1px solid rgba(255,255,255,.04);${i%2?'background:rgba(255,255,255,.015)':''}">
+        <td style="padding:7px 12px;color:rgba(235,248,255,.92)">
+          <i class="fas ${iconCls}" style="color:${iconCol};margin-right:8px;width:14px;text-align:center"></i>${f.name}
+        </td>
+        <td style="padding:7px 12px;text-align:right;font-family:var(--font-mono);color:rgba(180,200,220,.75);font-size:10px">${fmtSize(f.size)}</td>
+        <td style="padding:7px 12px;text-align:right;font-family:var(--font-mono);color:rgba(180,200,220,.65);font-size:10px">${fmtDate(f.modified)}</td>
+        <td style="padding:7px 12px;text-align:center;white-space:nowrap">
+          <a href="${f.fullUrl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:5px;border:1px solid rgba(0,200,255,.3);background:rgba(0,200,255,.08);color:var(--accent);font-size:9.5px;text-decoration:none;margin-right:4px"><i class="fas fa-eye"></i> Xem</a>
+          <button onclick="_bbtnCopyLink('${safeUrl}')" style="padding:3px 9px;border-radius:5px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:rgba(200,218,235,.85);font-size:9.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="fas fa-link"></i> Sao chép</button>
+        </td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+
+  html += '</div>';
+  cont.innerHTML = html;
+}
+
+function _bbtnRefresh() {
+  const path = window._bbtnState?.path || NAS_CONFIG.bbtnPath || '/BBTN';
+  _bbtnLoadPath(path);
+}
+
+function _bbtnCopyLink(url) {
+  navigator.clipboard?.writeText(url).then(
+    () => showChangeNotif('success', 'Đã sao chép link', url.length>60 ? url.substring(0,57)+'...' : url),
+    () => showChangeNotif('error', 'Không sao chép được', '')
+  );
+}
