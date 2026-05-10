@@ -1521,26 +1521,41 @@ const _renderTechChart = (c, cardUid, ci) => {
     return html;
   }
 
-  function buildLVSection() {
-    // 22kV: GIS | GIS+KCK (hỗn hợp) | KCK (Khí-Chân không)
-    const t = t22;
-    const total = (t.GIS||0) + (t.KCK||0) + (t.GIS_KCK||0);
-    if (total === 0) return ''; // Không có thiết bị 22-35kV -> ẩn section
-    const maxV = Math.max(t.GIS||0, t.GIS_KCK||0, t.KCK||0, 1);
-    let html = `<div class="ic-tech-cap" style="margin-top:8px">⚡ 22 – 35kV</div>`;
+  function buildLVSection(lvFilter) {
+    // 22kV / 35kV — render dạng giống HV section (có dropdown)
+    const tt22 = t22;
+    const tt35 = t35;
+    let gis, kck, honhop;
+    if (lvFilter === 'all') {
+      gis    = (tt22.GIS||0)     + (tt35.GIS||0);
+      kck    = (tt22.KCK||0)     + (tt35.KCK||0);
+      honhop = (tt22.GIS_KCK||0) + (tt35.GIS_KCK||0);
+    } else if (lvFilter === '35') {
+      gis = tt35.GIS||0; kck = tt35.KCK||0; honhop = tt35.GIS_KCK||0;
+    } else { // '22'
+      gis = tt22.GIS||0; kck = tt22.KCK||0; honhop = tt22.GIS_KCK||0;
+    }
+    const total = gis + kck + honhop;
+    if (total === 0) return ''; // Ẩn nếu không có thiết bị
+    const maxV = Math.max(gis, kck, honhop, 1);
+    const dropLV = `<select class="ic-tech-cap-select" id="lvdrop_${cardUid}_${ci}"
+      onchange="icTechLVFilter('${cardUid}',${ci},this.value)">
+      <option value="all"${lvFilter==='all'?' selected':''}>22 – 35kV</option>
+      <option value="22"${lvFilter==='22'?' selected':''}>22kV</option>
+      <option value="35"${lvFilter==='35'?' selected':''}>35kV</option>
+    </select>`;
+    let html = `<div class="ic-tech-cap" style="display:flex;align-items:center;gap:6px;justify-content:space-between;margin-top:8px">
+      <span>⚡</span>${dropLV}</div>`;
     html += `<div class="ic-tech-grid">`;
-    if ((t.GIS||0) > 0)
-      html += barItem('gis',    'GIS',              t.GIS||0,     maxV);
-    if ((t.KCK||0) > 0)
-      html += barItem('kck',    'Khí – Chân không', t.KCK||0,     maxV);
-    if ((t.GIS_KCK||0) > 0)
-      html += barItem('honhop', 'GIS + KCK',      t.GIS_KCK||0, maxV);
+    if (gis    > 0) html += barItem('gis',    'GIS',                  gis,    maxV);
+    if (honhop > 0) html += barItem('honhop', 'GIS – Khí - Chân không', honhop, maxV);
+    if (kck    > 0) html += barItem('kck',    'Khí – Chân không',     kck,    maxV);
     html += `</div>`;
     return html;
   }
 
   const hvFilter = c._hvFilter || 'all';
-  const rows = buildHVSection(hvFilter) + buildLVSection();
+  const rows = buildHVSection(hvFilter) + buildLVSection(c._lvFilter || 'all');
 
   return `<div class="ic-tech-chart" id="tc_${cardUid}_${ci}">
     <div class="ic-tech-rows" id="tr_${cardUid}_${ci}">${rows}</div>
@@ -2076,60 +2091,6 @@ function icTechHVFilter(uid, ci, filterKey) {
         </div>
       </div>`;
   }
-
-  // HV section (re-render rows div only, keep dropdown)
-  let ais, gis, hgis, honhop;
-  if (filterKey === 'all') {
-    ais    = (t220.AIS||0)      + (t110.AIS||0);
-    gis    = (t220.GIS||0)      + (t110.GIS||0);
-    hgis   = (t220.HGIS||0)    + (t110.HGIS||0);
-    honhop = (t220.HGIS_AIS||0) + (t110.HGIS_AIS||0);
-  } else {
-    const t = filterKey === '220' ? t220 : t110;
-    ais = t.AIS||0; gis = t.GIS||0; hgis = t.HGIS||0; honhop = t.HGIS_AIS||0;
-  }
-  const maxHV = Math.max(ais, gis, hgis, honhop, 1);
-
-  // Also update 1 STATS total display for 220/110
-  if (filterKey === '220') {
-    setText('total220kV', (t220.AIS+t220.GIS+t220.HGIS+t220.HGIS_AIS).toLocaleString('vi-VN'));
-  } else if (filterKey === '110') {
-    setText('total110kV', (t110.AIS+t110.GIS+t110.HGIS+t110.HGIS_AIS).toLocaleString('vi-VN'));
-  }
-
-  let html = `<div class="ic-tech-grid">`;
-  html += barItem('ais',    'AIS',        ais,    maxHV);
-  html += barItem('honhop', 'HGIS – AIS', honhop, maxHV);
-  html += barItem('gis',    'GIS',        gis,    maxHV);
-  html += barItem('hgis',   'HGIS',       hgis,   maxHV);
-  html += `</div>`;
-
-  // LV section
-  const maxV = Math.max(t22.GIS||0, t22.GIS_KCK||0, t22.KCK||0, 1);
-  html += `<div class="ic-tech-cap" style="margin-top:8px">⚡ 22 – 35kV</div>`;
-  html += `<div class="ic-tech-grid">`;
-  html += barItem('gis', 'GIS',              t22.GIS||0,     maxV);
-  html += barItem('kck', 'Khí – Chân không', t22.KCK||0,     maxV);
-  if ((t22.GIS_KCK||0) > 0)
-    html += barItem('honhop', 'GIS + KCK', t22.GIS_KCK||0, maxV);
-  html += `</div>`;
-
-  const rowsEl = document.getElementById(`tr_${uid}_${ci}`);
-  if (rowsEl) {
-    // Rebuild entire rows including dropdown (to preserve selected)
-    const dropHV = `<select class="ic-tech-cap-select" id="hvdrop_${uid}_${ci}"
-      onchange="icTechHVFilter('${uid}',${ci},this.value)">
-      <option value="all"${filterKey==='all'?' selected':''}>220 – 110kV</option>
-      <option value="220"${filterKey==='220'?' selected':''}>220kV</option>
-      <option value="110"${filterKey==='110'?' selected':''}>110kV</option>
-    </select>`;
-    const fullHtml = `<div class="ic-tech-cap" style="display:flex;align-items:center;gap:6px;justify-content:space-between">
-      <span>⚡</span>${dropHV}</div>` + html;
-    rowsEl.innerHTML = fullHtml;
-  }
-}
-
-// Legacy stub — kept for any residual onclick refs
 function icTechFilter(chipEl, uid, ci, filterKey) {
   icTechHVFilter(uid, ci, filterKey);
 }
@@ -4106,28 +4067,51 @@ function lytChipShowDetail(type) {
   });
   const typeRows = baseRows.filter(d => (d.Phan_loai_thiet_bi||'').trim() === type);
   if (!typeRows.length) return;
+
+  // Group by tram → ngan → device list
+  // Cấp 1 (item): Trạm + total ngăn
+  // Cấp 2 (children): Ngăn name + qty
   const byTram = {};
   typeRows.forEach(d => {
-    const t=(d.Tram||'').trim(); if(!t)return;
-    if(!byTram[t]) byTram[t]={ qty:0, ngans:new Set() };
+    const t  = (d.Tram||'').trim(); if(!t) return;
+    const ng = (d.Ngan_thiet_bi||'').trim() || '(không rõ ngăn)';
+    if (!byTram[t]) byTram[t] = { qty:0, ngans:{} };
     byTram[t].qty += Number(d.So_luong)||1;
-    if(d.Ngan_thiet_bi) byTram[t].ngans.add(d.Ngan_thiet_bi);
+    if (!byTram[t].ngans[ng]) byTram[t].ngans[ng] = { qty:0, names:[] };
+    byTram[t].ngans[ng].qty += Number(d.So_luong)||1;
+    const devName = (d.Ten_thiet_bi||'').trim();
+    if (devName) byTram[t].ngans[ng].names.push(devName);
   });
+
   const tramList = Object.keys(byTram).sort((a,b) => {
-    const pa=capPrio[tramMaxCap[a]]??9, pb=capPrio[tramMaxCap[b]]??9;
-    return pa!==pb?pa-pb:a.localeCompare(b,'vi');
+    const pa = capPrio[tramMaxCap[a]] ?? 9, pb = capPrio[tramMaxCap[b]] ?? 9;
+    return pa !== pb ? pa - pb : a.localeCompare(b, 'vi', { numeric: true });
   });
+
   const items = [];
-  const byC = {};
-  tramList.forEach(t=>{ const cv=tramMaxCap[t]||'?'; if(!byC[cv])byC[cv]=[]; byC[cv].push(t); });
-  ['2','1','3','4','9','6','0'].forEach(cap => {
-    const arr=byC[cap]; if(!arr?.length)return;
-    items.push({ isGroup:true, text:`── ${capLbl[cap]||cap} (${arr.length} trạm) ──`, color:capColor[cap]||'#888' });
-    arr.forEach(t => {
-      const info = byTram[t];
-      const ngans = [...info.ngans].sort();
-      items.push({ text:t, badge:`${info.qty.toLocaleString('vi-VN')} TB`, color:capColor[tramMaxCap[t]]||'#888',
-        detail: ngans.length ? ngans : null });
+  tramList.forEach(t => {
+    const info  = byTram[t];
+    const cap   = tramMaxCap[t] || '?';
+    const color = capColor[cap] || '#888';
+    const capLabel = capLbl[cap] || cap;
+    const ngansSorted = Object.entries(info.ngans).sort((a,b) => a[0].localeCompare(b[0],'vi',{numeric:true}));
+
+    // Build children: each ngan with detail = unique device names
+    const children = ngansSorted.map(([ngName, ngInfo]) => {
+      const uniqueNames = [...new Set(ngInfo.names)].sort((a,b)=>a.localeCompare(b,'vi',{numeric:true}));
+      return {
+        text:   ngName,
+        sub:    `${ngInfo.qty} TB`,
+        color,
+        detail: uniqueNames.length > 0 ? uniqueNames : null,
+      };
+    });
+
+    items.push({
+      text:  `${t} [${capLabel}]`,
+      badge: `${ngansSorted.length} ngăn · ${info.qty.toLocaleString('vi-VN')} TB`,
+      color,
+      children,
     });
   });
   const totalQty = typeRows.reduce((s,d)=>s+(Number(d.So_luong)||1),0);
@@ -4822,7 +4806,21 @@ function _recomputeStatsWithFilter() {
       case 'Ngăn liên lạc (LL)':  card.value = fmt(nganScope.ll.size); break;
       case 'Ngăn tụ bù (TBN)':    card.value = fmt(nganScope.tbn.size); break;
       case 'Ngăn tự dùng (TD)':   card.value = fmt(nganScope.td.size); break;
-      case 'Ngăn kháng':           card.value = fmt(nganScope.khang.size); break;
+      case 'Ngăn kháng': {
+        // Đếm độc lập từ _chipAllData để không bị ảnh hưởng bởi chip filter device-type
+        const allK = _chipAllData.length ? _chipAllData : rows;
+        const seen = new Set();
+        allK.forEach(d => {
+          const t  = (d.Tram||'').trim();
+          const ng = (d.Ngan_thiet_bi||'').trim();
+          if (!t || !ng) return;
+          const loai = lytNormalizeNganLoai(d.Loai_ngan_lo);
+          const pl   = (d.Phan_loai_thiet_bi||'').trim();
+          if (loai === 'Ngăn Kháng' || pl === 'K' || pl === 'Kháng') seen.add(t+'|||'+ng);
+        });
+        card.value = fmt(seen.size);
+        break;
+      }
       case 'Tổng công suất (MVA)': case 'Tổng công suất':
                                 card.value = fmt(Math.round(tongCS)); break;
     }
@@ -4830,7 +4828,7 @@ function _recomputeStatsWithFilter() {
 
   // ── Cập nhật Công nghệ TBA theo filter ──
   (function() {
-    const { tech220, tech110, tech22 } = lytComputeTech(rows);
+    const { tech220, tech110, tech22, tech35 } = lytComputeTech(rows);
     const statsItem2 = layout.find(l => l.type === 'stats');
     if (!statsItem2) return;
     const techCard = statsItem2.props.cards.find(c => c.chartType === 'tech' || (c.label||'').includes('Công nghệ'));
@@ -4838,6 +4836,7 @@ function _recomputeStatsWithFilter() {
     techCard.tech220 = { ...tech220 };
     techCard.tech110 = { ...tech110 };
     techCard.tech22  = { ...tech22  };
+    techCard.tech35  = { ...tech35  };
   })();
 
   // Update tech chart DOM trực tiếp (không chờ RAF)
@@ -5007,6 +5006,7 @@ function lytComputeTech(rows) {
   const tech220 = { AIS:0, GIS:0, HGIS:0, HGIS_AIS:0 };
   const tech110 = { AIS:0, GIS:0, HGIS:0, HGIS_AIS:0 };
   const tech22  = { GIS:0, KCK:0, GIS_KCK:0 };
+  const tech35  = { GIS:0, KCK:0, GIS_KCK:0 };
   const counted = new Set();
 
   Object.entries(tramCapTypes).forEach(([tram, capMap]) => {
@@ -5017,20 +5017,23 @@ function lytComputeTech(rows) {
       if (effCap === '2') tech220[cls] = (tech220[cls]||0) + 1;
       else                tech110[cls] = (tech110[cls]||0) + 1;
     }
-    const lvCaps = ['4','3'].filter(c => capMap[c]);
-    if (lvCaps.length > 0) {
-      const lvTypes = new Set();
-      lvCaps.forEach(cap => capMap[cap].forEach(t => lvTypes.add(t)));
-      const cls = classifyLV(lvTypes);
-      tech22[cls] = (tech22[cls]||0) + 1;
+    // 22kV separately
+    if (capMap['4']) {
+      const cls22 = classifyLV(capMap['4']);
+      tech22[cls22] = (tech22[cls22]||0) + 1;
+    }
+    // 35kV separately
+    if (capMap['3']) {
+      const cls35 = classifyLV(capMap['3']);
+      tech35[cls35] = (tech35[cls35]||0) + 1;
     }
   });
 
-  return { tech220, tech110, tech22 };
+  return { tech220, tech110, tech22, tech35 };
 }
 
 // Cập nhật card Công nghệ TBA trong layout với kết quả từ lytComputeTech
-function lytApplyTechToCard(tech220, tech110, tech22) {
+function lytApplyTechToCard(tech220, tech110, tech22, tech35) {
   const statsItem = layout.find(l => l.type === 'stats');
   if (!statsItem) return;
   const techCard = statsItem.props.cards.find(c => {
@@ -5042,6 +5045,7 @@ function lytApplyTechToCard(tech220, tech110, tech22) {
   techCard.tech220 = { ...tech220 };
   techCard.tech110 = { ...tech110 };
   techCard.tech22  = { ...tech22  };
+  techCard.tech35  = { ...(tech35 || {}) };
   // Trigger re-render chỉ stats section
   scheduleCanvasRender(statsItem.uid);
 }
@@ -5058,7 +5062,7 @@ async function loadStatsFromSupabase() {
     _recomputeStatsWithFilter();
     // Tính Công nghệ TBA từ cache (không được tính trong _recomputeStatsWithFilter)
     const { tech220, tech110, tech22 } = lytComputeTech(cached.rows);
-    lytApplyTechToCard(tech220, tech110, tech22);
+    lytApplyTechToCard(tech220, tech110, tech22, tech35);
     setTimeout(() => { renderChipsSection(); renderChartsSection(); renderTimelineSection(); renderLiveFilterSection(); }, 50);
     showToast(`⚡ Dùng cache cục bộ (${cached.rows.length.toLocaleString('vi-VN')} dòng)`);
     if (isFreshCache) return;
@@ -5199,6 +5203,7 @@ async function loadStatsFromSupabase() {
           card.tech220 = { ...tech220 };
           card.tech110 = { ...tech110 };
           card.tech22  = { ...tech22  };
+          card.tech35  = { ...tech35  };
           card.value = '';
           break;
         case 'Tổng số ngăn':
@@ -7514,6 +7519,23 @@ function _getAuthSb(){if(!_authSb&&window.supabase&&window.supabase.createClient
 function _authCurrentUser(){try{return JSON.parse(sessionStorage.getItem('evn_sess_v3'));}catch{return null;}}
 function _authSaveSession(u){sessionStorage.setItem('evn_sess_v3',JSON.stringify(u));}
 function _authClearSession(){sessionStorage.removeItem('evn_sess_v3');}
+
+/** Lấy JWT access_token hiện tại, tự refresh qua Supabase nếu cần */
+async function _authGetToken() {
+  const sb = _getAuthSb();
+  if (sb) {
+    try {
+      const { data } = await sb.auth.getSession();
+      if (data?.session?.access_token) {
+        const sess = _authCurrentUser();
+        if (sess) { sess.access_token = data.session.access_token; _authSaveSession(sess); }
+        return data.session.access_token;
+      }
+    } catch (e) { /* ignore */ }
+  }
+  return _authCurrentUser()?.access_token || '';
+}
+
 function _authGetLog(){try{return JSON.parse(localStorage.getItem(_AUTH_LOG_KEY)||'[]');}catch{return[];}}
 function _authAddLog(a,d,u){const l=_authGetLog();l.unshift({ts:new Date().toISOString(),user:u||'?',action:a,detail:d});if(l.length>500)l.length=500;try{localStorage.setItem(_AUTH_LOG_KEY,JSON.stringify(l));}catch{}}
 
@@ -7539,7 +7561,8 @@ async function _authLogin(){
     const u=data.user,meta=u.user_metadata||{};
     const role=meta.role||'user';
     const name=meta.name||meta.full_name||u.email.split('@')[0];
-    const sess={id:u.id,email:u.email,username:u.email,name,role,loginAt:new Date().toISOString()};
+    const sess={id:u.id,email:u.email,username:u.email,name,role,loginAt:new Date().toISOString(),
+                access_token:data.session?.access_token||''};
     _authSaveSession(sess);
     _authAddLog('LOGIN','Dang nhap thanh cong',sess.email);
     document.getElementById('authOverlay').style.display='none';
@@ -7564,7 +7587,8 @@ document.addEventListener('DOMContentLoaded',async()=>{
       const u=data.session.user,meta=u.user_metadata||{};
       const role=meta.role||'user';
       const name=meta.name||meta.full_name||u.email.split('@')[0];
-      const sess={id:u.id,email:u.email,username:u.email,name,role};
+      const sess={id:u.id,email:u.email,username:u.email,name,role,
+                  access_token:data.session?.access_token||''};
       _authSaveSession(sess);
       document.getElementById('authOverlay').style.display='none';
       _authInitUserMenu();
@@ -7849,10 +7873,6 @@ function _hmPanelSearch(q) {
 // ── LIVE CHIPS RENDERER ──────────────────────────────────────
 // Render device chips vào canvas section có id='deviceByType'
 // Đồng bộ logic với app.js renderTypeChips()
-
-let _chipAllData   = [];    // toàn bộ rows từ Supabase
-let _chipFiltered  = [];    // filtered rows (= _chipAllData khi không filter)
-let _selectedChips = new Set(); // chip filter state
 
 
 function _buildTramNganGroups(tramName, tRows, allNgans) {
@@ -8500,8 +8520,10 @@ const _navExtMapBBTN = {
       el.classList.add('active');
       const ov=document.getElementById('tbPageOverlay'),cv=document.getElementById('canvasArea'),rp=document.querySelector('.props-panel');
       if(ov){if(cv)cv.style.display='none';if(rp)rp.style.display='none';ov.style.display='block';}
-      if(_tnRawData.length||_tnAllData.length){_bbtnRenderPage();}
-      else{if(ov)ov.innerHTML='<div style="padding:40px;text-align:center;color:rgba(180,200,220,.6)"><i class="fas fa-spinner fa-spin" style="color:var(--accent);margin-right:8px"></i>Đang tải...</div>';if(typeof _tnFetchData==='function')_tnFetchData().then(()=>_bbtnRenderPage());}
+      // BBTN reads from NAS WebDAV directly — không phụ thuộc TN data
+      // Upload TNĐK chỉ cần modal — không phụ thuộc TN data nữa
+      const handler = _navExtMapBBTN[text];
+      if (typeof handler === 'function') handler();
       return;
     }
     if(orig) orig.call(this,el);
@@ -8970,34 +8992,24 @@ async function _bbtnLoadPath(path) {
     Đang tải danh sách từ NAS...
   </div>`;
 
-  // Check NAS config
-  if (!NAS_CONFIG.enabled || !NAS_CONFIG.baseUrl) {
-    cont.innerHTML = `<div style="padding:40px;text-align:center">
-      <i class="fas fa-exclamation-triangle" style="font-size:28px;color:#ff9100;margin-bottom:12px;display:block"></i>
-      <div style="font-size:13px;color:rgba(240,250,255,.9);font-weight:600;margin-bottom:6px">NAS chưa được cấu hình</div>
-      <div style="font-size:10.5px;color:rgba(180,200,220,.65);margin-bottom:16px">Cần cấu hình URL NAS và tài khoản trước khi xem BBTN</div>
-      ${(_authGetSession()?.role==='admin') ? '<button onclick="_nasOpenSettings()" style="padding:8px 18px;border-radius:7px;border:none;background:var(--accent);color:#000;font-weight:700;cursor:pointer;font-size:11.5px">Cấu hình NAS ngay</button>' : '<div style="font-size:10px;color:rgba(255,145,0,.7)">Liên hệ admin để cấu hình NAS</div>'}
-    </div>`;
-    return;
-  }
+  // User thường không cần NAS config — xem BBTN qua Edge Function.
+  // Chỉ admin local mới cần NAS config (để test trực tiếp).
+  // Không chặn user ở đây nữa — lỗi sẽ xuất hiện rõ trong catch bên dưới.
 
-  // Fetch directory listing via WebDAV PROPFIND
+  // Fetch directory listing via WebDAV PROPFIND (qua Edge Function)
   try {
     const items = await _bbtnPropfind(path);
     _bbtnRenderItems(items, path, rootPath, segments.length);
   } catch (err) {
-    console.error('PROPFIND error:', err);
+    console.error('BBTN load error:', err);
+    const isAuthErr = err.message?.includes('hết hạn') || err.message?.includes('đăng nhập');
     cont.innerHTML = `<div style="padding:40px;text-align:center">
       <i class="fas fa-times-circle" style="font-size:28px;color:#ff5252;margin-bottom:12px;display:block"></i>
-      <div style="font-size:13px;color:rgba(240,250,255,.9);font-weight:600;margin-bottom:6px">Không kết nối được NAS</div>
+      <div style="font-size:13px;color:rgba(240,250,255,.9);font-weight:600;margin-bottom:6px">${isAuthErr ? 'Phiên đăng nhập hết hạn' : 'Không tải được danh sách BBTN'}</div>
       <div style="font-size:10.5px;color:rgba(180,200,220,.65);margin-bottom:8px;font-family:var(--font-mono)">${err.message||'Unknown error'}</div>
-      <div style="font-size:10px;color:rgba(255,145,0,.7);max-width:480px;margin:0 auto;line-height:1.6">
-        <b>Khắc phục:</b><br>
-        1. Kiểm tra URL NAS, username/password trong Cài đặt NAS<br>
-        2. Bật WebDAV trên DSM (Control Panel → File Services → WebDAV)<br>
-        3. Nếu lỗi CORS: cấu hình Reverse Proxy với Access-Control-Allow-Origin trên NAS<br>
-        4. Nếu HTTPS với cert tự ký: truy cập <a href="${NAS_CONFIG.baseUrl}" target="_blank" style="color:var(--accent)">${NAS_CONFIG.baseUrl}</a> để chấp nhận chứng chỉ trước
-      </div>
+      ${isAuthErr
+        ? '<button onclick="_authLogout()" style="padding:8px 18px;border-radius:7px;border:none;background:#ff5252;color:#fff;font-weight:700;cursor:pointer;font-size:11.5px">Đăng nhập lại</button>'
+        : '<div style="font-size:10px;color:rgba(255,145,0,.7);max-width:400px;margin:0 auto;line-height:1.6">Kiểm tra kết nối mạng hoặc liên hệ admin nếu lỗi vẫn tiếp tục.</div>'}
     </div>`;
   }
 }
@@ -9007,68 +9019,37 @@ async function _bbtnLoadPath(path) {
  * Returns: [{ name, isFolder, size, modified, href, fullUrl }]
  */
 
+/**
+ * Lấy danh sách thư mục/file BBTN qua Supabase Edge Function bbtn-list
+ * Không gọi NAS trực tiếp — không cần NAS config ở client — không lộ credentials
+ */
 async function _bbtnPropfind(path) {
-  const fullUrl = NAS_CONFIG.baseUrl.replace(/\/$/,'') + path;
-  const propfindBody = `<?xml version="1.0" encoding="utf-8"?>
-<d:propfind xmlns:d="DAV:">
-  <d:prop>
-    <d:displayname/>
-    <d:resourcetype/>
-    <d:getcontentlength/>
-    <d:getlastmodified/>
-  </d:prop>
-</d:propfind>`;
+  const token = await _authGetToken();
+  if (!token) throw new Error('Chưa đăng nhập hoặc phiên hết hạn');
 
-  const resp = await fetch(fullUrl, {
-    method: 'PROPFIND',
+  const edgeUrl = _AUTH_SB_URL.replace(/\/$/, '')
+    + '/functions/v1/bbtn-list'
+    + '?path=' + encodeURIComponent(path);
+
+  const resp = await fetch(edgeUrl, {
     headers: {
-      'Content-Type': 'application/xml; charset=utf-8',
-      'Depth':        '1',
-      ...nasAuthHeader(),
-    },
-    body: propfindBody,
-    credentials: 'omit',
+      'Authorization': 'Bearer ' + token,
+      'apikey': _AUTH_SB_KEY,
+    }
   });
 
-  if (!resp.ok && resp.status !== 207) {
-    if (resp.status === 401) throw new Error('Sai tài khoản/mật khẩu (401)');
-    if (resp.status === 404) throw new Error('Đường dẫn không tồn tại (404): ' + path);
-    throw new Error('HTTP ' + resp.status);
+  if (!resp.ok) {
+    const txt = await resp.text().catch(() => resp.statusText);
+    if (resp.status === 401) throw new Error('Phiên đăng nhập hết hạn, vui lòng đăng nhập lại');
+    if (resp.status === 403) throw new Error('Không có quyền truy cập thư mục này');
+    if (resp.status === 503) throw new Error('NAS chưa được cấu hình — Admin cần set Supabase Secrets');
+    let msg = txt; try { msg = JSON.parse(txt).error || txt; } catch {}
+    throw new Error('Lỗi server: ' + (msg.length < 200 ? msg : msg.substring(0,200)));
   }
 
-  const xmlText = await resp.text();
-  const parser  = new DOMParser();
-  const doc     = parser.parseFromString(xmlText, 'text/xml');
-  const responses = doc.getElementsByTagNameNS('DAV:', 'response');
-  const items = [];
-  for (let i = 0; i < responses.length; i++) {
-    const r = responses[i];
-    const href = r.getElementsByTagNameNS('DAV:', 'href')[0]?.textContent || '';
-    // Skip self entry (the directory itself)
-    const decodedHref = decodeURIComponent(href);
-    const normalized  = decodedHref.replace(/\/$/,'');
-    const pathNormalized = path.replace(/\/$/,'');
-    if (normalized.endsWith(pathNormalized) || normalized === pathNormalized) continue;
-
-    const isFolder = !!r.getElementsByTagNameNS('DAV:', 'collection').length;
-    const sizeNode = r.getElementsByTagNameNS('DAV:', 'getcontentlength')[0];
-    const dateNode = r.getElementsByTagNameNS('DAV:', 'getlastmodified')[0];
-    const nameRaw  = decodedHref.replace(/\/$/,'').split('/').pop();
-    items.push({
-      name:     nameRaw,
-      isFolder,
-      size:     sizeNode ? parseInt(sizeNode.textContent,10) : 0,
-      modified: dateNode ? new Date(dateNode.textContent) : null,
-      href:     decodedHref,
-      fullUrl:  NAS_CONFIG.baseUrl.replace(/\/$/,'') + (decodedHref.startsWith('/') ? decodedHref : '/' + decodedHref),
-    });
-  }
-  // Sort: folders first, then alphabetically
-  items.sort((a,b) => {
-    if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
-    return a.name.localeCompare(b.name, 'vi', { numeric: true });
-  });
-  return items;
+  const json = await resp.json();
+  if (json.error) throw new Error(json.error);
+  return json.items || [];
 }
 
 /**
@@ -9146,7 +9127,7 @@ function _bbtnRenderItems(items, path, rootPath, depth) {
                         png:['fa-file-image','#e040fb'], jpg:['fa-file-image','#e040fb'], jpeg:['fa-file-image','#e040fb'],
                         zip:['fa-file-archive','#ffd740'], rar:['fa-file-archive','#ffd740'] };
       const [iconCls, iconCol] = iconMap[ext] || ['fa-file','#90a4ae'];
-      const safeUrl = f.fullUrl.replace(/'/g,"\\'");
+      const safeRelPath = (f.relativePath||'').replace(/'/g,"\\'");
       html += `<tr style="border-top:1px solid rgba(255,255,255,.04);${i%2?'background:rgba(255,255,255,.015)':''}">
         <td style="padding:7px 12px;color:rgba(235,248,255,.92)">
           <i class="fas ${iconCls}" style="color:${iconCol};margin-right:8px;width:14px;text-align:center"></i>${f.name}
@@ -9154,8 +9135,8 @@ function _bbtnRenderItems(items, path, rootPath, depth) {
         <td style="padding:7px 12px;text-align:right;font-family:var(--font-mono);color:rgba(180,200,220,.75);font-size:10px">${fmtSize(f.size)}</td>
         <td style="padding:7px 12px;text-align:right;font-family:var(--font-mono);color:rgba(180,200,220,.65);font-size:10px">${fmtDate(f.modified)}</td>
         <td style="padding:7px 12px;text-align:center;white-space:nowrap">
-          <a href="${f.fullUrl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:5px;border:1px solid rgba(0,200,255,.3);background:rgba(0,200,255,.08);color:var(--accent);font-size:9.5px;text-decoration:none;margin-right:4px"><i class="fas fa-eye"></i> Xem</a>
-          <button onclick="_bbtnCopyLink('${safeUrl}')" style="padding:3px 9px;border-radius:5px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:rgba(200,218,235,.85);font-size:9.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="fas fa-link"></i> Sao chép</button>
+          <button onclick="_bbtnViewFile('${safeRelPath}',false)" style="padding:3px 9px;border-radius:5px;border:1px solid rgba(0,200,255,.3);background:rgba(0,200,255,.08);color:var(--accent);font-size:9.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;margin-right:4px"><i class="fas fa-eye"></i> Xem</button>
+          <button onclick="_bbtnViewFile('${safeRelPath}',true)" style="padding:3px 9px;border-radius:5px;border:1px solid rgba(0,230,118,.3);background:rgba(0,230,118,.08);color:#00e676;font-size:9.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="fas fa-download"></i> Tải</button>
         </td>
       </tr>`;
     });
@@ -9177,3 +9158,195 @@ function _bbtnCopyLink(url) {
     () => showChangeNotif('error', 'Không sao chép được', '')
   );
 }
+
+/**
+ * Xem hoặc tải file BBTN qua Supabase Edge Function bbtn-download
+ * User chỉ cần đăng nhập — không cần NAS config, không lộ NAS URL/credentials
+ * @param {string} relativePath - đường dẫn file trả về từ bbtn-list
+ * @param {boolean} forceDownload - true = tải về, false = mở xem trong tab mới
+ */
+async function _bbtnViewFile(relativePath, forceDownload = false) {
+  if (!relativePath) { showChangeNotif('error','Lỗi','Không có đường dẫn file'); return; }
+  if (!forceDownload) showChangeNotif('info', 'Đang tải file...', relativePath.split('/').pop() || '');
+  try {
+    const token = await _authGetToken();
+    if (!token) { showChangeNotif('error','Chưa đăng nhập','Vui lòng đăng nhập lại'); return; }
+
+    const edgeBase = _AUTH_SB_URL.replace(/\/$/, '') + '/functions/v1/bbtn-download';
+    const url = edgeBase + '?path=' + encodeURIComponent(relativePath) + (forceDownload ? '&download=1' : '');
+
+    const resp = await fetch(url, {
+      headers: { 'Authorization': 'Bearer ' + token, 'apikey': _AUTH_SB_KEY }
+    });
+
+    if (!resp.ok) {
+      const errTxt = await resp.text().catch(() => `HTTP ${resp.status}`);
+      let msg = errTxt; try { msg = JSON.parse(errTxt).error || errTxt; } catch {}
+      throw new Error(msg.length < 150 ? msg : `HTTP ${resp.status}`);
+    }
+
+    const blob = await resp.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const fileName = decodeURIComponent(relativePath.split('/').pop() || 'file');
+
+    if (forceDownload) {
+      const a = document.createElement('a');
+      a.href = blobUrl; a.download = fileName;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+      showChangeNotif('success', 'Đang tải xuống', fileName);
+    } else {
+      const tab = window.open(blobUrl, '_blank');
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+      if (!tab) {
+        // Popup bị chặn → tải về thay thế
+        showChangeNotif('warn', 'Popup bị chặn — đang tải về', fileName);
+        const a = document.createElement('a');
+        a.href = blobUrl; a.download = fileName; a.click();
+      }
+    }
+  } catch (err) {
+    console.error('[_bbtnViewFile]', err);
+    showChangeNotif('error', 'Lỗi tải file', err.message || 'Vui lòng thử lại');
+  }
+}
+
+function icTechLVFilter(uid, ci, filterKey) {
+  const item = layout.find(l => l.uid === uid);
+  const c = item?.props?.cards?.[ci];
+  if (!c) return;
+  c._lvFilter = filterKey;
+  markModified();
+
+  const t22 = c.tech22 || { GIS:0, KCK:0, GIS_KCK:0 };
+  const t35 = c.tech35 || { GIS:0, KCK:0, GIS_KCK:0 };
+
+  function barItem(cls, label, val, maxVal) {
+    const pct = maxVal > 0 ? Math.round((val / maxVal) * 100) : 0;
+    return `<div class="ic-tech-bar-item">
+      <span class="ic-tech-bar-label ${cls}">${label}</span>
+      <span class="ic-tech-bar-number ${cls}">${val}</span>
+      <div class="ic-tech-bar-track">
+        <div class="ic-tech-bar-fill ${cls}" style="width:${pct}%"></div>
+      </div>
+    </div>`;
+  }
+
+  let lvGis, lvKck, lvHonhop;
+  if (filterKey === 'all') {
+    lvGis    = (t22.GIS||0)     + (t35.GIS||0);
+    lvKck    = (t22.KCK||0)     + (t35.KCK||0);
+    lvHonhop = (t22.GIS_KCK||0) + (t35.GIS_KCK||0);
+  } else if (filterKey === '35') {
+    lvGis = t35.GIS||0; lvKck = t35.KCK||0; lvHonhop = t35.GIS_KCK||0;
+  } else { // '22'
+    lvGis = t22.GIS||0; lvKck = t22.KCK||0; lvHonhop = t22.GIS_KCK||0;
+  }
+  const total = lvGis + lvKck + lvHonhop;
+  if (!total) {
+    // Hide if empty
+    const lvBlock = document.getElementById(`lvblock_${uid}_${ci}`);
+    if (lvBlock) lvBlock.style.display = 'none';
+    return;
+  }
+  const maxV = Math.max(lvGis, lvKck, lvHonhop, 1);
+
+  const dropLV = `<select class="ic-tech-cap-select" id="lvdrop_${uid}_${ci}"
+    onchange="icTechLVFilter('${uid}',${ci},this.value)">
+    <option value="all"${filterKey==='all'?' selected':''}>22 – 35kV</option>
+    <option value="22"${filterKey==='22'?' selected':''}>22kV</option>
+    <option value="35"${filterKey==='35'?' selected':''}>35kV</option>
+  </select>`;
+  let html = `<div class="ic-tech-cap" style="display:flex;align-items:center;gap:6px;justify-content:space-between;margin-top:8px">
+    <span>⚡</span>${dropLV}</div>`;
+  html += `<div class="ic-tech-grid">`;
+  if (lvGis    > 0) html += barItem('gis',    'GIS',                  lvGis,    maxV);
+  if (lvHonhop > 0) html += barItem('honhop', 'GIS – Khí - Chân không', lvHonhop, maxV);
+  if (lvKck    > 0) html += barItem('kck',    'Khí – Chân không',     lvKck,    maxV);
+  html += `</div>`;
+
+  // Find the rows container — re-render whole tech card (HV + LV)
+  const rowsEl = document.getElementById(`tr_${uid}_${ci}`);
+  if (rowsEl) {
+    // Trigger HV re-render to keep both in sync
+    if (typeof icTechHVFilter === 'function') {
+      icTechHVFilter(uid, ci, c._hvFilter || 'all');
+    }
+  }
+}
+
+  // HV section (re-render rows div only, keep dropdown)
+  let ais, gis, hgis, honhop;
+  if (filterKey === 'all') {
+    ais    = (t220.AIS||0)      + (t110.AIS||0);
+    gis    = (t220.GIS||0)      + (t110.GIS||0);
+    hgis   = (t220.HGIS||0)    + (t110.HGIS||0);
+    honhop = (t220.HGIS_AIS||0) + (t110.HGIS_AIS||0);
+  } else {
+    const t = filterKey === '220' ? t220 : t110;
+    ais = t.AIS||0; gis = t.GIS||0; hgis = t.HGIS||0; honhop = t.HGIS_AIS||0;
+  }
+  const maxHV = Math.max(ais, gis, hgis, honhop, 1);
+
+  // Also update 1 STATS total display for 220/110
+  if (filterKey === '220') {
+    setText('total220kV', (t220.AIS+t220.GIS+t220.HGIS+t220.HGIS_AIS).toLocaleString('vi-VN'));
+  } else if (filterKey === '110') {
+    setText('total110kV', (t110.AIS+t110.GIS+t110.HGIS+t110.HGIS_AIS).toLocaleString('vi-VN'));
+  }
+
+  let html = `<div class="ic-tech-grid">`;
+  html += barItem('ais',    'AIS',        ais,    maxHV);
+  html += barItem('honhop', 'HGIS – AIS', honhop, maxHV);
+  html += barItem('gis',    'GIS',        gis,    maxHV);
+  html += barItem('hgis',   'HGIS',       hgis,   maxHV);
+  html += `</div>`;
+
+  // LV section — same dropdown structure as HV
+  const c2  = layout.find(l => l.uid === uid)?.props?.cards?.[ci];
+  const t35 = c2?.tech35 || { GIS:0, KCK:0, GIS_KCK:0 };
+  const lvF = c2?._lvFilter || 'all';
+  let lvGis, lvKck, lvHonhop;
+  if (lvF === 'all') {
+    lvGis    = (t22.GIS||0)     + (t35.GIS||0);
+    lvKck    = (t22.KCK||0)     + (t35.KCK||0);
+    lvHonhop = (t22.GIS_KCK||0) + (t35.GIS_KCK||0);
+  } else if (lvF === '35') {
+    lvGis = t35.GIS||0; lvKck = t35.KCK||0; lvHonhop = t35.GIS_KCK||0;
+  } else { // '22'
+    lvGis = t22.GIS||0; lvKck = t22.KCK||0; lvHonhop = t22.GIS_KCK||0;
+  }
+  const lvTotal = lvGis + lvKck + lvHonhop;
+  if (lvTotal > 0) {
+    const maxV = Math.max(lvGis, lvKck, lvHonhop, 1);
+    const dropLV = `<select class="ic-tech-cap-select" id="lvdrop_${uid}_${ci}"
+      onchange="icTechLVFilter('${uid}',${ci},this.value)">
+      <option value="all"${lvF==='all'?' selected':''}>22 – 35kV</option>
+      <option value="22"${lvF==='22'?' selected':''}>22kV</option>
+      <option value="35"${lvF==='35'?' selected':''}>35kV</option>
+    </select>`;
+    html += `<div class="ic-tech-cap" style="display:flex;align-items:center;gap:6px;justify-content:space-between;margin-top:8px">
+      <span>⚡</span>${dropLV}</div>`;
+    html += `<div class="ic-tech-grid">`;
+    if (lvGis    > 0) html += barItem('gis',    'GIS',                  lvGis,    maxV);
+    if (lvHonhop > 0) html += barItem('honhop', 'GIS – Khí - Chân không', lvHonhop, maxV);
+    if (lvKck    > 0) html += barItem('kck',    'Khí – Chân không',     lvKck,    maxV);
+    html += `</div>`;
+  }
+
+  const rowsEl = document.getElementById(`tr_${uid}_${ci}`);
+  if (rowsEl) {
+    // Rebuild entire rows including dropdown (to preserve selected)
+    const dropHV = `<select class="ic-tech-cap-select" id="hvdrop_${uid}_${ci}"
+      onchange="icTechHVFilter('${uid}',${ci},this.value)">
+      <option value="all"${filterKey==='all'?' selected':''}>220 – 110kV</option>
+      <option value="220"${filterKey==='220'?' selected':''}>220kV</option>
+      <option value="110"${filterKey==='110'?' selected':''}>110kV</option>
+    </select>`;
+    const fullHtml = `<div class="ic-tech-cap" style="display:flex;align-items:center;gap:6px;justify-content:space-between">
+      <span>⚡</span>${dropHV}</div>` + html;
+    rowsEl.innerHTML = fullHtml;
+  }
+}
+
+// Legacy stub — kept for any residual onclick refs
