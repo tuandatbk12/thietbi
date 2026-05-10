@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 /* ═══════════════════════════════════════
    DESIGN TOKENS
@@ -5851,7 +5852,8 @@ function lytBuildNganMap(rows) {
     { key:'TBN',   fn: d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn TBN' },
     { key:'TD',    fn: d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'NgănTD' },
     { key:'KHANG', fn: d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn Kháng' ||
-                            (d.Phan_loai_thiet_bi || '').trim() === 'K' },
+                            (d.Phan_loai_thiet_bi || '').trim() === 'K' ||
+                            (d.Phan_loai_thiet_bi || '').trim() === 'Kháng' },
   ];
   const map = {};
   rows.forEach(d => {
@@ -8581,10 +8583,13 @@ async function loadStatsFromSupabase() {
     allRows.filter(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'NgănTD')
       .forEach(d => { if (d.Tram && d.Ngan_thiet_bi) nganTDSet.add(d.Tram + '|||' + d.Ngan_thiet_bi); });
 
-    // Ngăn kháng: Loai_ngan_lo = 'Ngăn Kháng' HOẶC Phan_loai_thiet_bi = 'K'
+    // Ngăn kháng: Loai_ngan_lo = 'Ngăn Kháng' HOẶC Phan_loai_thiet_bi = 'K' / 'Kháng'
     const nganKhangSet = new Set();
-    allRows.filter(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn Kháng' ||
-                        (d.Phan_loai_thiet_bi || '').trim() === 'K')
+    allRows.filter(d => {
+        const loai = lytNormalizeNganLoai(d.Loai_ngan_lo);
+        const pl = (d.Phan_loai_thiet_bi || '').trim();
+        return loai === 'Ngăn Kháng' || pl === 'K' || pl === 'Kháng';
+      })
       .forEach(d => { if (d.Tram && d.Ngan_thiet_bi) nganKhangSet.add(d.Tram + '|||' + d.Ngan_thiet_bi); });
 
     // ── 5. Công nghệ TBA — dùng lytComputeTech ──
@@ -11705,9 +11710,186 @@ async function nasTestConnection() {
 // ══════════════════════════════════════════════════════
 // MODULE: QUẢN LÝ BBTN (với NAS link)
 // ══════════════════════════════════════════════════════
+
+/** Quay về Dashboard từ BBTN */
+function _bbtnBackToDashboard() {
+  const dashboardNav = Array.from(document.querySelectorAll('.nav-item'))
+    .find(el => (el.querySelector('span')?.textContent || '').trim() === 'Dashboard');
+  if (dashboardNav) {
+    dashboardNav.click();
+  } else {
+    const ov = document.getElementById('tbPageOverlay');
+    const cv = document.getElementById('canvasArea');
+    const rp = document.querySelector('.props-panel');
+    if (ov) { ov.style.display = 'none'; ov.innerHTML = ''; }
+    if (cv) cv.style.display = '';
+    if (rp) rp.style.display = '';
+    if (typeof render === 'function') render();
+  }
+}
+
+/** Populate Đội/Năm/Trạm dropdowns từ data Supabase */
+function _bbtnPopulateFilters() {
+  const data = (Array.isArray(_chipAllData) && _chipAllData.length) ? _chipAllData
+              : (Array.isArray(_tnAllData) && _tnAllData.length) ? _tnAllData : [];
+  if (!data.length) return;
+
+  // Đội
+  const dois = [...new Set(data.map(d => (d.Doi||'').trim()).filter(Boolean))]
+    .sort((a,b) => a.localeCompare(b,'vi',{numeric:true}));
+  const selDoi = document.getElementById('_bbtnSelDoi');
+  if (selDoi) {
+    selDoi.innerHTML = '<option value="">— Đội —</option>' + dois.map(d => `<option value="${d}">${d}</option>`).join('');
+    if (window._bbtnFilter.doi) selDoi.value = window._bbtnFilter.doi;
+  }
+
+  // Năm: lấy từ Nam_van_hanh + Nam_san_xuat (chỉ các năm gần đây)
+  const curYear = new Date().getFullYear();
+  const years = [];
+  for (let y = curYear; y >= curYear - 5; y--) years.push(y);
+  const selNam = document.getElementById('_bbtnSelNam');
+  if (selNam) {
+    selNam.innerHTML = '<option value="">— Năm —</option>' + years.map(y => `<option value="${y}">${y}</option>`).join('');
+    if (window._bbtnFilter.nam) selNam.value = window._bbtnFilter.nam;
+  }
+
+  // Trạm: filter theo Đội nếu có
+  _bbtnPopulateTrams();
+}
+
+/** Populate Trạm dropdown - cascaded theo Đội */
+function _bbtnPopulateTrams() {
+  const data = (Array.isArray(_chipAllData) && _chipAllData.length) ? _chipAllData : [];
+  const doi = window._bbtnFilter.doi;
+  let trams = data;
+  if (doi) trams = trams.filter(d => (d.Doi||'').trim() === doi);
+  const tramList = [...new Set(trams.map(d => (d.Tram||'').trim()).filter(Boolean))]
+    .sort((a,b) => a.localeCompare(b,'vi',{numeric:true}));
+  const selTram = document.getElementById('_bbtnSelTram');
+  if (selTram) {
+    selTram.innerHTML = '<option value="">— Trạm —</option>' + tramList.map(t => `<option value="${t}">${t}</option>`).join('');
+    if (window._bbtnFilter.tram && tramList.includes(window._bbtnFilter.tram)) selTram.value = window._bbtnFilter.tram;
+    else window._bbtnFilter.tram = '';
+  }
+}
+
+/** Khi 1 dropdown thay đổi */
+function _bbtnFilterChange(field, value) {
+  window._bbtnFilter[field] = value;
+  // Đội đổi → reset Trạm và populate lại
+  if (field === 'doi') {
+    window._bbtnFilter.tram = '';
+    _bbtnPopulateTrams();
+  }
+  _bbtnFilterApply();
+}
+
+/** Áp filter — re-render items đang hiển thị */
+function _bbtnFilterApply() {
+  const search = document.getElementById('_bbtnSearch')?.value || '';
+  window._bbtnFilter.search = search.trim().toLowerCase();
+  // Re-render với items hiện tại nếu có
+  if (window._bbtnLastItems) {
+    _bbtnRenderItems(window._bbtnLastItems, window._bbtnLastPath, window._bbtnLastRoot, window._bbtnLastDepth);
+  }
+}
+
+/** Xoá tất cả filter */
+function _bbtnFilterClear() {
+  window._bbtnFilter = { doi: '', nam: '', tram: '', search: '' };
+  const sb = document.getElementById('_bbtnSearch'); if (sb) sb.value = '';
+  const sd = document.getElementById('_bbtnSelDoi'); if (sd) sd.value = '';
+  const sn = document.getElementById('_bbtnSelNam'); if (sn) sn.value = '';
+  _bbtnPopulateTrams();
+  _bbtnFilterApply();
+}
+
+/** Toggle chọn 1 thư mục Trạm */
+function _bbtnToggleSelect(folderName) {
+  if (!folderName) return;
+  if (window._bbtnSelected.has(folderName)) window._bbtnSelected.delete(folderName);
+  else window._bbtnSelected.add(folderName);
+  _bbtnUpdateZipBtn();
+}
+
+/** Cập nhật trạng thái nút Tải ZIP */
+function _bbtnUpdateZipBtn() {
+  const cnt = window._bbtnSelected.size;
+  const btn = document.getElementById('_bbtnZipBtn');
+  const cntEl = document.getElementById('_bbtnSelCnt');
+  if (cntEl) cntEl.textContent = '(' + cnt + ')';
+  if (btn) {
+    btn.disabled = cnt === 0;
+    btn.style.opacity = cnt === 0 ? '.4' : '1';
+  }
+}
+
+/** Tải ZIP các trạm đã chọn */
+async function _bbtnDownloadSelectedZip() {
+  if (typeof JSZip === 'undefined') {
+    showChangeNotif('error', 'Lỗi', 'JSZip chưa được tải, refresh trang lại');
+    return;
+  }
+  const sel = Array.from(window._bbtnSelected);
+  if (!sel.length) return;
+
+  const currentPath = (window._bbtnState && window._bbtnState.path) || (NAS_CONFIG.bbtnPath || '/BBTN');
+  const btn = document.getElementById('_bbtnZipBtn');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang gộp ZIP...'; }
+
+  try {
+    const zip = new JSZip();
+    let totalFiles = 0, errCount = 0;
+
+    for (const folderName of sel) {
+      const folderPath = currentPath.replace(/\/$/, '') + '/' + folderName;
+      try {
+        const items = await _bbtnPropfind(folderPath);
+        const files = (items || []).filter(it => !it.isFolder);
+        for (const f of files) {
+          try {
+            const token = await _authGetToken();
+            const url = _AUTH_SB_URL.replace(/\/$/, '') + '/functions/v1/bbtn-download'
+                      + '?path=' + encodeURIComponent(f.relativePath || '');
+            const resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token, 'apikey': _AUTH_SB_KEY }});
+            if (!resp.ok) { errCount++; continue; }
+            const blob = await resp.blob();
+            zip.file(folderName + '/' + (f.name || 'file'), blob);
+            totalFiles++;
+          } catch (e) { errCount++; console.warn('File error:', f.name, e); }
+        }
+      } catch (e) { errCount++; console.warn('Folder error:', folderName, e); }
+    }
+
+    if (totalFiles === 0) throw new Error('Không tải được file nào');
+
+    showChangeNotif('info', 'Đang nén ZIP...', totalFiles + ' file');
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 }});
+    const blobUrl = URL.createObjectURL(blob);
+    const fileName = 'BBTN_' + sel.length + 'tram_' + new Date().toISOString().slice(0,10) + '.zip';
+    const a = document.createElement('a'); a.href = blobUrl; a.download = fileName;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+
+    showChangeNotif('success', 'Đã tải ZIP', totalFiles + ' file' + (errCount ? ', ' + errCount + ' lỗi' : ''));
+    window._bbtnSelected.clear();
+    if (window._bbtnLastItems) _bbtnRenderItems(window._bbtnLastItems, window._bbtnLastPath, window._bbtnLastRoot, window._bbtnLastDepth);
+  } catch (err) {
+    console.error('[ZIP]', err);
+    showChangeNotif('error', 'Lỗi tải ZIP', err.message || 'Vui lòng thử lại');
+  } finally {
+    if (btn) { btn.disabled = window._bbtnSelected.size === 0; btn.innerHTML = orig; _bbtnUpdateZipBtn(); }
+  }
+}
+
 function _bbtnRenderPage() {
   const overlay = document.getElementById('tbPageOverlay');
   if (!overlay) return;
+
+  // Init filter & selection state
+  if (!window._bbtnFilter) window._bbtnFilter = { doi: '', nam: '', tram: '', search: '' };
+  if (!window._bbtnSelected) window._bbtnSelected = new Set();
 
   // Initial render (loading + path breadcrumb)
   overlay.innerHTML = `<div style="padding:0 0 32px">
@@ -11718,16 +11900,38 @@ function _bbtnRenderPage() {
         <div style="font-size:10px;color:rgba(180,200,220,.65);margin-top:3px">Trình duyệt thư mục NAS Synology • Cấu trúc: <code style="color:var(--accent);font-size:9.5px">BBTN/Đơn vị/Năm/Trạm/File</code></div>
       </div>
       <div style="margin-left:auto;display:flex;gap:8px">
+        <button onclick="_bbtnBackToDashboard()" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(140,160,180,.3);background:rgba(255,255,255,.04);color:rgba(220,232,245,.85);font-size:10.5px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-arrow-left"></i> Dashboard</button>
         <button onclick="_bbtnRefresh()" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(0,200,255,.3);background:rgba(0,200,255,.08);color:var(--accent);font-size:10.5px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-sync-alt"></i> Tải lại</button>
         ${(_authGetSession()?.role==='admin') ? `<button onclick="_nasOpenSettings()" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(255,215,64,.3);background:rgba(255,215,64,.08);color:#ffd740;font-size:10.5px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-cog"></i> Cài đặt NAS</button>` : ''}
       </div>
     </div>
+
+    <!-- Filter bar -->
+    <div id="_bbtnFilterBar" style="display:flex;align-items:center;gap:8px;padding:8px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:8px;margin-bottom:12px;flex-wrap:wrap">
+      <div style="position:relative;flex:1;min-width:220px">
+        <i class="fas fa-search" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:rgba(180,200,220,.4);font-size:10px"></i>
+        <input id="_bbtnSearch" type="text" placeholder="Tìm theo tên thư mục/file..." oninput="_bbtnFilterApply()" style="width:100%;padding:7px 10px 7px 30px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.25);color:rgba(235,248,255,.92);font-size:11px;outline:none">
+      </div>
+      <select id="_bbtnSelDoi" onchange="_bbtnFilterChange('doi', this.value)" style="padding:7px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.25);color:rgba(235,248,255,.92);font-size:11px;min-width:160px;cursor:pointer">
+        <option value="">— Đội —</option>
+      </select>
+      <select id="_bbtnSelNam" onchange="_bbtnFilterChange('nam', this.value)" style="padding:7px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.25);color:rgba(235,248,255,.92);font-size:11px;min-width:100px;cursor:pointer">
+        <option value="">— Năm —</option>
+      </select>
+      <select id="_bbtnSelTram" onchange="_bbtnFilterChange('tram', this.value)" style="padding:7px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.25);color:rgba(235,248,255,.92);font-size:11px;min-width:140px;cursor:pointer">
+        <option value="">— Trạm —</option>
+      </select>
+      <button onclick="_bbtnFilterClear()" style="padding:7px 11px;border-radius:6px;border:1px solid rgba(255,82,82,.3);background:rgba(255,82,82,.08);color:#ff5252;font-size:10.5px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-times"></i> Xoá lọc</button>
+      <button id="_bbtnZipBtn" onclick="_bbtnDownloadSelectedZip()" disabled style="padding:7px 13px;border-radius:6px;border:1px solid rgba(0,230,118,.3);background:rgba(0,230,118,.08);color:#00e676;font-size:10.5px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;opacity:.4"><i class="fas fa-file-archive"></i> Tải ZIP <span id="_bbtnSelCnt">(0)</span></button>
+    </div>
+
     <div id="_bbtnBreadcrumb" style="display:flex;align-items:center;gap:6px;padding:10px 14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:8px;margin-bottom:14px;font-size:11px;color:rgba(200,220,235,.85);flex-wrap:wrap"></div>
     <div id="_bbtnContent" style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:10px;min-height:240px"></div>
   </div>`;
 
   // Init state
   if (!window._bbtnState) window._bbtnState = { path: '', stack: [] };
+  _bbtnPopulateFilters();
   _bbtnLoadPath(NAS_CONFIG.bbtnPath || '/BBTN');
 }
 
@@ -11771,6 +11975,11 @@ async function _bbtnLoadPath(path) {
   // Fetch directory listing via WebDAV PROPFIND (qua Edge Function)
   try {
     const items = await _bbtnPropfind(path);
+    // Lưu để filter có thể re-render
+    window._bbtnLastItems = items;
+    window._bbtnLastPath = path;
+    window._bbtnLastRoot = rootPath;
+    window._bbtnLastDepth = segments.length;
     _bbtnRenderItems(items, path, rootPath, segments.length);
   } catch (err) {
     console.error('BBTN load error:', err);
@@ -11825,6 +12034,36 @@ async function _bbtnPropfind(path) {
 function _bbtnRenderItems(items, path, rootPath, depth) {
   const cont = document.getElementById('_bbtnContent');
   if (!cont) return;
+
+  // Lọc file hệ thống / file admin với user thường
+  const isAdmin = _authGetSession()?.role === 'admin';
+  if (!isAdmin) {
+    const SYSTEM_FILE_PATTERNS = [
+      /^cloudflared/i,        // cloudflared binary
+      /^\./,                   // hidden files (.DS_Store, .git, ...)
+      /^thumbs\.db$/i,        // Windows thumbnail cache
+      /^desktop\.ini$/i,      // Windows folder config
+      /\.tmp$/i, /\.bak$/i,   // temp/backup
+      /^@eaDir$/i,            // Synology metadata
+    ];
+    items = items.filter(it => !SYSTEM_FILE_PATTERNS.some(re => re.test(it.name || '')));
+  }
+
+  // Áp filter từ filter bar (search/đội/năm/trạm) — match theo tên thư mục/file
+  const flt = window._bbtnFilter || {};
+  const filterTokens = [];
+  if (flt.search) filterTokens.push(flt.search.toLowerCase());
+  if (flt.doi) filterTokens.push(flt.doi.toLowerCase());
+  if (flt.nam) filterTokens.push(String(flt.nam).toLowerCase());
+  if (flt.tram) filterTokens.push(flt.tram.toLowerCase());
+  if (filterTokens.length) {
+    items = items.filter(it => {
+      const nm = (it.name || '').toLowerCase();
+      // Match nếu CHỨA bất kỳ token nào (OR) — UX dễ chịu hơn AND
+      return filterTokens.some(tok => nm.includes(tok));
+    });
+  }
+
   const fmtSize = b => {
     if (!b) return '—';
     if (b < 1024) return b + ' B';
@@ -11854,18 +12093,31 @@ function _bbtnRenderItems(items, path, rootPath, depth) {
       <i class="fas fa-folder" style="color:#ffd740;margin-right:6px"></i>${folderTypeLbl} (${folders.length})
     </div>`;
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:18px">';
+    // Khi đang ở level mà folder con là Trạm (depth=2: BBTN/Đơn vị/Năm/[Trạm]), enable checkbox để chọn nhiều
+    const isTramLevel = depth >= 2;
     folders.forEach(f => {
       const newPath = path.replace(/\/$/,'') + '/' + f.name;
-      html += `<div onclick="_bbtnLoadPath('${newPath.replace(/'/g,"\\'")}')"
-        style="padding:14px 16px;border-radius:9px;border:1px solid rgba(255,215,64,.18);background:rgba(255,215,64,.04);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:10px"
-        onmouseover="this.style.borderColor='rgba(255,215,64,.5)';this.style.background='rgba(255,215,64,.08)'"
-        onmouseout="this.style.borderColor='rgba(255,215,64,.18)';this.style.background='rgba(255,215,64,.04)'">
-        <i class="fas fa-folder" style="font-size:20px;color:#ffd740;flex-shrink:0"></i>
-        <div style="min-width:0;flex:1">
-          <div style="font-size:11.5px;font-weight:700;color:rgba(240,250,255,.95);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</div>
-          <div style="font-size:9px;color:rgba(180,200,220,.55);margin-top:2px">${fmtDate(f.modified)}</div>
+      const safeName = f.name.replace(/'/g,"\\'");
+      const isSelected = window._bbtnSelected && window._bbtnSelected.has(f.name);
+      const checkboxHtml = isTramLevel
+        ? `<div onclick="event.stopPropagation();_bbtnToggleSelect('${safeName}');this.querySelector('input').checked=!this.querySelector('input').checked;this.parentElement.style.borderColor=this.querySelector('input').checked?'#00e676':'rgba(255,215,64,.18)'" style="display:flex;align-items:center;cursor:pointer">
+            <input type="checkbox" ${isSelected?'checked':''} style="width:16px;height:16px;cursor:pointer;accent-color:#00e676">
+          </div>`
+        : '';
+      const borderCol = isSelected ? '#00e676' : 'rgba(255,215,64,.18)';
+      const bgCol = isSelected ? 'rgba(0,230,118,.06)' : 'rgba(255,215,64,.04)';
+      html += `<div style="padding:14px 16px;border-radius:9px;border:1px solid ${borderCol};background:${bgCol};transition:all .15s;display:flex;align-items:center;gap:10px">
+        ${checkboxHtml}
+        <div onclick="_bbtnLoadPath('${newPath.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:10px;flex:1;cursor:pointer;min-width:0"
+          onmouseover="this.parentElement.style.borderColor='${isSelected?'#00e676':'rgba(255,215,64,.5)'}'"
+          onmouseout="this.parentElement.style.borderColor='${borderCol}'">
+          <i class="fas fa-folder" style="font-size:20px;color:#ffd740;flex-shrink:0"></i>
+          <div style="min-width:0;flex:1">
+            <div style="font-size:11.5px;font-weight:700;color:rgba(240,250,255,.95);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</div>
+            <div style="font-size:9px;color:rgba(180,200,220,.55);margin-top:2px">${fmtDate(f.modified)}</div>
+          </div>
+          <i class="fas fa-chevron-right" style="font-size:10px;color:rgba(180,200,220,.4);flex-shrink:0"></i>
         </div>
-        <i class="fas fa-chevron-right" style="font-size:10px;color:rgba(180,200,220,.4);flex-shrink:0"></i>
       </div>`;
     });
     html += '</div>';
