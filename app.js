@@ -7520,6 +7520,9 @@ function _authCurrentUser(){try{return JSON.parse(sessionStorage.getItem('evn_se
 function _authSaveSession(u){sessionStorage.setItem('evn_sess_v3',JSON.stringify(u));}
 function _authClearSession(){sessionStorage.removeItem('evn_sess_v3');}
 
+/** Alias để tương thích với code cũ dùng _authGetSession() */
+function _authGetSession() { return _authCurrentUser(); }
+
 /** Lấy JWT access_token hiện tại, tự refresh qua Supabase nếu cần */
 async function _authGetToken() {
   const sb = _getAuthSb();
