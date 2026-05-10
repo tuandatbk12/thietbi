@@ -86,11 +86,13 @@ body.user-mode {
     "sidebar canvas  props" !important;
 }
 body.user-mode .sidebar          { display: flex !important; }
-body.user-mode .nav-item:not(.nav-user-allowed),
+/* Phương án C: User xem tất cả menu — KHÔNG ẩn nav items theo whitelist nữa.
+   Layout Editor và Admin Panel đã được ẩn riêng qua các rule khác bên dưới. */
+/* body.user-mode .nav-item:not(.nav-user-allowed),
 body.user-mode .nav-sub-item:not(.nav-user-allowed),
 body.user-mode .nav-section:not(.nav-user-allowed) { display: none !important; }
 body.user-mode .nav-label                          { display: none !important; }
-body.user-mode .nav-label.nav-user-allowed         { display: block !important; }
+body.user-mode .nav-label.nav-user-allowed         { display: block !important; } */
 body.user-mode .props-panel      { display: none !important; }
 body.user-mode .statusbar        { display: none !important; }
 body.user-mode .topbar           {
@@ -12381,7 +12383,9 @@ async function _tnApproveRequest(reqId, approved, reqData) {
 
 // NavExtMap for BBTN
 // Define which nav items each role can access
-const _navUserAllowed = ['Dashboard','Quản lý BBTN'];
+// Phương án C: User được vào tất cả menu (xem-only).
+// Chỉ chặn các trang admin/editor (Layout editor đã bị ẩn UI bởi CSS user-mode).
+const _navUserBlocked = []; // để rỗng = không chặn page nào với user
 
 const _navExtMapBBTN = {
   'Quản lý BBTN': _bbtnRenderPage,
@@ -12394,17 +12398,17 @@ const _navExtMapBBTN = {
     if(ov){ov.style.display='none';}
     if(cv){cv.style.display='none';}
     if(rp){rp.style.display='none';}
-    if(sec){sec.style.display='block'; _uploadUpdateNasStatus();}
+    if(sec){sec.style.display='block'; if(typeof _uploadUpdateNasStatus==='function')_uploadUpdateNasStatus();}
   },
 };
 (function(){
   const orig = window.navActivate;
   window.navActivate = function(el) {
     const text = (el.querySelector('span')?.textContent||el.textContent||'').trim();
-    // Role gate: user chỉ được vào allowed list
+    // Role gate: user bị chặn các page trong _navUserBlocked
     const sess = (typeof _authGetSession==='function') ? _authGetSession() : null;
-    if (sess?.role === 'user' && !_navUserAllowed.includes(text)) {
-      if (typeof showChangeNotif === 'function') showChangeNotif('warn','Truy cập bị giới hạn','Tài khoản user chỉ xem được Dashboard và Quản lý BBTN');
+    if (sess?.role === 'user' && _navUserBlocked.includes(text)) {
+      if (typeof showChangeNotif === 'function') showChangeNotif('warn','Truy cập bị giới hạn','Tính năng này chỉ dành cho admin');
       return;
     }
     if (_navExtMapBBTN[text]) {
@@ -12416,6 +12420,23 @@ const _navExtMapBBTN = {
       else{if(ov)ov.innerHTML='<div style="padding:40px;text-align:center;color:rgba(180,200,220,.6)"><i class="fas fa-spinner fa-spin" style="color:var(--accent);margin-right:8px"></i>Đang tải...</div>';if(typeof _tnFetchData==='function')_tnFetchData().then(()=>_bbtnRenderPage());}
       return;
     }
+    // Đóng upload section nếu đang mở (khi navigate sang trang khác)
+    const uploadSec = document.getElementById('uploadSection');
+    if (uploadSec && uploadSec.style.display !== 'none') uploadSec.style.display = 'none';
+
+    // Khi quay về Dashboard hoặc page khác: clear overlay BBTN content + restore canvas
+    if (text === 'Dashboard') {
+      const ov=document.getElementById('tbPageOverlay'),cv=document.getElementById('canvasArea'),rp=document.querySelector('.props-panel');
+      if(ov){ov.style.display='none'; ov.innerHTML='';}  // clear BBTN content để không tốn memory
+      if(cv){cv.style.display='';}
+      if(rp){rp.style.display='';}
+      // Re-render dashboard để đảm bảo state đúng
+      document.querySelectorAll('.nav-item.active,.nav-sub-item.active').forEach(e=>e.classList.remove('active'));
+      el.classList.add('active');
+      if (typeof render === 'function') render();
+      return;
+    }
+
     if(orig) orig.call(this,el);
   };
 })();
