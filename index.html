@@ -11066,6 +11066,8 @@ async function _authLogin(){
     showChangeNotif('success','Dang nhap thanh cong','Xin chao '+name+'!');
     // Load pending requests for admin
     if (role === 'admin') setTimeout(_tnLoadPendingRequests, 500);
+    // Xử lý URL approve_pwd nếu có (admin click email)
+    setTimeout(() => { try { _checkApprovePwdUrl(); } catch(e){} }, 800);
   }catch(err){
     errEl.textContent='Loi ket noi: '+err.message;
   }finally{
@@ -11088,11 +11090,18 @@ document.addEventListener('DOMContentLoaded',async()=>{
       document.getElementById('authOverlay').style.display='none';
       _authInitUserMenu();
       _authApplyRoleUI(role);
+      // Xử lý URL approve_pwd nếu có
+      setTimeout(() => { try { _checkApprovePwdUrl(); } catch(e){} }, 800);
       return;
     }
   }catch{}
   const sess=_authCurrentUser();
-  if(sess){document.getElementById('authOverlay').style.display='none';_authInitUserMenu();_authApplyRoleUI(sess.role);}
+  if(sess){
+    document.getElementById('authOverlay').style.display='none';
+    _authInitUserMenu();
+    _authApplyRoleUI(sess.role);
+    setTimeout(() => { try { _checkApprovePwdUrl(); } catch(e){} }, 800);
+  }
 });
 
 async function _authLogout(){
@@ -11142,33 +11151,119 @@ function _openChangePassword(){
   const ex=document.getElementById('_changePwModal');if(ex)ex.remove();
   const modal=document.createElement('div');modal.id='_changePwModal';
   modal.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center';
-  modal.innerHTML=`<div style="background:var(--bg-surface);border:1px solid var(--border-accent);border-radius:14px;padding:28px 32px;width:360px;box-shadow:0 8px 48px rgba(0,0,0,.7)">
-    <div style="font-size:14px;font-weight:800;color:var(--text-primary);margin-bottom:20px"><i class="fas fa-key" style="color:var(--accent);margin-right:8px"></i>Doi mat khau</div>
+  modal.innerHTML=`<div style="background:var(--bg-surface);border:1px solid var(--border-accent);border-radius:14px;padding:28px 32px;width:380px;box-shadow:0 8px 48px rgba(0,0,0,.7)">
+    <div style="font-size:14px;font-weight:800;color:var(--text-primary);margin-bottom:8px"><i class="fas fa-key" style="color:var(--accent);margin-right:8px"></i>Doi mat khau</div>
+    <div style="font-size:10.5px;color:#ffd740;background:rgba(255,215,64,.07);border:1px solid rgba(255,215,64,.2);border-radius:6px;padding:8px 10px;margin-bottom:16px;line-height:1.5"><i class="fas fa-info-circle" style="margin-right:5px"></i>Yêu cầu sẽ được gửi qua email đến admin để duyệt. Sau khi admin duyệt, mật khẩu mới có hiệu lực.</div>
+    <div style="margin-bottom:12px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Mat khau hien tai</label><input id="_cpCur" type="password" class="auth-input" placeholder="Nhap mat khau dang dung"></div>
     <div style="margin-bottom:12px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Mat khau moi</label><input id="_cpNew" type="password" class="auth-input" placeholder="Toi thieu 6 ky tu"></div>
     <div style="margin-bottom:16px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Xac nhan mat khau moi</label><input id="_cpCfm" type="password" class="auth-input" placeholder="Nhap lai"></div>
     <div id="_cpErr" style="font-size:11px;color:var(--red);min-height:14px;margin-bottom:10px"></div>
     <div style="display:flex;gap:8px">
-      <button class="auth-btn" style="flex:1" id="_cpBtn" onclick="_doChangePassword()">Xac nhan</button>
+      <button class="auth-btn" style="flex:1" id="_cpBtn" onclick="_doChangePassword()">Gui yeu cau</button>
       <button onclick="document.getElementById('_changePwModal').remove()" style="flex:0.5;padding:10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:13px;cursor:pointer">Huy</button>
     </div></div>`;
   document.body.appendChild(modal);
 }
 async function _doChangePassword(){
+  const cur=document.getElementById('_cpCur').value;
   const nw=document.getElementById('_cpNew').value,cf=document.getElementById('_cpCfm').value;
   const er=document.getElementById('_cpErr'),btn=document.getElementById('_cpBtn');
   er.textContent='';
-  if(nw.length<6){er.textContent='Mat khau it nhat 6 ky tu';return;}
+  if(!cur){er.textContent='Nhap mat khau hien tai';return;}
+  if(nw.length<6){er.textContent='Mat khau moi it nhat 6 ky tu';return;}
   if(nw!==cf){er.textContent='Xac nhan khong khop';return;}
-  if(btn){btn.disabled=true;btn.textContent='Dang cap nhat...';}
+  if(nw===cur){er.textContent='Mat khau moi phai khac mat khau cu';return;}
+  if(btn){btn.disabled=true;btn.textContent='Dang gui yeu cau...';}
   try{
-    const sb=_getAuthSb();
-    const{error}=await sb.auth.updateUser({password:nw});
-    if(error){er.textContent='Loi: '+error.message;return;}
-    _authAddLog('CHANGE_PASSWORD','Doi mat khau thanh cong',(_authCurrentUser()||{}).email||'');
+    const token=await _authGetToken();
+    if(!token){er.textContent='Phien dang nhap het han, dang nhap lai';return;}
+    const url=_AUTH_SB_URL.replace(/\/$/,'')+'/functions/v1/request-password-change';
+    const resp=await fetch(url,{
+      method:'POST',
+      headers:{
+        'Authorization':'Bearer '+token,
+        'apikey':_AUTH_SB_KEY,
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify({current_password:cur,new_password:nw})
+    });
+    const data=await resp.json().catch(()=>({}));
+    if(!resp.ok){er.textContent=data.error||('Loi '+resp.status);return;}
+    _authAddLog('PASSWORD_CHANGE_REQUEST','Gui yeu cau doi mat khau',(_authCurrentUser()||{}).email||'');
     document.getElementById('_changePwModal').remove();
-    showChangeNotif('success','Doi mat khau thanh cong','');
+    showChangeNotif('success','Da gui yeu cau','Cho admin duyet qua email mtuandat@gmail.com');
   }catch(err){er.textContent='Loi: '+err.message;}
-  finally{if(btn){btn.disabled=false;btn.textContent='Xac nhan';}}
+  finally{if(btn){btn.disabled=false;btn.textContent='Gui yeu cau';}}
+}
+
+/** Xử lý URL ?approve_pwd=<token>&action=approve|reject khi admin click email */
+async function _checkApprovePwdUrl(){
+  const params=new URLSearchParams(window.location.search);
+  const token=params.get('approve_pwd');
+  const action=params.get('action');
+  if(!token||!['approve','reject'].includes(action))return;
+
+  // Xoá query param khỏi URL ngay (tránh user F5 lặp)
+  history.replaceState(null,'',window.location.pathname);
+
+  // Phải đăng nhập admin
+  const sess=_authGetSession();
+  if(!sess){
+    showChangeNotif('error','Can dang nhap','Dang nhap admin de duyet yeu cau');
+    return;
+  }
+
+  const isAdmin=sess.role==='admin'||sess.email==='mtuandat@gmail.com';
+  if(!isAdmin){
+    showChangeNotif('error','Khong co quyen','Chi admin duyet duoc yeu cau doi mat khau');
+    return;
+  }
+
+  // Modal xác nhận
+  const ex=document.getElementById('_approvePwdModal');if(ex)ex.remove();
+  const modal=document.createElement('div');modal.id='_approvePwdModal';
+  modal.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center';
+  const isApprove=action==='approve';
+  const titleColor=isApprove?'#00e676':'#ff5252';
+  const titleIcon=isApprove?'fa-check-circle':'fa-times-circle';
+  const titleText=isApprove?'Xac nhan duyet doi mat khau':'Xac nhan tu choi yeu cau';
+  modal.innerHTML=`<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:14px;padding:28px 32px;width:400px;box-shadow:0 8px 48px rgba(0,0,0,.7)">
+    <div style="font-size:14px;font-weight:800;color:${titleColor};margin-bottom:14px"><i class="fas ${titleIcon}" style="margin-right:8px"></i>${titleText}</div>
+    <div style="font-size:12.5px;color:var(--text-secondary);line-height:1.6;margin-bottom:16px">
+      Token: <code style="font-size:10.5px;color:var(--text-primary);word-break:break-all">${token}</code>
+    </div>
+    <div id="_apErr" style="font-size:11px;color:var(--red);min-height:14px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px">
+      <button class="auth-btn" style="flex:1;background:${titleColor}" id="_apBtn" onclick="_doApprovePwd('${token}','${action}')">${isApprove?'Duyet':'Tu choi'}</button>
+      <button onclick="document.getElementById('_approvePwdModal').remove()" style="flex:0.5;padding:10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:13px;cursor:pointer">Bo qua</button>
+    </div></div>`;
+  document.body.appendChild(modal);
+}
+
+async function _doApprovePwd(token,action){
+  const er=document.getElementById('_apErr'),btn=document.getElementById('_apBtn');
+  er.textContent='';
+  if(btn){btn.disabled=true;btn.textContent='Dang xu ly...';}
+  try{
+    const tk=await _authGetToken();
+    if(!tk){er.textContent='Phien hien tai loi, dang nhap lai';return;}
+    const url=_AUTH_SB_URL.replace(/\/$/,'')+'/functions/v1/approve-password-change';
+    const resp=await fetch(url,{
+      method:'POST',
+      headers:{
+        'Authorization':'Bearer '+tk,
+        'apikey':_AUTH_SB_KEY,
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify({token,action})
+    });
+    const data=await resp.json().catch(()=>({}));
+    if(!resp.ok){er.textContent=data.error||('Loi '+resp.status);return;}
+    _authAddLog('PASSWORD_CHANGE_'+action.toUpperCase(),data.message||'',data.user_email||'');
+    document.getElementById('_approvePwdModal').remove();
+    showChangeNotif('success',action==='approve'?'Da duyet doi mat khau':'Da tu choi yeu cau',data.message||'');
+  }catch(err){er.textContent='Loi: '+err.message;}
+  finally{if(btn){btn.disabled=false;btn.textContent=action==='approve'?'Duyet':'Tu choi';}}
 }
 
 function _authApplyRoleUI(role){
