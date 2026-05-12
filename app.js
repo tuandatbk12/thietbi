@@ -5505,6 +5505,8 @@ function _tbApply() {
     return _tbSortAsc ? va.localeCompare(vb,'vi') : vb.localeCompare(va,'vi');
   });
   _tbPage = 1;
+  // Expose globally for asset module
+  window._tbFiltered = _tbFiltered;
 }
 
 // ── STATS ─────────────────────────────────────────────────────
@@ -5833,6 +5835,9 @@ function _tbShowLyLich(idx) {
         <i class="fas fa-file-export"></i> Xuất lý lịch CSV
       </button>
     </div>`;
+  // Store row data on panel for asset module
+  p.dataset.assetIdx = idx;
+  window._tbCurrentRow = r;
   if (typeof _assetLoadGallery === 'function') setTimeout(() => _assetLoadGallery(idx), 50);
   p.style.right='0';
   document.getElementById('_tbLyLichBd').style.display='block';
@@ -9358,21 +9363,29 @@ function icTechLVFilter(uid, ci, filterKey) {
 
 
 // ═══════════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════════
 // MODULE: ASSET ATTACHMENTS (Ảnh & Tài liệu thiết bị)
 // 
-// Tích hợp vào panel _tbShowLyLich:
-//   - Hiển thị gallery ảnh + danh sách tài liệu của thiết bị
-//   - Form upload ảnh hoặc tài liệu
-//   - Xóa file (user: trong 3 ngày + của mình, admin: bất kỳ lúc nào)
+// Tích hợp vào panel _tbShowLyLich — áp dụng cho TẤT CẢ loại thiết bị
+// (MBA, MC, DCL, TU, TI, CSV, Cáp, MBATD, ...) miễn là panel mở qua
+// _tbShowLyLich (tức là Bảng "Lý lịch chi tiết" trong sidebar Thiết bị).
 //
 // Phụ thuộc:
-//   - _AUTH_SB_URL, _AUTH_SB_KEY (Supabase config — đã có)
-//   - _authGetToken() (lấy JWT — đã có)
-//   - _authGetSession() (lấy user info — đã có)
-//   - window._sbClient (Supabase client — đã có)
-//   - _tbFiltered (mảng device đang hiển thị — đã có)
+//   - _AUTH_SB_URL, _AUTH_SB_KEY, _authGetToken(), _authGetSession()
+//   - window._sbClient (Supabase JS client)
+//   - window._tbFiltered (đã expose ở _lfApply)
+//   - window._tbCurrentRow (đã set ở _tbShowLyLich)
 // ═══════════════════════════════════════════════════════════════
+
+/** Lấy row hiện tại từ _tbFiltered[idx] hoặc fallback _tbCurrentRow */
+function _assetGetRow(idx) {
+  // Ưu tiên window._tbFiltered (đã expose)
+  if (window._tbFiltered && window._tbFiltered[idx]) return window._tbFiltered[idx];
+  // Fallback: row được set lúc panel mở
+  if (window._tbCurrentRow) return window._tbCurrentRow;
+  // Last resort: thử biến _tbFiltered direct (nếu cùng scope)
+  try { if (typeof _tbFiltered !== 'undefined' && _tbFiltered[idx]) return _tbFiltered[idx]; } catch(e){}
+  return null;
+}
 
 /** Tạo asset_key (định danh thiết bị) từ 5 trường */
 function makeAssetKey(r) {
@@ -9416,7 +9429,7 @@ function _assetSectionHtml(idx) {
                                             text-align:center;margin-bottom:6px;min-height:14px">
         Chưa chọn file
       </div>
-      <input id="_assetNote_${idx}" type="text" placeholder="Ghi chú (vd: Ảnh tem MBA, Biên bản TN T6/2025...)"
+      <input id="_assetNote_${idx}" type="text" placeholder="Ghi chú (vd: Ảnh tem, Biên bản TN T6/2025...)"
         style="width:100%;padding:7px 9px;border-radius:6px;border:1px solid rgba(255,255,255,.12);
                background:rgba(255,255,255,.04);color:rgba(235,248,255,.9);font-size:10.5px;
                outline:none;box-sizing:border-box;margin-bottom:6px">
@@ -9453,8 +9466,11 @@ function _assetFileChosen(idx) {
 
 /** Load gallery (ảnh + tài liệu đã có) từ Supabase */
 async function _assetLoadGallery(idx) {
-  const r = _tbFiltered[idx];
-  if (!r) return;
+  const r = _assetGetRow(idx);
+  if (!r) {
+    console.warn('[_assetLoadGallery] Không lấy được row data');
+    return;
+  }
   const gEl = document.getElementById('_assetGallery_' + idx);
   if (!gEl || !window._sbClient) return;
 
@@ -9485,7 +9501,6 @@ async function _assetLoadGallery(idx) {
     const now = Date.now();
     const THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
 
-    // Check user có thể xóa file nào không (in 3 days + của mình)
     const canDeleteFile = (f) => {
       if (isAdmin) return true;
       if (f.uploaded_by_email !== myEmail) return false;
@@ -9495,7 +9510,6 @@ async function _assetLoadGallery(idx) {
 
     let html = '';
 
-    // ── Section: Ảnh ──
     if (photos.length) {
       html += `<div style="font-size:10px;color:rgba(0,230,118,.7);margin-bottom:5px;font-weight:600">
         <i class="fas fa-camera" style="margin-right:4px"></i>Ảnh hiện trường (${photos.length})
@@ -9526,7 +9540,6 @@ async function _assetLoadGallery(idx) {
       html += '</div>';
     }
 
-    // ── Section: Tài liệu ──
     if (docs.length) {
       html += `<div style="font-size:10px;color:rgba(0,150,255,.7);margin-bottom:5px;font-weight:600">
         <i class="fas fa-file-alt" style="margin-right:4px"></i>Tài liệu (${docs.length})
@@ -9573,8 +9586,11 @@ async function _assetLoadGallery(idx) {
 
 /** Upload file (ảnh hoặc tài liệu) */
 async function _assetDoUpload(idx) {
-  const r = _tbFiltered[idx];
-  if (!r) return;
+  const r = _assetGetRow(idx);
+  if (!r) {
+    alert('Không lấy được thông tin thiết bị. Vui lòng đóng panel và mở lại.');
+    return;
+  }
   const inp = document.getElementById('_assetFile_' + idx);
   const note = document.getElementById('_assetNote_' + idx)?.value?.trim() || '';
   const statusEl = document.getElementById('_assetStatus_' + idx);
@@ -9587,13 +9603,11 @@ async function _assetDoUpload(idx) {
   const file = inp.files[0];
   const fileType = file.type.startsWith('image/') ? 'image' : 'document';
 
-  // UI: disable + show progress
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang tải...';
   if (statusEl) { statusEl.style.color = '#ffd740'; statusEl.textContent = 'Đang mã hóa file...'; }
 
   try {
-    // ── 1. Encode Base64 ──
     const fileBase64 = await new Promise((res, rej) => {
       const reader = new FileReader();
       reader.onload = () => res(reader.result.split(',')[1]);
@@ -9603,11 +9617,9 @@ async function _assetDoUpload(idx) {
 
     if (statusEl) statusEl.textContent = 'Đang upload lên NAS...';
 
-    // ── 2. Lấy JWT ──
     const token = await _authGetToken();
     if (!token) throw new Error('Chưa đăng nhập — vui lòng login lại');
 
-    // ── 3. Gọi Edge Function asset-upload ──
     const url = _AUTH_SB_URL.replace(/\/$/, '') + '/functions/v1/asset-upload';
     const resp = await fetch(url, {
       method: 'POST',
@@ -9635,18 +9647,15 @@ async function _assetDoUpload(idx) {
     const result = await resp.json();
     if (!result.success) throw new Error(result.error || `HTTP ${resp.status}`);
 
-    // ── 4. Thành công ──
     if (statusEl) {
       statusEl.style.color = '#00e676';
       statusEl.textContent = `✅ Upload thành công! ${fileType === 'image' ? 'Ảnh' : 'Tài liệu'} đã lưu trên NAS.`;
     }
 
-    // Reset form
     inp.value = '';
     document.getElementById('_assetFileLbl_' + idx).textContent = 'Chưa chọn file';
     document.getElementById('_assetNote_' + idx).value = '';
 
-    // Refresh gallery sau 300ms
     setTimeout(() => _assetLoadGallery(idx), 300);
 
   } catch (e) {
@@ -9680,7 +9689,6 @@ async function _assetView(id) {
     const blob = await resp.blob();
     const blobUrl = URL.createObjectURL(blob);
     window.open(blobUrl, '_blank');
-    // Cleanup sau 1 phút
     setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
   } catch (e) {
     alert('Không mở được file: ' + e.message);
