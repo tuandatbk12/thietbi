@@ -7574,6 +7574,7 @@ async function _authLogin(){
     const sess={id:u.id,email:u.email,username:u.email,name,role,loginAt:new Date().toISOString(),
                 access_token:data.session?.access_token||''};
     _authSaveSession(sess);
+    window._sbClient = _getAuthSb(); // ← khởi tạo _sbClient ngay sau login
     _authAddLog('LOGIN','Dang nhap thanh cong',sess.email);
     document.getElementById('authOverlay').style.display='none';
     _authInitUserMenu();
@@ -7600,6 +7601,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
       const sess={id:u.id,email:u.email,username:u.email,name,role,
                   access_token:data.session?.access_token||''};
       _authSaveSession(sess);
+      window._sbClient = _getAuthSb(); // ← khởi tạo _sbClient khi restore session
       document.getElementById('authOverlay').style.display='none';
       _authInitUserMenu();
       _authApplyRoleUI(role);
@@ -7607,7 +7609,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
     }
   }catch{}
   const sess=_authCurrentUser();
-  if(sess){document.getElementById('authOverlay').style.display='none';_authInitUserMenu();_authApplyRoleUI(sess.role);}
+  if(sess){window._sbClient = _getAuthSb(); document.getElementById('authOverlay').style.display='none';_authInitUserMenu();_authApplyRoleUI(sess.role);}
 });
 
 async function _authLogout(){
