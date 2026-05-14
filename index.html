@@ -11066,6 +11066,7 @@ async function _authLogin(){
     const sess={id:u.id,email:u.email,username:u.email,name,role,loginAt:new Date().toISOString(),
                 access_token:data.session?.access_token||''};
     _authSaveSession(sess);
+    window._sbClient = _getAuthSb(); // ← khởi tạo _sbClient ngay sau login
     _authAddLog('LOGIN','Dang nhap thanh cong',sess.email);
     document.getElementById('authOverlay').style.display='none';
     _authInitUserMenu();
@@ -11094,6 +11095,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
       const sess={id:u.id,email:u.email,username:u.email,name,role,
                   access_token:data.session?.access_token||''};
       _authSaveSession(sess);
+      window._sbClient = _getAuthSb(); // ← khởi tạo _sbClient khi restore session
       document.getElementById('authOverlay').style.display='none';
       _authInitUserMenu();
       _authApplyRoleUI(role);
@@ -11104,6 +11106,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
   }catch{}
   const sess=_authCurrentUser();
   if(sess){
+    window._sbClient = _getAuthSb(); // ← khởi tạo _sbClient từ sessionStorage
     document.getElementById('authOverlay').style.display='none';
     _authInitUserMenu();
     _authApplyRoleUI(sess.role);
@@ -12905,22 +12908,7 @@ async function _assetLoadGallery(idx) {
     return;
   }
   const gEl = document.getElementById('_assetGallery_' + idx);
-  if (!gEl) return;
-
-  // Nếu _sbClient chưa sẵn sàng → thử lại tối đa 10 lần, mỗi lần 400ms
-  if (!window._sbClient) {
-    const retry = parseInt(gEl.dataset.sbRetry || '0', 10);
-    if (retry < 10) {
-      gEl.dataset.sbRetry = String(retry + 1);
-      setTimeout(() => _assetLoadGallery(idx), 400);
-    } else {
-      gEl.innerHTML = `<div style="font-size:10px;color:#ff9100;text-align:center;padding:10px 0">
-        <i class="fas fa-exclamation-triangle" style="margin-right:5px"></i>
-        Chưa kết nối Supabase — thử đăng xuất và đăng nhập lại
-      </div>`;
-    }
-    return;
-  }
+  if (!gEl || !window._sbClient) return;
 
   const assetKey = makeAssetKey(r);
 
