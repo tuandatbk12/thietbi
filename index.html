@@ -11016,6 +11016,9 @@ const _AUTH_SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 const _AUTH_LOG_KEY='evn_audit_log_v1';
 let _authSb=null;
 function _getAuthSb(){if(!_authSb&&window.supabase&&window.supabase.createClient)_authSb=window.supabase.createClient(_AUTH_SB_URL,_AUTH_SB_KEY);return _authSb;}
+// Khởi tạo _sbClient NGAY khi script load (không đợi DOMContentLoaded/login)
+// → các module Asset / TNĐK / Update Requests luôn có _sbClient sẵn sàng
+try { window._sbClient = _getAuthSb(); } catch(e) { console.warn('_sbClient init failed:', e); }
 function _authCurrentUser(){try{return JSON.parse(sessionStorage.getItem('evn_sess_v3'));}catch{return null;}}
 function _authSaveSession(u){sessionStorage.setItem('evn_sess_v3',JSON.stringify(u));}
 function _authClearSession(){sessionStorage.removeItem('evn_sess_v3');}
