@@ -12905,7 +12905,22 @@ async function _assetLoadGallery(idx) {
     return;
   }
   const gEl = document.getElementById('_assetGallery_' + idx);
-  if (!gEl || !window._sbClient) return;
+  if (!gEl) return;
+
+  // Nếu _sbClient chưa sẵn sàng → thử lại tối đa 10 lần, mỗi lần 400ms
+  if (!window._sbClient) {
+    const retry = parseInt(gEl.dataset.sbRetry || '0', 10);
+    if (retry < 10) {
+      gEl.dataset.sbRetry = String(retry + 1);
+      setTimeout(() => _assetLoadGallery(idx), 400);
+    } else {
+      gEl.innerHTML = `<div style="font-size:10px;color:#ff9100;text-align:center;padding:10px 0">
+        <i class="fas fa-exclamation-triangle" style="margin-right:5px"></i>
+        Chưa kết nối Supabase — thử đăng xuất và đăng nhập lại
+      </div>`;
+    }
+    return;
+  }
 
   const assetKey = makeAssetKey(r);
 
