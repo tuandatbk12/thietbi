@@ -5034,8 +5034,11 @@ const LYT_CAP_LABEL  = {'0':'TT','1':'110kV','2':'220kV','3':'35kV','4':'22kV','
 const LYT_CAP_ORDER  = ['2','1','3','4','9','6','0'];
 const LYT_CAP_COLORS = {'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
 const LYT_TECH_COLORS = {AIS:'#00c8ff', GIS:'#b388ff', HGIS:'#18ffff', HGIS_AIS:'#ff9100'};
-const LYT_DATA_CACHE_KEY = 'evn_supabase_rows_cache_v6';
-const LYT_DATA_CACHE_META_KEY = 'evn_supabase_rows_cache_meta_v6';
+// ── Cache version v7: bump khi structure/logic thay đổi ──
+// v6 → v7: fix logic đếm Ngăn Kháng (sync 3 điều kiện với panel detail)
+// Bump version → user tự động fetch lại data mới, không phải bấm "Tải lại"
+const LYT_DATA_CACHE_KEY = 'evn_supabase_rows_cache_v7';
+const LYT_DATA_CACHE_META_KEY = 'evn_supabase_rows_cache_meta_v7';
 // ── Tối ưu #8: tăng cache TTL từ 30 phút lên 24 giờ ──
 // Data điện lực rất ít thay đổi (vài ngày 1 lần) → cache 24h an toàn.
 // Khi cần force refresh: bấm nút "Tải lại" trên dashboard hoặc xóa localStorage.
@@ -5211,7 +5214,27 @@ async function loadStatsFromSupabase() {
   const cached = lytReadRowsCache();
   const cacheAge = cached?.meta?.ts ? (Date.now() - cached.meta.ts) : Number.POSITIVE_INFINITY;
   const isFreshCache = cacheAge < LYT_CACHE_FRESH_MS;
+
+  // ── Cache validation triệt để: check row count từ server ──
+  // Nếu count khác với cache → data đã thay đổi → invalidate cache
+  let serverCount = null;
+  let cacheValid = true;
   if (cached?.rows?.length) {
+    try {
+      const sbCheck = window.supabase.createClient(_SB_URL, _SB_KEY);
+      const { count } = await sbCheck.from('TongHopThietBi').select('*', { count: 'exact', head: true });
+      serverCount = count;
+      const cachedCount = cached.meta?.count || cached.rows.length;
+      if (count != null && count !== cachedCount) {
+        console.log(`[cache] Server có ${count} rows, cache có ${cachedCount} → invalidate`);
+        cacheValid = false;
+      }
+    } catch (e) {
+      console.warn('[cache] Không check được server count, dùng cache:', e);
+    }
+  }
+
+  if (cached?.rows?.length && cacheValid) {
     _chipAllData = cached.rows;
     _chipFiltered = [...cached.rows];
     _selectedChips.clear();
@@ -5222,6 +5245,13 @@ async function loadStatsFromSupabase() {
     setTimeout(() => { renderChipsSection(); renderChartsSection(); renderTimelineSection(); renderLiveFilterSection(); }, 50);
     showToast(`⚡ Dùng cache cục bộ (${cached.rows.length.toLocaleString('vi-VN')} dòng)`);
     if (isFreshCache) return;
+  } else if (!cacheValid) {
+    // Cache invalid → xóa luôn
+    try {
+      localStorage.removeItem(LYT_DATA_CACHE_KEY);
+      localStorage.removeItem(LYT_DATA_CACHE_META_KEY);
+    } catch(_) {}
+    showToast('🔄 Phát hiện dữ liệu mới — đang tải lại...');
   } else {
     showToast('⏳ Đang tải dữ liệu từ Supabase...');
   }
@@ -6434,7 +6464,7 @@ const _TN_TABLE     = 'CongTacThiNghiem';
 const _TN_SB_URL    = 'https://xqqmfmljwycpehfyknoy.supabase.co';
 const _TN_SB_KEY    = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxcW1mbWxqd3ljcGVoZnlrbm95Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODM4MDQsImV4cCI6MjA4Nzg1OTgwNH0.J_z0cFqq_Yet-n2X2L_VREdkcAqbkRFpYUp-ti3Fukc';
 const _TN_WARN_DAYS = 30;
-const _TN_CACHE_KEY = 'evn_tn_cache_v2';
+const _TN_CACHE_KEY = 'evn_tn_cache_v3';
 // ── Tối ưu #8: tăng TN cache từ 15 phút lên 12 giờ ──
 const _TN_CACHE_TTL = 12 * 60 * 60 * 1000;
 
@@ -6526,16 +6556,35 @@ function _tnAlertBadge(row) {
 
 // ── DATA FETCH ────────────────────────────────────────────────
 async function _tnFetchData() {
+  const sb = window.supabase ? window.supabase.createClient(_TN_SB_URL, _TN_SB_KEY) : null;
+  if (!sb) return [];
+
+  // ── Cache + row count check triệt để ──
+  let cachedData = null, cachedCount = null;
   try {
     const cached = localStorage.getItem(_TN_CACHE_KEY);
     if (cached) {
       const { ts, data } = JSON.parse(cached);
-      if (Date.now() - ts < _TN_CACHE_TTL && data.length > 0) return data;
+      if (Date.now() - ts < _TN_CACHE_TTL && data?.length > 0) {
+        cachedData = data;
+        cachedCount = data.length;
+      }
     }
   } catch(_) {}
 
-  const sb = window.supabase ? window.supabase.createClient(_TN_SB_URL, _TN_SB_KEY) : null;
-  if (!sb) return [];
+  // Nếu có cache, check row count từ server
+  if (cachedData) {
+    try {
+      const { count } = await sb.from(_TN_TABLE).select('*', { count: 'exact', head: true });
+      if (count != null && count === cachedCount) {
+        return cachedData;  // Cache vẫn match server
+      }
+      console.log(`[TN cache] Server: ${count} rows, cache: ${cachedCount} → refresh`);
+    } catch (e) {
+      // Network lỗi → vẫn dùng cache
+      return cachedData;
+    }
+  }
 
   // ── Tối ưu #7: chỉ SELECT các cột thực sự dùng (thay vì SELECT *) ──
   const TN_COLS = 'Id,Tram,Nhom_thiet_bi,Ngan_thiet_bi,Ten_thiet_bi,Phan_loai_thiet_bi,Cap_dien_ap,So_luong,Don_vi_tinh,Han_thi_nghiem,Thoi_gian_thi_nghiem_truoc,Thoi_gian_thi_nghiem_gan_nhat,Thoi_gian_thi_nghiem_tiep_theo,Lich_dat_lam,Ngay_thi_nghiem,Bien_ban,Ghi_chu,Nam_ke_hoach,Nam_thuc_hien,Doi,Loai_ngan_lo';
