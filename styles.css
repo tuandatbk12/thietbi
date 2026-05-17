@@ -1,8 +1,7 @@
-/* ============================================================
-   EVNHANOI Dashboard - styles.css
-   Extracted from inline <style> in index.html
-   Includes: design tokens, layout, components, auth UI
-============================================================ */
+/* ════════════════════════════════════════════════════════════════
+   EVNHANOI Dashboard — styles.css
+   Tách từ inline <style> trong index.html
+════════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════
    DESIGN TOKENS
@@ -75,12 +74,19 @@ body {
 ═══════════════════════════════════════ */
 body.user-mode {
   grid-template-rows: 48px 1fr !important;
-  grid-template-columns: 0px 1fr 0px !important;
+  grid-template-columns: var(--sidebar-w, 240px) 1fr 0px !important;
   grid-template-areas:
     "topbar  topbar  topbar"
     "sidebar canvas  props" !important;
 }
-body.user-mode .sidebar          { display: none !important; }
+body.user-mode .sidebar          { display: flex !important; }
+/* Phương án C: User xem tất cả menu — KHÔNG ẩn nav items theo whitelist nữa.
+   Layout Editor và Admin Panel đã được ẩn riêng qua các rule khác bên dưới. */
+/* body.user-mode .nav-item:not(.nav-user-allowed),
+body.user-mode .nav-sub-item:not(.nav-user-allowed),
+body.user-mode .nav-section:not(.nav-user-allowed) { display: none !important; }
+body.user-mode .nav-label                          { display: none !important; }
+body.user-mode .nav-label.nav-user-allowed         { display: block !important; } */
 body.user-mode .props-panel      { display: none !important; }
 body.user-mode .statusbar        { display: none !important; }
 body.user-mode .topbar           {
@@ -98,9 +104,8 @@ body.user-mode .topbar-page      { display: none !important; }
 body.user-mode .canvas-header    { display: none !important; }
 body.user-mode .canvas-quick-nav { display: none !important; }
 body.user-mode #uxAuditPanel     { display: none !important; }
-/* Canvas area chiếm toàn bộ không gian */
+/* Phương án C: Canvas-area giữ vị trí mặc định (cột giữa), sidebar hiển thị bình thường */
 body.user-mode .canvas-area {
-  grid-column: 1 / -1 !important;
   padding: 0 !important;
   overflow-y: auto !important;
 }
@@ -1761,16 +1766,16 @@ body { font-size: var(--fs-base); }
 .hm-table tbody tr:hover td { filter:brightness(1.20); }
 .hm-th-grp,.hm-cell-grp  { position:sticky; left:0; z-index:3; background:var(--bg-elevated); text-align:left; overflow:hidden; white-space:nowrap; border-right:1px solid rgba(255,255,255,0.12); }
 .hm-cell-grp { background:var(--bg-base); z-index:2; font-size:8.5px; font-weight:700; padding:4px 8px; color:var(--text-muted); }
-.hm-th-grp   { font-size:8px; font-weight:700; padding:5px 8px; color:var(--text-muted); letter-spacing:.1em; border-bottom:1px solid rgba(255,255,255,0.10); }
+.hm-th-grp   { font-size:8px; font-weight:700; padding:5px 8px; color:rgba(200,218,235,.9); letter-spacing:.1em; border-bottom:1px solid rgba(255,255,255,0.10); }
 .hm-th-tram,.hm-cell-tram { position:sticky; z-index:3; background:var(--bg-elevated); text-align:left; overflow:hidden; white-space:nowrap; border-right:1px solid rgba(255,255,255,0.10); }
 .hm-cell-tram { background:var(--bg-base); z-index:2; font-size:9px; padding:4px 8px; color:var(--text-secondary); }
-.hm-th-tram   { font-size:8px; font-weight:700; padding:5px 8px; color:var(--text-muted); letter-spacing:.08em; border-bottom:1px solid rgba(255,255,255,0.10); }
+.hm-th-tram   { font-size:8px; font-weight:700; padding:5px 8px; color:rgba(200,218,235,.9); letter-spacing:.08em; border-bottom:1px solid rgba(255,255,255,0.10); }
 .hm-th-ngan-grp { text-align:center; font-size:8px; font-weight:700; padding:4px 4px; background:var(--bg-elevated); letter-spacing:.06em; border-bottom:1px solid rgba(255,255,255,0.06); border-left:2px solid rgba(255,255,255,0.12); }
 .hm-th-cap  { text-align:center; padding:4px 3px; font-size:7.5px; font-weight:600; background:var(--bg-elevated); overflow:hidden; white-space:nowrap; border-bottom:1px solid rgba(255,255,255,0.10); border-left:1px solid rgba(255,255,255,0.05); cursor:pointer; user-select:none; position:relative; }
 .hm-th-cap:hover { background:rgba(255,255,255,0.06); }
 .hm-th-cap.sort-asc::after  { content:' ↑'; font-size:7px; }
 .hm-th-cap.sort-desc::after { content:' ↓'; font-size:7px; }
-.hm-th-total { text-align:right; padding:5px 8px; font-size:8px; font-weight:700; color:var(--text-muted); background:var(--bg-elevated); white-space:nowrap; border-left:2px solid rgba(255,255,255,0.12); border-bottom:1px solid rgba(255,255,255,0.10); cursor:pointer; position:relative; }
+.hm-th-total { text-align:right; padding:5px 8px; font-size:8px; font-weight:700; color:rgba(200,218,235,.9); background:var(--bg-elevated); white-space:nowrap; border-left:2px solid rgba(255,255,255,0.12); border-bottom:1px solid rgba(255,255,255,0.10); cursor:pointer; position:relative; }
 .hm-cell-cap   { text-align:center; padding:3px 3px; font-size:9px; font-weight:700; border:1px solid rgba(255,255,255,0.06); cursor:pointer; }
 .hm-cell-cap:hover { filter:brightness(1.4); }
 .hm-cell-total { text-align:right; padding:3px 8px; font-size:9px; font-weight:800; color:#c0d0e8; border-left:2px solid rgba(255,255,255,0.12); }
@@ -1866,7 +1871,9 @@ body { font-size: var(--fs-base); }
   box-shadow: -10px 0 40px rgba(0,0,0,.65);
   transform: translateX(100%);
   transition: transform .22s cubic-bezier(0.4,0,0.2,1);
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .hm-detail-panel.open { transform: translateX(0); }
 /* Khi panel open, đảm bảo flex layout */
@@ -1886,7 +1893,7 @@ body { font-size: var(--fs-base); }
   background: rgba(0,200,255,0.35);
 }
 
-.hm-detail-hd { padding:12px 16px 10px; font-size:13px; font-weight:700; color:var(--accent); border-bottom:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center; flex-shrink:0; user-select:none; cursor:move; }
+.hm-detail-hd { padding:12px 16px 10px; font-size:13px; font-weight:700; color:rgba(255,255,255,.97); border-bottom:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center; flex-shrink:0; user-select:none; cursor:move; }
 /* Đảm bảo scroll div bên trong panel luôn hoạt động */
 
 /* Header và toolbar không co lại */
@@ -2940,9 +2947,9 @@ body.light-mode .canvas-quick-nav {
 }
 body.light-mode .canvas-area::before { background: transparent; }
 body.light-mode .section-card { box-shadow: 0 2px 12px rgba(0,0,0,0.10); }
-body.light-mode .hm-table thead { background: #e8eef5; }
-body.light-mode .hm-cell-grp, body.light-mode .hm-th-grp { background: #e8eef5; }
-body.light-mode .hm-cell-tram, body.light-mode .hm-th-tram { background: #f0f4f8; color: #1e3a52; }
+body.light-mode .hm-table thead { background: var(--bg-elevated); }
+body.light-mode .hm-cell-grp, body.light-mode .hm-th-grp { background: var(--bg-elevated); }
+body.light-mode .hm-cell-tram, body.light-mode .hm-th-tram { background: var(--bg-elevated); color: rgba(200,220,240,.85); }
 body.light-mode .ic-card { background: #fff; border-color: rgba(0,0,0,0.10); }
 body.light-mode .ic-tech-bar-track { background: rgba(0,0,0,0.08); }
 body.light-mode .rpanel { background: #fff; border-left-color: rgba(0,0,0,0.10); }
@@ -2984,3 +2991,8 @@ body.preview-mode .section-card {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ── Inline style #2 (Auth overlay & misc) ── */
+.upload-lbl { font-size:10px;color:rgba(180,200,220,.85);display:block;margin-bottom:5px;font-weight:500 }
+.upload-inp { width:100%;padding:9px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:rgba(235,248,255,.92);font-size:12px;outline:none;box-sizing:border-box;font-family:inherit;transition:border-color .15s }
+.upload-inp:focus { border-color:var(--accent) }
