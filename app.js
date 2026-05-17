@@ -4885,7 +4885,13 @@ function lytBuildScopedNganSets(activeRows, sourceRows = _chipAllData) {
     td:     tdActiveSet,         // chỉ đếm ngăn có MBATD thực sự
     tdAll:  tdAllSet,
     tdMeta: _tdNganKeys,
-    khang:  buildSet(d => lytNormalizeNganLoai(d.Loai_ngan_lo) === 'Ngăn Kháng'),
+    // ── Fix bug Ngăn Kháng (sync với logic panel detail dòng ~4639):
+    // Phải check cả Phan_loai_thiet_bi='K' hoặc 'Kháng' vì có TB không có Loai_ngan_lo
+    khang:  buildSet(d => {
+      const loai = lytNormalizeNganLoai(d.Loai_ngan_lo);
+      const pl   = (d.Phan_loai_thiet_bi||'').trim();
+      return loai === 'Ngăn Kháng' || pl === 'K' || pl === 'Kháng';
+    }),
   };
 }
 
