@@ -10154,3 +10154,199 @@ window._assetView        = _assetView;
 window._assetDelete      = _assetDelete;
 
 
+
+/* ════════════════════════════════════════════════════════════════
+   ROUND 3 — Service Worker + Realtime + Offline Indicator
+════════════════════════════════════════════════════════════════ */
+
+// ── Service Worker registration ──────────────────────────────
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').then((reg) => {
+      console.log('[SW] Đã đăng ký');
+
+      // Auto reload khi có version mới
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // Có version mới đang chờ activate
+            _showUpdateNotification();
+          }
+        });
+      });
+    }).catch((err) => console.warn('[SW] Đăng ký lỗi:', err));
+
+    // Reload trang khi worker mới active
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+  });
+}
+
+function _showUpdateNotification() {
+  const existing = document.getElementById('_swUpdateBanner');
+  if (existing) return;
+  const banner = document.createElement('div');
+  banner.id = '_swUpdateBanner';
+  banner.style.cssText = `
+    position:fixed;top:8px;left:50%;transform:translateX(-50%);
+    background:linear-gradient(135deg,#1565c0,#0d47a1);color:#fff;
+    padding:10px 16px;border-radius:10px;font-size:12px;z-index:99999;
+    box-shadow:0 4px 20px rgba(0,0,0,.5);display:flex;align-items:center;gap:10px;
+    border:1px solid rgba(255,255,255,.15)
+  `;
+  banner.innerHTML = `
+    <i class="fas fa-sync-alt" style="animation:spin 2s linear infinite"></i>
+    <span>Phiên bản mới — bấm để cập nhật</span>
+    <button onclick="_swApplyUpdate()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:#fff;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px">Cập nhật</button>
+    <button onclick="this.parentElement.remove()" style="background:transparent;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:14px;padding:0 4px">×</button>
+  `;
+  document.body.appendChild(banner);
+}
+
+function _swApplyUpdate() {
+  if (navigator.serviceWorker.controller) {
+    navigator.serviceWorker.getRegistration().then((reg) => {
+      if (reg?.waiting) reg.waiting.postMessage('skipWaiting');
+    });
+  }
+}
+window._swApplyUpdate = _swApplyUpdate;
+
+// ── Offline / Online indicator ────────────────────────────────
+function _updateOnlineStatus() {
+  const isOnline = navigator.onLine;
+  let badge = document.getElementById('_offlineBadge');
+
+  if (!isOnline) {
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.id = '_offlineBadge';
+      badge.style.cssText = `
+        position:fixed;bottom:10px;left:10px;z-index:99999;
+        background:rgba(255,82,82,.95);color:#fff;
+        padding:8px 14px;border-radius:8px;font-size:11px;
+        display:flex;align-items:center;gap:6px;
+        box-shadow:0 4px 12px rgba(0,0,0,.4);
+        animation:pulse 2s ease-in-out infinite
+      `;
+      badge.innerHTML = '<i class="fas fa-wifi-slash"></i> Mất kết nối — đang dùng cache';
+      document.body.appendChild(badge);
+    }
+  } else {
+    if (badge) {
+      badge.style.background = 'rgba(0,230,118,.95)';
+      badge.innerHTML = '<i class="fas fa-wifi"></i> Đã kết nối lại';
+      setTimeout(() => badge?.remove(), 2000);
+    }
+  }
+}
+window.addEventListener('online', _updateOnlineStatus);
+window.addEventListener('offline', _updateOnlineStatus);
+// Check ngay khi load
+setTimeout(_updateOnlineStatus, 1000);
+
+// ── Realtime subscription cho TongHopThietBi & CongTacThiNghiem ──
+// Khi admin INSERT/UPDATE/DELETE → tất cả user thấy ngay
+let _realtimeChannels = [];
+function _setupRealtimeSync() {
+  if (!window._sbClient) {
+    setTimeout(_setupRealtimeSync, 1000);
+    return;
+  }
+
+  try {
+    // Subscribe TongHopThietBi changes
+    const ch1 = window._sbClient
+      .channel('tonghop-changes')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'TongHopThietBi' },
+        (payload) => {
+          console.log('[Realtime] TongHopThietBi thay đổi:', payload.eventType);
+          // Invalidate cache để lần load tới fetch mới
+          try {
+            localStorage.removeItem(LYT_DATA_CACHE_KEY);
+            localStorage.removeItem(LYT_DATA_CACHE_META_KEY);
+          } catch(_) {}
+          _showRealtimeToast('🔄 Dữ liệu thiết bị đã được cập nhật');
+        }
+      )
+      .subscribe();
+    _realtimeChannels.push(ch1);
+
+    // Subscribe CongTacThiNghiem changes
+    const ch2 = window._sbClient
+      .channel('congtac-changes')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'CongTacThiNghiem' },
+        (payload) => {
+          console.log('[Realtime] CongTacThiNghiem thay đổi:', payload.eventType);
+          try { localStorage.removeItem(_TN_CACHE_KEY); } catch(_) {}
+          _showRealtimeToast('🔄 Dữ liệu TNĐK đã được cập nhật');
+        }
+      )
+      .subscribe();
+    _realtimeChannels.push(ch2);
+
+    console.log('[Realtime] Đã subscribe TongHopThietBi & CongTacThiNghiem');
+  } catch (e) {
+    console.warn('[Realtime] Setup failed:', e);
+  }
+}
+
+// Toast hiển thị khi có realtime update — không spam (1 toast / 10 giây)
+let _lastRealtimeToastTime = 0;
+function _showRealtimeToast(msg) {
+  const now = Date.now();
+  if (now - _lastRealtimeToastTime < 10000) return;
+  _lastRealtimeToastTime = now;
+
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position:fixed;top:60px;right:10px;z-index:99998;
+    background:rgba(0,230,118,.95);color:#000;font-weight:600;
+    padding:10px 16px;border-radius:8px;font-size:12px;
+    box-shadow:0 4px 14px rgba(0,0,0,.3);
+    animation:slideInRight .3s ease-out
+  `;
+  toast.innerHTML = `
+    ${msg}
+    <button onclick="forceReloadData();this.parentElement.remove()"
+            style="margin-left:10px;background:rgba(0,0,0,.2);border:none;color:#000;padding:3px 8px;border-radius:4px;cursor:pointer;font-weight:600">
+      Tải lại
+    </button>
+    <button onclick="this.parentElement.remove()"
+            style="margin-left:4px;background:transparent;border:none;color:rgba(0,0,0,.6);cursor:pointer;font-size:14px;padding:0 4px">
+      ×
+    </button>
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 8000);
+}
+
+// Bắt đầu subscribe sau khi auth ready
+setTimeout(_setupRealtimeSync, 2000);
+
+// Cleanup channels khi tab đóng (tránh memory leak Supabase)
+window.addEventListener('beforeunload', () => {
+  _realtimeChannels.forEach(ch => {
+    try { window._sbClient?.removeChannel(ch); } catch(_) {}
+  });
+});
+
+// CSS animations cho indicators
+(function injectRealtimeCss() {
+  const css = `
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.7} }
+    @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+    @keyframes slideInRight { from{transform:translateX(120%)} to{transform:translateX(0)} }
+  `;
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
+})();
