@@ -7781,6 +7781,83 @@ function _getAuthSb(){if(!_authSb&&window.supabase&&window.supabase.createClient
 // Khởi tạo _sbClient NGAY khi script load (không đợi DOMContentLoaded/login)
 // → các module Asset / TNĐK / Update Requests luôn có _sbClient sẵn sàng
 try { window._sbClient = _getAuthSb(); } catch(e) { console.warn('_sbClient init failed:', e); }
+
+// ════════════════════════════════════════════════════════════════
+// Tối ưu #16: Error Monitoring - log lỗi tự động vào Supabase
+// - Capture lỗi JS không bắt được (window.onerror)
+// - Capture promise rejection (unhandledrejection)
+// - Throttle: tối đa 1 lỗi/giây để tránh spam DB
+// - Filter: bỏ qua lỗi từ extension trình duyệt
+// ════════════════════════════════════════════════════════════════
+
+const _errorLogState = {
+  lastLogTime: 0,
+  recentErrors: new Set(),  // dedup trong 5 giây
+};
+
+function _shouldLogError(msg, source) {
+  // Bỏ qua extension trình duyệt
+  if (source && /\b(chrome-extension|moz-extension|onboarding\.js|edge-extension)\b/i.test(source)) return false;
+  // Bỏ qua lỗi từ CDN bên ngoài (jsdelivr, font-awesome, ...) — không phải lỗi mình
+  if (source && /\b(cdn\.jsdelivr|cdnjs\.cloudflare|fonts\.googleapis)\b/i.test(source)) return false;
+  // Bỏ qua lỗi quá ngắn / không có thông tin
+  if (!msg || msg.length < 5) return false;
+  // Throttle: 1 lỗi / giây
+  const now = Date.now();
+  if (now - _errorLogState.lastLogTime < 1000) return false;
+  // Dedup: cùng 1 lỗi trong 5 giây → bỏ qua
+  const key = msg.slice(0, 100);
+  if (_errorLogState.recentErrors.has(key)) return false;
+  _errorLogState.recentErrors.add(key);
+  setTimeout(() => _errorLogState.recentErrors.delete(key), 5000);
+  _errorLogState.lastLogTime = now;
+  return true;
+}
+
+async function _logError(payload) {
+  if (!_shouldLogError(payload.message, payload.source)) return;
+  try {
+    if (!window._sbClient) return;
+    const user = _authCurrentUser();
+    await window._sbClient.from('error_logs').insert({
+      error_type:  payload.type || 'js_error',
+      message:     String(payload.message || '').slice(0, 500),
+      stack:       String(payload.stack || '').slice(0, 2000),
+      url:         String(payload.source || location.href).slice(0, 300),
+      user_id:     user?.id || null,
+      user_email:  user?.email || null,
+      user_agent:  navigator.userAgent.slice(0, 300),
+    });
+  } catch (e) {
+    // Đừng để error monitoring tự gây error
+    console.warn('[errorLog] Failed:', e);
+  }
+}
+
+// Bắt lỗi JS không catch
+window.addEventListener('error', (event) => {
+  _logError({
+    type:    'js_error',
+    message: event.message,
+    stack:   event.error?.stack,
+    source:  event.filename || event.target?.src,
+  });
+});
+
+// Bắt promise rejection không catch
+window.addEventListener('unhandledrejection', (event) => {
+  const reason = event.reason;
+  _logError({
+    type:    'promise_rejection',
+    message: reason?.message || String(reason),
+    stack:   reason?.stack,
+    source:  location.href,
+  });
+});
+
+// Expose helper để code khác có thể log lỗi chủ động
+window._logError = _logError;
+
 function _authCurrentUser(){try{return JSON.parse(sessionStorage.getItem('evn_sess_v3'));}catch{return null;}}
 function _authSaveSession(u){sessionStorage.setItem('evn_sess_v3',JSON.stringify(u));}
 function _authClearSession(){sessionStorage.removeItem('evn_sess_v3');}
@@ -9666,6 +9743,86 @@ function _assetFileChosen(idx) {
 }
 
 /** Load gallery (ảnh + tài liệu đã có) từ Supabase */
+// ════════════════════════════════════════════════════════════════
+// Tối ưu #12: Lazy load gallery thumbnails
+// - IntersectionObserver chỉ load ảnh khi scroll tới
+// - Cache blob URL trong Map để mở lại không phải tải lại
+// - Auto cleanup blob URL khi tab đóng
+// ════════════════════════════════════════════════════════════════
+
+const _assetThumbCache = new Map();  // id → blobUrl
+let _assetThumbObserver = null;
+
+async function _assetFetchThumb(id) {
+  // Cache hit
+  if (_assetThumbCache.has(id)) return _assetThumbCache.get(id);
+
+  try {
+    const token = await _authGetToken();
+    if (!token) return null;
+
+    const url = _AUTH_SB_URL.replace(/\/$/, '') + '/functions/v1/asset-download?id=' + id;
+    const resp = await fetch(url, {
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'apikey': _AUTH_SB_KEY,
+      }
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+    const blob = await resp.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    _assetThumbCache.set(id, blobUrl);
+    return blobUrl;
+  } catch (e) {
+    console.warn('[thumb] Failed to load id=' + id, e);
+    return null;
+  }
+}
+
+function _assetSetupLazyThumbs(container) {
+  // Tìm tất cả ảnh chưa load trong container
+  const lazyImgs = container.querySelectorAll('img[data-asset-thumb]');
+  if (!lazyImgs.length) return;
+
+  // Init observer (chỉ 1 lần)
+  if (!_assetThumbObserver) {
+    _assetThumbObserver = new IntersectionObserver((entries) => {
+      entries.forEach(async (entry) => {
+        if (!entry.isIntersecting) return;
+        const img = entry.target;
+        _assetThumbObserver.unobserve(img);  // load 1 lần thôi
+
+        const id = parseInt(img.dataset.assetThumb, 10);
+        if (!id) return;
+
+        const blobUrl = await _assetFetchThumb(id);
+        if (blobUrl) {
+          img.src = blobUrl;
+        } else {
+          // Fail → hiện icon fallback đã có sẵn (xử lý bởi onerror)
+          img.dispatchEvent(new Event('error'));
+        }
+      });
+    }, {
+      // Bắt đầu load khi ảnh còn cách viewport 100px
+      rootMargin: '100px',
+      threshold: 0.01,
+    });
+  }
+
+  // Observe từng ảnh
+  lazyImgs.forEach(img => _assetThumbObserver.observe(img));
+}
+
+// Cleanup blob URLs khi tab đóng (tránh memory leak)
+window.addEventListener('beforeunload', () => {
+  _assetThumbCache.forEach(url => {
+    try { URL.revokeObjectURL(url); } catch(_) {}
+  });
+  _assetThumbCache.clear();
+});
+
 async function _assetLoadGallery(idx) {
   const r = _assetGetRow(idx);
   if (!r) {
@@ -9719,13 +9876,23 @@ async function _assetLoadGallery(idx) {
       photos.forEach(p => {
         const canDel = canDeleteFile(p);
         const tooltip = `${p.file_name}\n${p.note ? p.note + '\n' : ''}Upload: ${p.uploaded_by_email || '?'}\n${new Date(p.created_at).toLocaleString('vi-VN')}`;
+        // ── Tối ưu #12: Lazy load thumbnail thật ──
+        // <img data-asset-id="..."> rỗng ban đầu, src được set khi cuộn tới (IntersectionObserver)
+        // Khi load lỗi: ẩn img, hiện icon fallback bên dưới
         html += `<div style="position:relative;width:78px;border:1px solid rgba(0,230,118,.2);
                              border-radius:6px;overflow:hidden;background:rgba(0,0,0,.3)"
                       title="${tooltip.replace(/"/g, '&quot;')}">
           <div style="width:78px;height:60px;background:rgba(0,230,118,.05);
-                      display:flex;align-items:center;justify-content:center;cursor:pointer"
+                      display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative"
                onclick="_assetView(${p.id})">
-            <i class="fas fa-image" style="font-size:18px;color:rgba(0,230,118,.4)"></i>
+            <img data-asset-thumb="${p.id}"
+                 style="width:100%;height:100%;object-fit:cover;display:none"
+                 onload="this.style.display='block';this.nextElementSibling.style.display='none'"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+                 alt="">
+            <div class="asset-thumb-fallback" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">
+              <i class="fas fa-image" style="font-size:18px;color:rgba(0,230,118,.4)"></i>
+            </div>
           </div>
           <div style="padding:3px 4px;font-size:8.5px;color:rgba(180,200,220,.65);
                       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer"
@@ -9776,6 +9943,10 @@ async function _assetLoadGallery(idx) {
     }
 
     gEl.innerHTML = html;
+
+    // ── Tối ưu #12: kích hoạt lazy load thumbnails ──
+    // IntersectionObserver chỉ tải ảnh khi scroll tới (tiết kiệm băng thông)
+    _assetSetupLazyThumbs(gEl);
 
   } catch (e) {
     console.error('[_assetLoadGallery]', e);
