@@ -3,7 +3,7 @@
 // Cache strategy: stale-while-revalidate cho assets, network-first cho API
 // ════════════════════════════════════════════════════════════════
 
-const CACHE_VERSION = 'evn-v1';
+const CACHE_VERSION = 'evn-v5-bbtn-timeout';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE    = `${CACHE_VERSION}-api`;
 
@@ -79,10 +79,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // ── Same-origin static files (app.js, styles.css, index.html) ──
-  // → Stale-while-revalidate: hiện cache ngay, update background
+  // ── Same-origin static files ──
+  // app.js/index.html/sw.js dùng network-first để tránh trình duyệt giữ bản lỗi cũ sau deploy.
   if (url.origin === self.location.origin) {
-    event.respondWith(staleWhileRevalidate(req));
+    if (/\/(app\.js|index\.html|sw\.js)$/.test(url.pathname) || url.pathname === '/') {
+      event.respondWith(networkFirstWithCache(req));
+    } else {
+      event.respondWith(staleWhileRevalidate(req));
+    }
     return;
   }
 

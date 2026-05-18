@@ -9087,8 +9087,7 @@ async function _bbtnDownloadSelectedZip() {
             const token = await _authGetToken();
             const url = _AUTH_SB_URL.replace(/\/$/, '') + '/functions/v1/bbtn-download'
                       + '?path=' + encodeURIComponent(f.relativePath || '');
-            const resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token, 'apikey': _AUTH_SB_KEY }});
-            if (!resp.ok) { errCount++; continue; }
+            const resp = await _bbtnFetchEdge(url, token, { timeoutMs: 30000 });
             const blob = await resp.blob();
             zip.file(folderName + '/' + (f.name || 'file'), blob);
             totalFiles++;
@@ -9232,6 +9231,46 @@ async function _bbtnLoadPath(path) {
  * WebDAV PROPFIND request - lấy danh sách items trong thư mục
  * Returns: [{ name, isFolder, size, modified, href, fullUrl }]
  */
+function _bbtnBuildEdgeError(status, text, fallback) {
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (_) {}
+
+  if (status === 401) return new Error('Phiên đăng nhập hết hạn, vui lòng đăng nhập lại');
+  if (status === 403) return new Error('Không có quyền truy cập thư mục này');
+
+  const code = data?.code ? '[' + data.code + '] ' : '';
+  const msg = data?.error || data?.detail || text || fallback || ('HTTP ' + status);
+  const detail = data?.detail && data?.detail !== msg ? ' — ' + data.detail : '';
+  return new Error(code + String(msg + detail).slice(0, 500));
+}
+
+async function _bbtnFetchEdge(edgeUrl, token, options = {}) {
+  const timeoutMs = options.timeoutMs || 20000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const resp = await fetch(edgeUrl, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        'Authorization': 'Bearer ' + token,
+        'apikey': _AUTH_SB_KEY,
+      },
+      signal: controller.signal,
+    });
+    if (!resp.ok) {
+      const txt = await resp.text().catch(() => resp.statusText || '');
+      throw _bbtnBuildEdgeError(resp.status, txt, resp.statusText);
+    }
+    return resp;
+  } catch (err) {
+    if (err?.name === 'AbortError') throw new Error('[CLIENT_TIMEOUT] Trình duyệt chờ Edge Function quá lâu, vui lòng thử lại sau vài giây');
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function _bbtnPropfind(path) {
   const token = await _authGetToken();
   if (!token) throw new Error('Chưa đăng nhập hoặc phiên hết hạn');
@@ -9240,24 +9279,9 @@ async function _bbtnPropfind(path) {
     + '/functions/v1/bbtn-list'
     + '?path=' + encodeURIComponent(path);
 
-  const resp = await fetch(edgeUrl, {
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'apikey': _AUTH_SB_KEY,
-    }
-  });
-
-  if (!resp.ok) {
-    const txt = await resp.text().catch(() => resp.statusText);
-    if (resp.status === 401) throw new Error('Phiên đăng nhập hết hạn, vui lòng đăng nhập lại');
-    if (resp.status === 403) throw new Error('Không có quyền truy cập thư mục này');
-    if (resp.status === 503) throw new Error('NAS chưa được cấu hình — Admin cần set Supabase Secrets');
-    let msg = txt; try { msg = JSON.parse(txt).error || txt; } catch {}
-    throw new Error('Lỗi server: ' + (msg.length < 200 ? msg : msg.substring(0,200)));
-  }
-
+  const resp = await _bbtnFetchEdge(edgeUrl, token, { timeoutMs: 25000 });
   const json = await resp.json();
-  if (json.error) throw new Error(json.error);
+  if (json.error) throw _bbtnBuildEdgeError(200, JSON.stringify(json), 'Lỗi bbtn-list');
   return json.items || [];
 }
 
@@ -9424,16 +9448,7 @@ async function _bbtnViewFile(relativePath, forceDownload) {
     const edgeBase = _AUTH_SB_URL.replace(/\/$/, '') + '/functions/v1/bbtn-download';
     const url = edgeBase + '?path=' + encodeURIComponent(relativePath) + (forceDownload ? '&download=1' : '');
 
-    const resp = await fetch(url, {
-      headers: { 'Authorization': 'Bearer ' + token, 'apikey': _AUTH_SB_KEY }
-    });
-
-    if (!resp.ok) {
-      const errTxt = await resp.text().catch(() => 'HTTP ' + resp.status);
-      let msg = errTxt; try { msg = JSON.parse(errTxt).error || errTxt; } catch {}
-      throw new Error(msg.length < 150 ? msg : ('HTTP ' + resp.status));
-    }
-
+    const resp = await _bbtnFetchEdge(url, token, { timeoutMs: 30000 });
     const blob = await resp.blob();
     const blobUrl = URL.createObjectURL(blob);
     const fileName = decodeURIComponent(relativePath.split('/').pop() || 'file');
