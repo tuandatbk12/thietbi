@@ -3519,7 +3519,7 @@ function _lfPopulate(key, anchorBtn) {
     list._tramCaps = tramCaps;
     list._tramMaxCap = tramMaxCap;
 
-    const tramsAll = [...new Set(_chipAllData.map(d=>(d.Tram||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
+    const tramsAll = [...new Set(_chipAllData.map(d=>(d.Tram||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'}));
     const byGrp = {};
     tramsAll.forEach(t => {
       const cap = tramMaxCap[t] || '?';
@@ -3567,7 +3567,7 @@ function _lfPopulate(key, anchorBtn) {
 
   } else if (key === 'type') {
     const excl = pl => { const n=(pl||'').trim().toUpperCase().replace(/\s+/g,''); return n.startsWith('TICHAN')||n==='HTTD'||n.startsWith('HTTD'); };
-    const types = [...new Set(_chipAllData.map(d=>(d.Phan_loai_thiet_bi||'').trim()).filter(Boolean).filter(t=>!excl(t)))].sort((a,b)=>a.localeCompare(b,'vi'));
+    const types = [...new Set(_chipAllData.map(d=>(d.Phan_loai_thiet_bi||'').trim()).filter(Boolean).filter(t=>!excl(t)))].sort((a,b)=>a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'}));
 
     html = `<div style="padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.07);position:sticky;top:0;background:var(--bg-surface);z-index:1">
       <input type="text" id="lytDdS_lf_type_${uid}" placeholder="🔍 Tìm loại..."
@@ -3858,7 +3858,7 @@ function lytTLBucketClick(type, bucketKey, bucketLabel, color) {
   });
   const tramList = Object.keys(byTram).sort((a,b)=>{
     const pa=capPrio[tramMaxCap[a]]??9,pb=capPrio[tramMaxCap[b]]??9;
-    return pa!==pb?pa-pb:a.localeCompare(b,'vi');
+    return pa!==pb?pa-pb:a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'});
   });
   const items=[]; const byC={};
   tramList.forEach(t=>{const cv=tramMaxCap[t]||'?';if(!byC[cv])byC[cv]=[];byC[cv].push(t);});
@@ -4211,6 +4211,7 @@ function lytChipToggle(type) {
 
 function lytChipShowDetail(type) {
   const baseRows = _chipAllData;
+  // ── Thứ tự cấp điện áp: 220→110→35→22→10→6→TT ──
   const capPrio  = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
   const capColor = {'2':'#1565c0','1':'#18ffff','3':'#00e676','4':'#e040fb','9':'#00e676','6':'#00e676','0':'#18ffff'};
   const capLbl   = {'2':'220kV','1':'110kV','3':'35kV','4':'22kV','9':'10kV','6':'6kV','0':'TT'};
@@ -4225,25 +4226,86 @@ function lytChipShowDetail(type) {
   const byTram = {};
   typeRows.forEach(d => {
     const t=(d.Tram||'').trim(); if(!t)return;
-    if(!byTram[t]) byTram[t]={ qty:0, ngans:new Set() };
+    if(!byTram[t]) byTram[t]={ qty:0, ngans:new Set(), rows:[] };
     byTram[t].qty += Number(d.So_luong)||1;
+    byTram[t].rows.push(d);
     if(d.Ngan_thiet_bi) byTram[t].ngans.add(d.Ngan_thiet_bi);
   });
+  // ── Natural sort: E1.1 < E1.2 < E1.5 < E1.10 (không phải alphabet) ──
   const tramList = Object.keys(byTram).sort((a,b) => {
     const pa=capPrio[tramMaxCap[a]]??9, pb=capPrio[tramMaxCap[b]]??9;
-    return pa!==pb?pa-pb:a.localeCompare(b,'vi');
+    return pa!==pb ? pa-pb : a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'});
   });
+
   const items = [];
   const byC = {};
   tramList.forEach(t=>{ const cv=tramMaxCap[t]||'?'; if(!byC[cv])byC[cv]=[]; byC[cv].push(t); });
+  // Thứ tự cấp điện áp: 220 → 110 → 35 → 22 → 10 → 6 → TT
   ['2','1','3','4','9','6','0'].forEach(cap => {
     const arr=byC[cap]; if(!arr?.length)return;
     items.push({ isGroup:true, text:`── ${capLbl[cap]||cap} (${arr.length} trạm) ──`, color:capColor[cap]||'#888' });
     arr.forEach(t => {
       const info = byTram[t];
-      const ngans = [...info.ngans].sort();
-      items.push({ text:t, badge:`${info.qty.toLocaleString('vi-VN')} TB`, color:capColor[tramMaxCap[t]]||'#888',
-        detail: ngans.length ? ngans : null });
+      const allNgans = [...info.ngans].sort((a,b)=>a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'}));
+      // ── Build hierarchy 3 level: Trạm → Nhóm Ngăn → ngăn cụ thể (đồng nhất với TBA 220kV/110kV) ──
+      // tRows là toàn bộ rows của trạm (không chỉ rows của loại đang chọn) để phân loại đúng
+      const tRowsAll = _chipAllData.filter(r => (r.Tram||'').trim() === t);
+      const NGAN_GROUPS = [
+        { label:'Ngăn ĐZ',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn ĐZ' },
+        { label:'Ngăn MBA',          fn: r=>lytIsMBARow(r) },
+        { label:'Ngăn XT',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn XT' },
+        { label:'Ngăn LL',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn LL' },
+        { label:'Ngăn Tụ bù (TBN)', fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn TBN'||((r.Phan_loai_thiet_bi||'').trim().toUpperCase().includes('TBN')) },
+        { label:'Ngăn Tự dùng (TD)',fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='NgănTD'||((r.Phan_loai_thiet_bi||'').trim().toUpperCase()==='MBATD') },
+        { label:'Ngăn Kháng',        fn: r=>{
+          const loai = lytNormalizeNganLoai(r.Loai_ngan_lo);
+          const pl   = (r.Phan_loai_thiet_bi||'').trim();
+          return loai === 'Ngăn Kháng' || pl === 'K' || pl === 'Kháng';
+        }},
+      ];
+      // Chỉ build children nếu có ngăn của loại type này
+      const catSet = new Set();
+      const children = [];
+      // Filter các ngăn THUỘC loại type đang chọn
+      const ngansOfType = new Set();
+      info.rows.forEach(r => {
+        const ng = (r.Ngan_thiet_bi||'').trim();
+        if (ng) ngansOfType.add(ng);
+      });
+      NGAN_GROUPS.forEach(g => {
+        // Chỉ lấy ngăn vừa thuộc nhóm này VỪA chứa thiết bị loại type
+        const gNgans = [...new Set(
+          tRowsAll.filter(g.fn).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean)
+        )].filter(n => ngansOfType.has(n))
+          .sort((a,b)=>a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'}));
+        if (!gNgans.length) return;
+        gNgans.forEach(n => catSet.add(n));
+        children.push({
+          text: g.label,
+          sub: `${gNgans.length} ngăn`,
+          color: capColor[tramMaxCap[t]] || '#888',
+          detail: gNgans
+        });
+      });
+      // Ngăn khác — của type này nhưng không thuộc nhóm nào
+      const uncat = [...ngansOfType].filter(n => !catSet.has(n))
+        .sort((a,b)=>a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'}));
+      if (uncat.length) {
+        children.push({
+          text: 'Ngăn khác',
+          sub: `${uncat.length} ngăn`,
+          color: capColor[tramMaxCap[t]] || '#888',
+          detail: uncat
+        });
+      }
+      items.push({
+        text: t,
+        badge: `${info.qty.toLocaleString('vi-VN')} TB`,
+        sub: `${allNgans.length} ngăn`,
+        color: capColor[tramMaxCap[t]] || '#888',
+        children: children.length ? children : null,
+        detail: children.length ? null : allNgans  // fallback nếu không phân nhóm được
+      });
     });
   });
   const totalQty = typeRows.reduce((s,d)=>s+(Number(d.So_luong)||1),0);
@@ -4318,6 +4380,119 @@ function _buildTramNganGroups(tramName, tRows, allNgans) {
 }
 
 // ── Stats card click — hiện detail panel bên phải ──────────────
+// ════════════════════════════════════════════════════════════════
+// Helper chung: Build hierarchy 3 cấp Trạm → Loại ngăn → Tên ngăn
+// Dùng cho tất cả panel detail (TBA, MBA, Ngăn XX, Tổng thiết bị...)
+//
+// Args:
+//   trams          : array trạm cần hiển thị (đã sort theo cấp + tên)
+//   tramMaxCap     : map { tram → cap }  (vd: 'E1.1' → '1')
+//   capColors      : map { cap → color } (LYT_CAP_COLORS)
+//   capLbls        : map { cap → '110kV' }
+//   getNgansForTram: function(tram) → Set/Array tên ngăn THUỘC loại đang xem
+//                                     (vd: chỉ ngăn có MBA)
+//
+// Returns: items[] sẵn sàng cho _lytShowDetailPanel
+// ════════════════════════════════════════════════════════════════
+function _lytBuildHierarchy(trams, tramMaxCap, capColors, capLbls, getNgansForTram) {
+  // Group trạm theo cấp điện áp
+  const byCap = {};
+  trams.forEach(t => {
+    const cap = tramMaxCap[t] || '?';
+    if (!byCap[cap]) byCap[cap] = [];
+    byCap[cap].push(t);
+  });
+
+  // Thứ tự cấp điện áp: 220 → 110 → 35 → 22 → 10 → 6 → TT
+  const CAP_ORDER = ['2','1','3','4','9','6','0'];
+  const items = [];
+
+  // 7 nhóm ngăn chuẩn (cùng logic với code TBA 220kV/110kV)
+  const NGAN_GROUPS = [
+    { label:'Ngăn ĐZ',           fn: r => lytNormalizeNganLoai(r.Loai_ngan_lo) === 'Ngăn ĐZ' },
+    { label:'Ngăn MBA',          fn: r => lytIsMBARow(r) },
+    { label:'Ngăn XT',           fn: r => lytNormalizeNganLoai(r.Loai_ngan_lo) === 'Ngăn XT' },
+    { label:'Ngăn LL',           fn: r => lytNormalizeNganLoai(r.Loai_ngan_lo) === 'Ngăn LL' },
+    { label:'Ngăn Tụ bù (TBN)', fn: r => lytNormalizeNganLoai(r.Loai_ngan_lo) === 'Ngăn TBN' ||
+                                          ((r.Phan_loai_thiet_bi||'').trim().toUpperCase().includes('TBN')) },
+    { label:'Ngăn Tự dùng (TD)',fn: r => lytNormalizeNganLoai(r.Loai_ngan_lo) === 'NgănTD' ||
+                                          ((r.Phan_loai_thiet_bi||'').trim().toUpperCase() === 'MBATD') },
+    { label:'Ngăn Kháng',        fn: r => {
+        const loai = lytNormalizeNganLoai(r.Loai_ngan_lo);
+        const pl   = (r.Phan_loai_thiet_bi||'').trim();
+        return loai === 'Ngăn Kháng' || pl === 'K' || pl === 'Kháng';
+    }},
+  ];
+
+  CAP_ORDER.forEach(cap => {
+    const arr = byCap[cap];
+    if (!arr?.length) return;
+
+    // Sort trạm theo natural order (E1.1, E1.2, E1.5, E1.10...)
+    arr.sort((a, b) => a.localeCompare(b, 'vi', { numeric: true, sensitivity: 'base' }));
+
+    // Header nhóm cấp điện áp
+    items.push({
+      isGroup: true,
+      text: `── ${capLbls[cap] || cap} (${arr.length} trạm) ──`,
+      color: capColors[cap] || '#888'
+    });
+
+    // Từng trạm
+    arr.forEach(t => {
+      // Lấy ngăn của trạm THUỘC loại đang xem (từ caller)
+      const ngansOfType = new Set(getNgansForTram(t));
+      if (!ngansOfType.size) return;
+
+      // Lấy tất cả rows của trạm để phân loại đúng từng ngăn vào nhóm nào
+      const tRowsAll = _chipAllData.filter(r => (r.Tram||'').trim() === t);
+      const tColor = capColors[cap] || '#888';
+
+      // Build children: mỗi child = 1 nhóm ngăn
+      const children = [];
+      const usedNgans = new Set();
+
+      NGAN_GROUPS.forEach(g => {
+        // Ngăn vừa thuộc nhóm này VỪA chứa thiết bị loại đang xem
+        const gNgans = [...new Set(
+          tRowsAll.filter(g.fn).map(r => (r.Ngan_thiet_bi||'').trim()).filter(Boolean)
+        )].filter(n => ngansOfType.has(n))
+          .sort((a, b) => a.localeCompare(b, 'vi', { numeric: true, sensitivity: 'base' }));
+
+        if (!gNgans.length) return;
+        gNgans.forEach(n => usedNgans.add(n));
+        children.push({
+          text:  g.label,
+          sub:   `${gNgans.length} ngăn`,
+          color: tColor,
+          detail: gNgans,
+        });
+      });
+
+      // Ngăn còn lại không thuộc nhóm nào → gom vào "Ngăn khác"
+      const otherNgans = [...ngansOfType].filter(n => !usedNgans.has(n))
+        .sort((a, b) => a.localeCompare(b, 'vi', { numeric: true, sensitivity: 'base' }));
+      if (otherNgans.length) {
+        children.push({
+          text:  'Ngăn khác',
+          sub:   `${otherNgans.length} ngăn`,
+          color: tColor,
+          detail: otherNgans,
+        });
+      }
+
+      items.push({
+        text:  t,
+        sub:   `${ngansOfType.size} ngăn`,
+        color: tColor,
+        children,
+      });
+    });
+  });
+
+  return items;
+}
+
 function lytStatsCardClick(label, color) {
   // Guard: data chưa load
   if (!_chipAllData || !_chipAllData.length) {
@@ -4341,7 +4516,7 @@ function lytStatsCardClick(label, color) {
   const filteredTrams = [...new Set(rows.map(d=>(d.Tram||'').trim()).filter(Boolean))];
   filteredTrams.sort((a,b) => {
     const pa = capPrio[tramMaxCap[a]]??9, pb = capPrio[tramMaxCap[b]]??9;
-    return pa!==pb ? pa-pb : a.localeCompare(b,'vi');
+    return pa!==pb ? pa-pb : a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'});
   });
 
   let title = label;
@@ -4357,10 +4532,49 @@ function lytStatsCardClick(label, color) {
         if (!byMaxCap[mc]) byMaxCap[mc] = [];
         byMaxCap[mc].push(t);
       });
+      // ── Đồng bộ với TBA 220kV: mỗi trạm có children là các nhóm ngăn ──
+      const scope_tba = lytBuildScopedNganSets(rows, _chipAllData);
+      const NGAN_GROUPS_TBA = [
+        { label:'Ngăn ĐZ',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn ĐZ' },
+        { label:'Ngăn MBA',          fn: r=>lytIsMBARow(r) },
+        { label:'Ngăn XT',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn XT' },
+        { label:'Ngăn LL',           fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn LL' },
+        { label:'Ngăn Tụ bù (TBN)', fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='Ngăn TBN'||((r.Phan_loai_thiet_bi||'').trim().toUpperCase().includes('TBN')) },
+        { label:'Ngăn Tự dùng (TD)',fn: r=>lytNormalizeNganLoai(r.Loai_ngan_lo)==='NgănTD'||((r.Phan_loai_thiet_bi||'').trim().toUpperCase()==='MBATD') },
+        { label:'Ngăn Kháng',        fn: r=>{
+          const loai = lytNormalizeNganLoai(r.Loai_ngan_lo);
+          const pl   = (r.Phan_loai_thiet_bi||'').trim();
+          return loai === 'Ngăn Kháng' || pl === 'K' || pl === 'Kháng';
+        }},
+      ];
+      // Thứ tự cấp: 220 → 110 → 35 → 22 → 10 → 6 → TT
       ['2','1','3','4','9','6','0'].forEach(cap => {
         const arr = byMaxCap[cap]; if (!arr||!arr.length) return;
+        // Natural sort các trạm trong cùng cấp
+        arr.sort((a,b) => a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'}));
         items.push({ text: `── ${capLbl[cap]||cap} (${arr.length} trạm) ──`, isGroup: true, color: LYT_CAP_COLORS[cap]||'#888' });
-        arr.forEach(t => items.push({ text: t, sub: capLbl[cap]||cap, color: LYT_CAP_COLORS[cap]||'#888' }));
+        arr.forEach(t => {
+          const tRowsT = scope_tba.scopedRows.filter(r=>(r.Tram||'').trim()===t);
+          const allNgansT = [...new Set(tRowsT.map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))];
+          const catSetT = new Set();
+          const childrenT = [];
+          NGAN_GROUPS_TBA.forEach(g => {
+            const gNgans = [...new Set(tRowsT.filter(g.fn).map(r=>(r.Ngan_thiet_bi||'').trim()).filter(Boolean))]
+              .sort((a,b)=>a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'}));
+            if (!gNgans.length) return;
+            gNgans.forEach(n => catSetT.add(n));
+            childrenT.push({ text: g.label, sub: `${gNgans.length} ngăn`, color: LYT_CAP_COLORS[cap]||'#888', detail: gNgans });
+          });
+          const uncatT = allNgansT.filter(n=>!catSetT.has(n))
+            .sort((a,b)=>a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'}));
+          if (uncatT.length) childrenT.push({ text: 'Ngăn khác', sub: `${uncatT.length} ngăn`, color: LYT_CAP_COLORS[cap]||'#888', detail: uncatT });
+          items.push({
+            text: t,
+            sub: `${allNgansT.length} ngăn · ${capLbl[cap]||cap}`,
+            color: LYT_CAP_COLORS[cap]||'#888',
+            children: childrenT.length ? childrenT : null
+          });
+        });
       });
       totalLine = `${filteredTrams.length} trạm`;
       break;
@@ -4509,12 +4723,11 @@ function lytStatsCardClick(label, color) {
         if (!byTram[tram]) byTram[tram] = new Set();
         byTram[tram].add(ngan);
       });
-      let total = 0;
-      filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort(); total += ngans.length;
-        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
-      });
-      totalLine = `${total} ngăn ĐZ / ${Object.keys(byTram).length} trạm`;
+      const showTrams = filteredTrams.filter(t => byTram[t]);
+      items = _lytBuildHierarchy(showTrams, tramMaxCap, LYT_CAP_COLORS, capLbl,
+        (t) => byTram[t] || new Set());
+      const total = showTrams.reduce((s, t) => s + byTram[t].size, 0);
+      totalLine = `${total} ngăn ĐZ · ${showTrams.length} trạm`;
       break;
     }
     case 'MBA': case 'Ngăn MBA': {
@@ -4527,12 +4740,11 @@ function lytStatsCardClick(label, color) {
         if (!byTram[tram]) byTram[tram] = new Set();
         byTram[tram].add(ngan);
       });
-      let total = 0;
-      filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort(); total += ngans.length;
-        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
-      });
-      totalLine = `${total} ngăn MBA / ${Object.keys(byTram).length} trạm`;
+      const showTrams = filteredTrams.filter(t => byTram[t]);
+      items = _lytBuildHierarchy(showTrams, tramMaxCap, LYT_CAP_COLORS, capLbl,
+        (t) => byTram[t] || new Set());
+      const total = showTrams.reduce((s, t) => s + byTram[t].size, 0);
+      totalLine = `${total} ngăn MBA · ${showTrams.length} trạm`;
       break;
     }
     case 'Ngăn XT': case 'Ngăn xuất tuyến': case 'Ngăn xuất tuyến (XT)': {
@@ -4545,12 +4757,11 @@ function lytStatsCardClick(label, color) {
         if (!byTram[tram]) byTram[tram] = new Set();
         byTram[tram].add(ngan);
       });
-      let total = 0;
-      filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort(); total += ngans.length;
-        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
-      });
-      totalLine = `${total} ngăn XT / ${Object.keys(byTram).length} trạm`;
+      const showTrams = filteredTrams.filter(t => byTram[t]);
+      items = _lytBuildHierarchy(showTrams, tramMaxCap, LYT_CAP_COLORS, capLbl,
+        (t) => byTram[t] || new Set());
+      const total = showTrams.reduce((s, t) => s + byTram[t].size, 0);
+      totalLine = `${total} ngăn XT · ${showTrams.length} trạm`;
       break;
     }
     case 'Ngăn liên lạc (LL)': {
@@ -4563,97 +4774,73 @@ function lytStatsCardClick(label, color) {
         if (!byTram[tram]) byTram[tram] = new Set();
         byTram[tram].add(ngan);
       });
-      let total = 0;
-      filteredTrams.filter(t => byTram[t]).forEach(t => {
-        const ngans = [...byTram[t]].sort(); total += ngans.length;
-        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail: ngans });
-      });
-      totalLine = `${total} ngăn LL / ${Object.keys(byTram).length} trạm`;
+      const showTrams = filteredTrams.filter(t => byTram[t]);
+      items = _lytBuildHierarchy(showTrams, tramMaxCap, LYT_CAP_COLORS, capLbl,
+        (t) => byTram[t] || new Set());
+      const total = showTrams.reduce((s, t) => s + byTram[t].size, 0);
+      totalLine = `${total} ngăn LL · ${showTrams.length} trạm`;
       break;
     }
     case 'Ngăn tụ bù (TBN)': {
       title = '🔋 Ngăn Tụ Bù (TBN)';
       const _tbnScope = lytBuildScopedNganSets(rows, _chipAllData);
-      const byTramTBN = {};
+      const byTram = {};
+      let totalActive = 0, totalInactive = 0;
       _tbnScope.tbnAll.forEach(key => {
         const [tram, ngan] = key.split('|||'); if(!tram||!ngan) return;
-        if(!byTramTBN[tram]) byTramTBN[tram] = { active:[], inactive:[] };
+        if(!byTram[tram]) byTram[tram] = new Set();
+        byTram[tram].add(ngan);
         const ckhai = (_tbnScope.tbnMeta?.get(key)||'') === 'chua_khai_thac';
-        if (ckhai) byTramTBN[tram].inactive.push(ngan);
-        else       byTramTBN[tram].active.push(ngan);
+        if (ckhai) totalInactive++; else totalActive++;
       });
-      let total = 0;
-      filteredTrams.filter(t => byTramTBN[t]).forEach(t => {
-        const { active, inactive } = byTramTBN[t];
-        total += active.length;
-        const detail = [
-          ...active.sort().map(n => `${n} — Ngăn TBN (có thiết bị tụ bù)`),
-          ...inactive.sort().map(n => `${n} — Ngăn TBN (chưa khai thác)`),
-        ];
-        const sub = active.length
-          ? `${active.length} ngăn${inactive.length?' · '+inactive.length+' chưa khai thác':''}`
-          : `${inactive.length} ngăn (chưa khai thác)`;
-        items.push({ text: t, sub, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail });
-      });
-      totalLine = `${total} ngăn TBN / ${filteredTrams.size} trạm`;
+      const showTrams = filteredTrams.filter(t => byTram[t]);
+      items = _lytBuildHierarchy(showTrams, tramMaxCap, LYT_CAP_COLORS, capLbl,
+        (t) => byTram[t] || new Set());
+      totalLine = `${totalActive} ngăn TBN · ${totalInactive} chưa khai thác · ${showTrams.length} trạm`;
       break;
     }
     case 'Ngăn tự dùng (TD)': {
       title = '🔌 Ngăn Tự Dùng (TD)';
       const _tdScope = lytBuildScopedNganSets(rows, _chipAllData);
-      // Use tdAll (includes chưa khai thác) for display, tdActiveSet for count
-      const byTramTD = {};
+      const byTram = {};
+      let totalActive = 0, totalInactive = 0;
       _tdScope.tdAll.forEach(key => {
         const [tram, ngan] = key.split('|||'); if(!tram||!ngan) return;
-        if(!byTramTD[tram]) byTramTD[tram] = { active:[], inactive:[] };
-        const status = (_tdScope.tdMeta?.get(key)||'') === 'chua_khai_thac';
-        if (status) byTramTD[tram].inactive.push(ngan);
-        else        byTramTD[tram].active.push(ngan);
+        if(!byTram[tram]) byTram[tram] = new Set();
+        byTram[tram].add(ngan);
+        const ck = (_tdScope.tdMeta?.get(key)||'') === 'chua_khai_thac';
+        if (ck) totalInactive++; else totalActive++;
       });
-      let total = 0;
-      filteredTrams.filter(t => byTramTD[t]).forEach(t => {
-        const { active, inactive } = byTramTD[t];
-        total += active.length; // chỉ đếm ngăn có MBATD
-        const detail = [
-          ...active.sort().map(n => `${n} — Ngăn TD (có MBATD)`),
-          ...inactive.sort().map(n => `${n} — Ngăn TD (chưa khai thác)`),
-        ];
-        const sub = active.length
-          ? `${active.length} ngăn${inactive.length?' · '+inactive.length+' chưa khai thác':''}`
-          : `${inactive.length} ngăn (chưa khai thác)`;
-        items.push({ text: t, sub, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#888', detail });
-      });
-      totalLine = `${total} ngăn TD / ${filteredTrams.size} trạm`;
+      const showTrams = filteredTrams.filter(t => byTram[t]);
+      items = _lytBuildHierarchy(showTrams, tramMaxCap, LYT_CAP_COLORS, capLbl,
+        (t) => byTram[t] || new Set());
+      totalLine = `${totalActive} ngăn TD · ${totalInactive} chưa khai thác · ${showTrams.length} trạm`;
       break;
     }
     case 'Ngăn kháng': {
       title = '🧲 Ngăn Kháng';
-      // Use _chipAllData (full dataset) to find kháng ngăn, not just filtered rows
       const khangSource = _chipAllData.length ? _chipAllData : rows;
-      const byTramK = {};
+      const byTram = {};
       khangSource.forEach(d => {
         const t = (d.Tram||'').trim(); if(!t) return;
-        const ng= (d.Ngan_thiet_bi||'').trim(); if(!ng) return;
+        const ng = (d.Ngan_thiet_bi||'').trim(); if(!ng) return;
         const loai = lytNormalizeNganLoai(d.Loai_ngan_lo);
         const pl   = (d.Phan_loai_thiet_bi||'').trim();
-        const isKhang = loai === 'Ngăn Kháng' || pl === 'K' || pl === 'Kháng';
-        if (!isKhang) return;
-        if (!byTramK[t]) byTramK[t] = new Set();
-        byTramK[t].add(ng);
+        if (loai === 'Ngăn Kháng' || pl === 'K' || pl === 'Kháng') {
+          if (!byTram[t]) byTram[t] = new Set();
+          byTram[t].add(ng);
+        }
       });
-      if (!Object.keys(byTramK).length) {
-        items.push({ text: 'Không tìm thấy Ngăn Kháng', sub: 'Kiểm tra trường Loai_ngan_lo hoặc Phan_loai_thiet_bi', color: '#ff9100' });
+      if (!Object.keys(byTram).length) {
+        items.push({ text: 'Không tìm thấy Ngăn Kháng', sub: 'Kiểm tra Loai_ngan_lo hoặc Phan_loai_thiet_bi', color: '#ff9100' });
         totalLine = 'Không có dữ liệu';
         break;
       }
-      let total = 0;
-      // Only show trams matching current filter
-      const showTrams = filteredTrams.size ? [...filteredTrams] : Object.keys(byTramK);
-      showTrams.filter(t => byTramK[t]).forEach(t => {
-        const ngans = [...byTramK[t]].sort(); total += ngans.length;
-        items.push({ text: t, sub: `${ngans.length} ngăn`, color: LYT_CAP_COLORS[tramMaxCap[t]]||'#e040fb', detail: ngans });
-      });
-      totalLine = `${total} ngăn Kháng / ${Object.keys(byTramK).length} trạm`;
+      const showTrams = (filteredTrams.length ? filteredTrams : Object.keys(byTram)).filter(t => byTram[t]);
+      items = _lytBuildHierarchy(showTrams, tramMaxCap, LYT_CAP_COLORS, capLbl,
+        (t) => byTram[t] || new Set());
+      const total = showTrams.reduce((s, t) => s + byTram[t].size, 0);
+      totalLine = `${total} ngăn Kháng · ${showTrams.length} trạm`;
       break;
     }
     case 'Tổng số thiết bị': {
@@ -4685,7 +4872,7 @@ function lytStatsCardClick(label, color) {
           // Leaf: each device name A-Z, deduplicated
           const devNames = [...new Set(
             rs.map(r=>(r.Ten_thiet_bi||r.Ngan_thiet_bi||r.Phan_loai_thiet_bi||'').trim()).filter(Boolean)
-          )].sort((a,b)=>a.localeCompare(b,'vi'));
+          )].sort((a,b)=>a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'}));
           const qty = rs.reduce((s,r)=>s+(Number(r.So_luong)||1),0);
           return {
             text: `${t}${capTag}`,
@@ -5866,6 +6053,7 @@ function _tbStatCardClick(key) {
   const items=[];
 
   if(key==='total'){
+    // ── Unified: nhóm theo loại thiết bị → trong mỗi loại dùng hierarchy 3 cấp ──
     const byType={};
     rows.forEach(r=>{
       const pl=(r.Phan_loai_thiet_bi||'Khác').trim();
@@ -5874,14 +6062,59 @@ function _tbStatCardClick(key) {
       const t=(r.Tram||'').trim();
       if(t){if(!byType[pl].trams[t])byType[pl].trams[t]=[];byType[pl].trams[t].push(r);}
     });
-    Object.entries(byType).sort((a,b)=>b[1].qty-a[1].qty).forEach(([pl,v])=>{
-      const tList=Object.entries(v.trams).sort((a,b)=>b[1].length-a[1].length);
-      const detail=tList.map(([t,rs])=>{
-        const cap=tramMaxCap[t]||'';
-        const devNames=rs.slice(0,5).map(r=>(r.Ten_thiet_bi||r.Ngan_thiet_bi||'—').trim()).filter((x,i,a)=>a.indexOf(x)===i);
-        return `${t}${cap?` [${capLbl2[cap]||cap}]`:''} — ${rs.length} TB: ${devNames.join(', ')}${rs.length>5?'…':''}`;
+
+    // Sort theo qty giảm dần (loại nhiều nhất lên đầu)
+    const sortedTypes = Object.entries(byType).sort((a,b)=>b[1].qty-a[1].qty);
+
+    sortedTypes.forEach(([pl, v]) => {
+      const trams = Object.keys(v.trams);
+
+      // Build children dạng hierarchy 3 cấp: cấp điện áp → trạm → tên ngăn
+      const byCap = {};
+      trams.forEach(t => {
+        const cap = tramMaxCap[t] || '?';
+        if (!byCap[cap]) byCap[cap] = [];
+        byCap[cap].push(t);
       });
-      items.push({text:pl,badge:`${fmt(v.qty)} TB · ${tList.length} trạm`,color:'#00c8ff',detail});
+
+      const CAP_ORDER = ['2','1','3','4','9','6','0'];
+      const children = [];
+
+      CAP_ORDER.forEach(cap => {
+        const arr = byCap[cap];
+        if (!arr?.length) return;
+        // Natural sort: E1.1, E1.2, E1.5, E1.10...
+        arr.sort((a, b) => a.localeCompare(b, 'vi', { numeric: true, sensitivity: 'base' }));
+
+        // Header nhóm cấp (level 2 - đứng ngay sau loại TB)
+        children.push({
+          isGroup: true,
+          text: `── ${capLbl2[cap]||cap} (${arr.length} trạm) ──`,
+          color: capCol2[cap] || '#888',
+        });
+
+        arr.forEach(t => {
+          const rs = v.trams[t];
+          // Detail: tên ngăn/thiết bị unique
+          const devNames = [...new Set(
+            rs.map(r => (r.Ngan_thiet_bi || r.Ten_thiet_bi || '').trim()).filter(Boolean)
+          )].sort((a, b) => a.localeCompare(b, 'vi', { numeric: true, sensitivity: 'base' }));
+
+          children.push({
+            text: t,
+            sub: `${rs.length} TB`,
+            color: capCol2[cap] || '#888',
+            detail: devNames,
+          });
+        });
+      });
+
+      items.push({
+        text: pl,
+        sub: `${fmt(v.qty)} TB · ${trams.length} trạm`,
+        color: '#00c8ff',
+        children,
+      });
     });
   } else if(key==='trams'){
     const byTram={};
@@ -6204,7 +6437,7 @@ function _tbLoadFromSource(source, conf) {
   _tbApply();
 
   // Build data lists for dropdowns
-  const sortVi = (a,b) => a.localeCompare(b,'vi');
+  const sortVi = (a,b) => a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'});
   const sortNum = (a,b) => Number(b) - Number(a);
   const tramsAll = [...new Set(_tbData.map(r=>(r.Tram||'').trim()).filter(Boolean))].sort(sortVi);
   const typesAll = [...new Set(_tbData.map(r=>(r.Phan_loai_thiet_bi||'').trim()).filter(Boolean))].sort(sortVi);
@@ -6314,7 +6547,7 @@ function _tbLoadFromSource(source, conf) {
 
   const _tbDdRefs = {}; // key → {btn, lbl, ico, setItems, reset}
   const _tbCapPrioCasc = {'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
-  const _sortViCasc = (a,b) => a.localeCompare(b,'vi');
+  const _sortViCasc = (a,b) => a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'});
   const _sortNumCasc = (a,b) => Number(b)-Number(a);
 
   // Lấy source data đã lọc đến key (không tính key hiện tại)
@@ -6700,7 +6933,7 @@ function _tnShowStatPanel(lvl) {
     if(!byTram[t]) byTram[t]=[];
     byTram[t].push(r);
   });
-  const tramKeys = Object.keys(byTram).sort((a,b)=>a.localeCompare(b,'vi'));
+  const tramKeys = Object.keys(byTram).sort((a,b)=>a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'}));
 
   const bodyHtml = tramKeys.map(t => {
     const arr = byTram[t];
@@ -7013,7 +7246,7 @@ function tnRenderPage(conf, title) {
     _tnApply();
 
     // Dropdowns
-    const sortVi=(a,b)=>a.localeCompare(b,'vi');
+    const sortVi=(a,b)=>a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'});
     const cpPrio={'2':0,'1':1,'3':2,'4':3,'9':4,'6':5,'0':6};
     const trA=[...new Set(_tnAllData.map(r=>(r.Tram||'').trim()).filter(Boolean))].sort(sortVi);
     const tyA=[...new Set(_tnAllData.map(r=>(r.Phan_loai_thiet_bi||'').trim()).filter(Boolean))].sort(sortVi);
@@ -7170,7 +7403,7 @@ function _bcGroupedTable(rows, colDefs) {
     groups[key].push(r);
   });
 
-  const sortedKeys = Object.keys(groups).sort((a,b) => a.localeCompare(b,'vi'));
+  const sortedKeys = Object.keys(groups).sort((a,b) => a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'}));
 
   const thead = `<tr>${colDefs.map(c=>`<th style="padding:7px 10px;font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);white-space:nowrap;min-width:${c.w||'80px'};text-align:${c.num?'right':'left'};position:sticky;top:0;z-index:2">${c.l}</th>`).join('')}</tr>`;
 
@@ -7283,7 +7516,7 @@ function _bcRenderByMonth(conf) {
   });
 
   const months = Object.keys(monthMap).sort().map(k=>monthMap[k]);
-  const filteredTypes = [...new Set(data.map(r=>(r.Phan_loai_thiet_bi||'Khác').trim()))].sort((a,b)=>a.localeCompare(b,'vi'));
+  const filteredTypes = [...new Set(data.map(r=>(r.Phan_loai_thiet_bi||'Khác').trim()))].sort((a,b)=>a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'}));
   const COLORS = ['#00c8ff','#00e676','#ffd740','#ff9100','#e040fb','#18ffff','#ff4081','#00bcd4','#8bc34a','#ff5252'];
 
   const totalDone = data.filter(r=>r.Ngay_thi_nghiem).length;
@@ -7547,7 +7780,7 @@ function _bcRenderByYear(conf) {
   });
 
   const years = Object.keys(yearMap).map(Number).sort((a,b)=>a-b);
-  const allTypes = [...new Set(data.map(r=>(r.Phan_loai_thiet_bi||'Khác').trim()))].sort((a,b)=>a.localeCompare(b,'vi'));
+  const allTypes = [...new Set(data.map(r=>(r.Phan_loai_thiet_bi||'Khác').trim()))].sort((a,b)=>a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'}));
   const COLORS = ['#00c8ff','#00e676','#ffd740','#ff9100','#b388ff','#18ffff','#ff4081','#00bcd4','#8bc34a','#ff5252'];
 
   return `
@@ -7696,7 +7929,7 @@ function _bcStatClick(key, data) {
     const types=Object.keys(byType).sort((a,b)=>byType[b].total-byType[a].total);
     totalLine=`${fmt(filtered.length)} thiết bị · ${types.length} loại · ${new Set(filtered.map(r=>(r.Tram||'').trim())).size} trạm`;
     const items2=types.map(tp=>{
-      const ti=byType[tp],trams=Object.keys(ti.trams).sort((a,b)=>a.localeCompare(b,'vi'));
+      const ti=byType[tp],trams=Object.keys(ti.trams).sort((a,b)=>a.localeCompare(b,'vi',{numeric:true,sensitivity:'base'}));
       const detail=trams.map(t=>{const rs=ti.trams[t];return `${t} [${_cL[String(rs[0]?.Cap_dien_ap??'')] ||''}] — ${rs.length} TB: ${rs.slice(0,3).map(r=>r.Ten_thiet_bi||r.Ngan_thiet_bi||'—').join(', ')}${rs.length>3?'…':''}`;});
       return {text:tp,badge:`${fmt(ti.total)}`,color:col,detail};
     });
