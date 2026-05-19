@@ -3,7 +3,7 @@
 // Cache strategy: stale-while-revalidate cho assets, network-first cho API
 // ════════════════════════════════════════════════════════════════
 
-const CACHE_VERSION = 'evn-v5-bbtn-timeout';
+const CACHE_VERSION = 'evn-v6-nas-retry';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE    = `${CACHE_VERSION}-api`;
 
