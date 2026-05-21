@@ -1,11 +1,13 @@
 // ════════════════════════════════════════════════════════════════
 // EVNHANOI Dashboard — Service Worker
-// Cache strategy: stale-while-revalidate cho assets, network-first cho API
+// Cache strategy:
+//   - Static assets (HTML/JS/CSS): network-first → tránh giữ bản lỗi cũ
+//   - CDN libraries: cache-first (version trong URL)
+//   - Supabase API & Edge Functions: KHÔNG cache (luôn live)
 // ════════════════════════════════════════════════════════════════
 
-const CACHE_VERSION = 'evn-v6-nas-retry';
-const STATIC_CACHE = `${CACHE_VERSION}-static`;
-const API_CACHE    = `${CACHE_VERSION}-api`;
+const CACHE_VERSION = 'evn-v7-nas-fix';
+const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 
 // Assets cần cache ngay khi install (precaching)
 const STATIC_ASSETS = [
@@ -62,14 +64,16 @@ self.addEventListener('fetch', (event) => {
   // Bỏ qua chrome-extension, blob:, data:
   if (!url.protocol.startsWith('http')) return;
 
-  // ── Supabase API queries: network-first (luôn lấy data mới) ──
+  // ── Supabase API & Edge Functions: KHÔNG đụng vào ──
+  //   Lý do: bbtn-list, bbtn-download, asset-* cần dữ liệu live; cache sai
+  //   sẽ cho user file/folder ảo. Mọi retry/timeout xử lý trong app.js.
   if (url.hostname.includes('supabase.co')) {
-    // Edge Functions không cache
-    if (url.pathname.includes('/functions/')) {
-      return;  // dùng default network fetch
-    }
-    // REST queries: network-first, fallback cache
-    event.respondWith(networkFirstWithCache(req));
+    return;  // dùng default network fetch của browser
+  }
+
+  // ── ngrok tunnel (nếu frontend gọi trực tiếp, không qua Edge): KHÔNG cache
+  if (url.hostname.endsWith('ngrok-free.dev') || url.hostname.endsWith('ngrok-free.app') ||
+      url.hostname.endsWith('ngrok.io') || url.hostname.endsWith('ngrok.app')) {
     return;
   }
 
@@ -83,7 +87,7 @@ self.addEventListener('fetch', (event) => {
   // app.js/index.html/sw.js dùng network-first để tránh trình duyệt giữ bản lỗi cũ sau deploy.
   if (url.origin === self.location.origin) {
     if (/\/(app\.js|index\.html|sw\.js)$/.test(url.pathname) || url.pathname === '/') {
-      event.respondWith(networkFirstWithCache(req));
+      event.respondWith(networkFirstShortFallback(req));
     } else {
       event.respondWith(staleWhileRevalidate(req));
     }
@@ -122,31 +126,28 @@ async function staleWhileRevalidate(req) {
   return cached || fetchPromise || new Response('Offline', { status: 503 });
 }
 
-// ── Strategy: Network-first với cache fallback ───────────
-async function networkFirstWithCache(req) {
-  const cache = await caches.open(API_CACHE);
+// ── Strategy: Network-first cho static, fallback cache (chỉ cho HTML/JS/CSS chính) ──
+async function networkFirstShortFallback(req) {
+  const cache = await caches.open(STATIC_CACHE);
   try {
-    const fresh = await fetch(req);
-    if (fresh.ok) {
-      // Cache GET data 5 phút (cho fallback khi offline)
-      cache.put(req, fresh.clone());
-    }
+    // Timeout ngắn 8s vì file local nhỏ
+    const ctrl = new AbortController();
+    const tid  = setTimeout(() => ctrl.abort(), 8000);
+    const fresh = await fetch(req, { signal: ctrl.signal });
+    clearTimeout(tid);
+    if (fresh.ok) cache.put(req, fresh.clone());
     return fresh;
   } catch (e) {
-    // Mất mạng → fallback cache
     const cached = await cache.match(req);
     if (cached) {
       console.log('[SW] Offline fallback:', req.url);
       return cached;
     }
-    return new Response(
-      JSON.stringify({ error: 'Offline - không có cache' }),
-      { status: 503, headers: { 'Content-Type': 'application/json' } }
-    );
+    return new Response('Offline', { status: 503 });
   }
 }
 
-// ── Message handler: cho phép page yêu cầu skipWaiting ──
+// ── Message handler: cho phép page yêu cầu skipWaiting / clearCache ──
 self.addEventListener('message', (event) => {
   if (event.data === 'skipWaiting') self.skipWaiting();
   if (event.data === 'clearCache') {

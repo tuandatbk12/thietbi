@@ -8883,6 +8883,7 @@ async function nasUploadFile(file, folder, prefix='') {
     method:  'PUT',
     headers: {
       'Content-Type': file.type || 'application/octet-stream',
+      'ngrok-skip-browser-warning': 'true',
       ...nasAuthHeader(),
     },
     body: buf,
@@ -8906,7 +8907,7 @@ async function nasMkdir(folderPath) {
   try {
     await fetch(url, {
       method: 'MKCOL',
-      headers: nasAuthHeader(),
+      headers: { 'ngrok-skip-browser-warning': 'true', ...nasAuthHeader() },
       credentials: 'omit',
     });
   } catch(e) { /* ignore — folder may already exist */ }
@@ -9071,34 +9072,68 @@ async function _bbtnDownloadSelectedZip() {
   const currentPath = (window._bbtnState && window._bbtnState.path) || (NAS_CONFIG.bbtnPath || '/BBTN');
   const btn = document.getElementById('_bbtnZipBtn');
   const orig = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang gộp ZIP...'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Liệt kê file...'; }
 
-  try {
-    const zip = new JSZip();
-    let totalFiles = 0, errCount = 0;
-
+  // Helper: gom toàn bộ file trong các trạm (đệ quy 1 cấp đủ vì BBTN/.../Trạm/<file>)
+  async function _collectFiles() {
+    const all = [];   // { folder, relPath, name }
     for (const folderName of sel) {
       const folderPath = currentPath.replace(/\/$/, '') + '/' + folderName;
       try {
         const items = await _bbtnPropfind(folderPath);
-        const files = (items || []).filter(it => !it.isFolder);
-        for (const f of files) {
-          try {
-            const token = await _authGetToken();
-            const url = _AUTH_SB_URL.replace(/\/$/, '') + '/functions/v1/bbtn-download'
-                      + '?path=' + encodeURIComponent(f.relativePath || '');
-            const resp = await _bbtnFetchEdge(url, token, { timeoutMs: 30000 });
-            const blob = await resp.blob();
-            zip.file(folderName + '/' + (f.name || 'file'), blob);
-            totalFiles++;
-          } catch (e) { errCount++; console.warn('File error:', f.name, e); }
-        }
-      } catch (e) { errCount++; console.warn('Folder error:', folderName, e); }
+        (items || []).filter(it => !it.isFolder).forEach(f => {
+          all.push({ folder: folderName, relPath: f.relativePath || '', name: f.name || 'file' });
+        });
+      } catch (e) { console.warn('[ZIP] list folder', folderName, e); }
     }
+    return all;
+  }
 
-    if (totalFiles === 0) throw new Error('Không tải được file nào');
+  // Concurrency limit để không vắt kiệt ngrok
+  async function _runPool(items, limit, worker) {
+    const results = []; let idx = 0;
+    const workers = Array.from({ length: limit }, async () => {
+      while (idx < items.length) {
+        const i = idx++;
+        results[i] = await worker(items[i], i);
+      }
+    });
+    await Promise.all(workers);
+    return results;
+  }
 
-    showChangeNotif('info', 'Đang nén ZIP...', totalFiles + ' file');
+  try {
+    const allFiles = await _collectFiles();
+    if (!allFiles.length) throw new Error('Không có file trong các trạm đã chọn');
+
+    const zip = new JSZip();
+    let done = 0, errCount = 0;
+    const total = allFiles.length;
+    const updateBtn = () => {
+      if (btn) btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Tải ${done}/${total}…`;
+    };
+    updateBtn();
+
+    await _runPool(allFiles, 3, async (f) => {
+      try {
+        const token = await _authGetToken();
+        const url = _AUTH_SB_URL.replace(/\/$/, '') + '/functions/v1/bbtn-download'
+                  + '?path=' + encodeURIComponent(f.relPath);
+        const resp = await _bbtnFetchEdge(url, token, { timeoutMs: 90_000, maxRetries: 1 });
+        const blob = await resp.blob();
+        zip.file(f.folder + '/' + f.name, blob);
+      } catch (e) {
+        errCount++; console.warn('[ZIP] file error', f.name, e);
+      } finally {
+        done++; updateBtn();
+      }
+    });
+
+    const ok = total - errCount;
+    if (ok === 0) throw new Error('Không tải được file nào');
+
+    if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang nén ZIP...';
+    showChangeNotif('info', 'Đang nén ZIP...', ok + '/' + total + ' file');
     const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 }});
     const blobUrl = URL.createObjectURL(blob);
     const fileName = 'BBTN_' + sel.length + 'tram_' + new Date().toISOString().slice(0,10) + '.zip';
@@ -9106,7 +9141,7 @@ async function _bbtnDownloadSelectedZip() {
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
 
-    showChangeNotif('success', 'Đã tải ZIP', totalFiles + ' file' + (errCount ? ', ' + errCount + ' lỗi' : ''));
+    showChangeNotif('success', 'Đã tải ZIP', ok + ' file' + (errCount ? ', ' + errCount + ' lỗi' : ''));
     window._bbtnSelected.clear();
     if (window._bbtnLastItems) _bbtnRenderItems(window._bbtnLastItems, window._bbtnLastPath, window._bbtnLastRoot, window._bbtnLastDepth);
   } catch (err) {
@@ -9217,12 +9252,36 @@ async function _bbtnLoadPath(path) {
     _bbtnRenderItems(items, path, rootPath, segments.length);
   } catch (err) {
     console.error('BBTN load error:', err);
-    const isAuthErr = err.message?.includes('hết hạn') || err.message?.includes('đăng nhập');
+    const msg       = err.message || 'Unknown error';
+    const isAuthErr = msg.includes('hết hạn') || msg.includes('đăng nhập');
+    const isTimeout = /NAS_TIMEOUT|CLIENT_TIMEOUT|abort/i.test(msg);
+    const isNotFound= /NOT_FOUND|404|không tồn tại/i.test(msg);
+
+    let title, hint, action;
+    if (isAuthErr) {
+      title = 'Phiên đăng nhập hết hạn';
+      hint  = 'Đăng nhập lại để tiếp tục.';
+      action= '<button onclick="_authLogout()" style="padding:8px 18px;border-radius:7px;border:none;background:#ff5252;color:#fff;font-weight:700;cursor:pointer;font-size:11.5px">Đăng nhập lại</button>';
+    } else if (isTimeout) {
+      title = 'NAS phản hồi quá lâu';
+      hint  = 'ngrok tunnel có thể đang cold-start hoặc NAS quá tải. Bấm Thử lại — lần thứ 2 thường nhanh hơn.';
+      action= `<button onclick="_bbtnInvalidateCache('${path.replace(/'/g,"\\'")}');_bbtnLoadPath('${path.replace(/'/g,"\\'")}')" style="padding:8px 18px;border-radius:7px;border:none;background:var(--accent);color:#000;font-weight:700;cursor:pointer;font-size:11.5px"><i class="fas fa-sync-alt"></i> Thử lại</button>`;
+    } else if (isNotFound) {
+      title = 'Thư mục không tồn tại trên NAS';
+      hint  = 'Đường dẫn không đúng hoặc folder vừa bị xóa.';
+      action= `<button onclick="_bbtnLoadPath('${rootPath.replace(/'/g,"\\'")}')" style="padding:8px 18px;border-radius:7px;border:none;background:var(--accent);color:#000;font-weight:700;cursor:pointer;font-size:11.5px"><i class="fas fa-home"></i> Về trang chủ BBTN</button>`;
+    } else {
+      title = 'Không tải được danh sách BBTN';
+      hint  = 'Kiểm tra kết nối hoặc liên hệ admin nếu lỗi vẫn tiếp tục.';
+      action= `<button onclick="_bbtnInvalidateCache('${path.replace(/'/g,"\\'")}');_bbtnLoadPath('${path.replace(/'/g,"\\'")}')" style="padding:8px 18px;border-radius:7px;border:none;background:var(--accent);color:#000;font-weight:700;cursor:pointer;font-size:11.5px"><i class="fas fa-sync-alt"></i> Thử lại</button>`;
+    }
+
     cont.innerHTML = `<div style="padding:40px;text-align:center">
       <i class="fas fa-times-circle" style="font-size:28px;color:#ff5252;margin-bottom:12px;display:block"></i>
-      <div style="font-size:13px;color:rgba(240,250,255,.9);font-weight:600;margin-bottom:6px">${isAuthErr ? 'Phiên đăng nhập hết hạn' : 'Không tải được danh sách BBTN'}</div>
-      <div style="font-size:10.5px;color:rgba(180,200,220,.65);margin-bottom:8px;font-family:var(--font-mono)">${err.message||'Unknown error'}</div>
-      ${isAuthErr ? '<button onclick="_authLogout()" style="padding:8px 18px;border-radius:7px;border:none;background:#ff5252;color:#fff;font-weight:700;cursor:pointer;font-size:11.5px">Đăng nhập lại</button>' : '<div style="font-size:10px;color:rgba(255,145,0,.7);max-width:400px;margin:0 auto;line-height:1.6">Kiểm tra kết nối hoặc liên hệ admin nếu lỗi vẫn tiếp tục.</div>'}
+      <div style="font-size:13px;color:rgba(240,250,255,.9);font-weight:600;margin-bottom:6px">${title}</div>
+      <div style="font-size:10.5px;color:rgba(180,200,220,.65);margin-bottom:8px;font-family:var(--font-mono);word-break:break-word;max-width:560px;margin-left:auto;margin-right:auto">${msg}</div>
+      <div style="font-size:10.5px;color:rgba(255,145,0,.75);max-width:480px;margin:8px auto 14px;line-height:1.6">${hint}</div>
+      ${action}
     </div>`;
   }
 }
@@ -9244,34 +9303,81 @@ function _bbtnBuildEdgeError(status, text, fallback) {
   return new Error(code + String(msg + detail).slice(0, 500));
 }
 
+// ── Retry + cache infrastructure cho Edge Function ─────────────
+// Lý do: ngrok free có cold-start 3-5s, NAS PROPFIND lớn 10-30s
+//   → cần timeout rộng tay + retry 1 lần khi gặp timeout/lỗi mạng.
+const _bbtnListCache = new Map();   // path → { ts, items }
+const _BBTN_LIST_TTL = 60_000;       // 60s — đủ để điều hướng nhanh
+let   _bbtnInflight  = new Map();    // path → Promise (chống double-fetch)
+
+function _bbtnSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
 async function _bbtnFetchEdge(edgeUrl, token, options = {}) {
-  const timeoutMs = options.timeoutMs || 20000;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const resp = await fetch(edgeUrl, {
-      ...options,
-      headers: {
-        ...(options.headers || {}),
-        'Authorization': 'Bearer ' + token,
-        'apikey': _AUTH_SB_KEY,
-      },
-      signal: controller.signal,
-    });
-    if (!resp.ok) {
-      const txt = await resp.text().catch(() => resp.statusText || '');
-      throw _bbtnBuildEdgeError(resp.status, txt, resp.statusText);
+  const timeoutMs   = options.timeoutMs   || 45_000;   // tăng từ 20s
+  const maxRetries  = options.maxRetries  ?? 1;        // mặc định 1 lần retry
+  const retryDelay  = options.retryDelay  || 1500;
+
+  let lastErr;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const resp = await fetch(edgeUrl, {
+        ...options,
+        headers: {
+          ...(options.headers || {}),
+          'Authorization': 'Bearer ' + token,
+          'apikey': _AUTH_SB_KEY,
+          // Bypass ngrok HTML interstitial NẾU Edge Function chạy ra ngrok trực tiếp;
+          // header này vô hại với Supabase nhưng được forward bởi Edge Function của ta.
+          'ngrok-skip-browser-warning': 'true',
+        },
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
+      if (!resp.ok) {
+        const txt = await resp.text().catch(() => resp.statusText || '');
+        const err = _bbtnBuildEdgeError(resp.status, txt, resp.statusText);
+        // Retry chỉ với 5xx & 408 & 504 (lỗi tạm thời)
+        if (attempt < maxRetries && (resp.status >= 500 || resp.status === 408 || resp.status === 504)) {
+          lastErr = err;
+          await _bbtnSleep(retryDelay * (attempt + 1));
+          continue;
+        }
+        throw err;
+      }
+      return resp;
+    } catch (err) {
+      clearTimeout(timer);
+      const isAbort   = err?.name === 'AbortError';
+      const isNetwork = err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError');
+      // Chỉ retry với timeout & network — không retry với lỗi nghiệp vụ (401/403/parse...)
+      if (attempt < maxRetries && (isAbort || isNetwork)) {
+        lastErr = isAbort
+          ? new Error('[CLIENT_TIMEOUT] Phiên đầu NAS phản hồi chậm — đang thử lại...')
+          : err;
+        await _bbtnSleep(retryDelay * (attempt + 1));
+        continue;
+      }
+      if (isAbort) throw new Error('[CLIENT_TIMEOUT] NAS phản hồi quá lâu sau ' + Math.round(timeoutMs/1000) + 's — kiểm tra ngrok tunnel & WebDAV');
+      throw err;
     }
-    return resp;
-  } catch (err) {
-    if (err?.name === 'AbortError') throw new Error('[CLIENT_TIMEOUT] Trình duyệt chờ Edge Function quá lâu, vui lòng thử lại sau vài giây');
-    throw err;
-  } finally {
-    clearTimeout(timer);
   }
+  throw lastErr || new Error('Edge Function lỗi không xác định');
 }
 
-async function _bbtnPropfind(path) {
+async function _bbtnPropfind(path, opts = {}) {
+  // ── Cache hit (trừ khi force refresh) ─────────────────
+  if (!opts.noCache) {
+    const cached = _bbtnListCache.get(path);
+    if (cached && (Date.now() - cached.ts) < _BBTN_LIST_TTL) {
+      return cached.items;
+    }
+  }
+  // ── Dedupe đồng thời (cùng path đang fetch → chờ chung) ─
+  if (_bbtnInflight.has(path)) return _bbtnInflight.get(path);
+
   const token = await _authGetToken();
   if (!token) throw new Error('Chưa đăng nhập hoặc phiên hết hạn');
 
@@ -9279,11 +9385,29 @@ async function _bbtnPropfind(path) {
     + '/functions/v1/bbtn-list'
     + '?path=' + encodeURIComponent(path);
 
-  const resp = await _bbtnFetchEdge(edgeUrl, token, { timeoutMs: 25000 });
-  const json = await resp.json();
-  if (json.error) throw _bbtnBuildEdgeError(200, JSON.stringify(json), 'Lỗi bbtn-list');
-  return json.items || [];
+  const p = (async () => {
+    try {
+      // Timeout 50s + 1 retry → tổng có thể 100s nếu ngrok cold start.
+      const resp = await _bbtnFetchEdge(edgeUrl, token, { timeoutMs: 50_000, maxRetries: 1 });
+      const json = await resp.json();
+      if (json.error) throw _bbtnBuildEdgeError(200, JSON.stringify(json), 'Lỗi bbtn-list');
+      const items = json.items || [];
+      _bbtnListCache.set(path, { ts: Date.now(), items });
+      return items;
+    } finally {
+      _bbtnInflight.delete(path);
+    }
+  })();
+  _bbtnInflight.set(path, p);
+  return p;
 }
+
+// Cho phép xóa cache (gọi từ _bbtnRefresh)
+function _bbtnInvalidateCache(path) {
+  if (path) _bbtnListCache.delete(path);
+  else _bbtnListCache.clear();
+}
+window._bbtnInvalidateCache = _bbtnInvalidateCache;
 
 /**
  * Render danh sách items (folder + file)
@@ -9424,6 +9548,7 @@ function _bbtnRenderItems(items, path, rootPath, depth) {
 
 function _bbtnRefresh() {
   const path = window._bbtnState?.path || NAS_CONFIG.bbtnPath || '/BBTN';
+  _bbtnInvalidateCache(path);  // bỏ cache → ép fetch lại từ NAS
   _bbtnLoadPath(path);
 }
 
@@ -9437,10 +9562,15 @@ function _bbtnCopyLink(url) {
 /**
  * Xem hoặc tải file BBTN qua Supabase Edge Function bbtn-download
  * User chỉ cần đăng nhập — không cần NAS config, không lộ NAS URL/credentials
+ *
+ * NB: timeout 120s + 1 retry; file lớn (PDF scan 20MB) qua ngrok có thể chậm
+ *     nhưng Edge Function ta đã stream nên không bị memory bound.
  */
 async function _bbtnViewFile(relativePath, forceDownload) {
   if (!relativePath) { showChangeNotif('error','Lỗi','Không có đường dẫn file'); return; }
-  if (!forceDownload) showChangeNotif('info', 'Đang tải file...', relativePath.split('/').pop() || '');
+  const fileName = decodeURIComponent(relativePath.split('/').pop() || 'file');
+  if (!forceDownload) showChangeNotif('info', 'Đang tải file...', fileName);
+
   try {
     const token = await _authGetToken();
     if (!token) { showChangeNotif('error','Chưa đăng nhập','Vui lòng đăng nhập lại'); return; }
@@ -9448,10 +9578,10 @@ async function _bbtnViewFile(relativePath, forceDownload) {
     const edgeBase = _AUTH_SB_URL.replace(/\/$/, '') + '/functions/v1/bbtn-download';
     const url = edgeBase + '?path=' + encodeURIComponent(relativePath) + (forceDownload ? '&download=1' : '');
 
-    const resp = await _bbtnFetchEdge(url, token, { timeoutMs: 30000 });
+    // 120s + 1 retry → đủ cho file PDF 20MB qua ngrok cold tunnel
+    const resp = await _bbtnFetchEdge(url, token, { timeoutMs: 120_000, maxRetries: 1 });
     const blob = await resp.blob();
     const blobUrl = URL.createObjectURL(blob);
-    const fileName = decodeURIComponent(relativePath.split('/').pop() || 'file');
 
     if (forceDownload) {
       const a = document.createElement('a');
@@ -10065,12 +10195,17 @@ async function _assetFetchThumb(id) {
     if (!token) return null;
 
     const url = _AUTH_SB_URL.replace(/\/$/, '') + '/functions/v1/asset-download?id=' + id;
+    // 30s timeout cho thumb — ngrok cold start có thể 5-8s đầu
+    const ctrl = new AbortController();
+    const tid  = setTimeout(() => ctrl.abort(), 30_000);
     const resp = await fetch(url, {
       headers: {
         'Authorization': 'Bearer ' + token,
         'apikey': _AUTH_SB_KEY,
-      }
-    });
+        'ngrok-skip-browser-warning': 'true',
+      },
+      signal: ctrl.signal,
+    }).finally(() => clearTimeout(tid));
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
 
     const blob = await resp.blob();
@@ -10278,49 +10413,59 @@ async function _assetDoUpload(idx) {
   const file = inp.files[0];
   const fileType = file.type.startsWith('image/') ? 'image' : 'document';
 
+  // Limit kích thước file để tránh kẹt Edge Function (Supabase free = 50MB max)
+  const MAX_MB = 25;
+  if (file.size > MAX_MB * 1024 * 1024) {
+    if (statusEl) { statusEl.style.color = '#ff5252'; statusEl.textContent = `✗ File quá lớn (${(file.size/1024/1024).toFixed(1)}MB) — tối đa ${MAX_MB}MB`; }
+    return;
+  }
+
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang tải...';
-  if (statusEl) { statusEl.style.color = '#ffd740'; statusEl.textContent = 'Đang mã hóa file...'; }
+  if (statusEl) { statusEl.style.color = '#ffd740'; statusEl.textContent = 'Đang upload lên NAS...'; }
 
   try {
-    const fileBase64 = await new Promise((res, rej) => {
-      const reader = new FileReader();
-      reader.onload = () => res(reader.result.split(',')[1]);
-      reader.onerror = rej;
-      reader.readAsDataURL(file);
-    });
-
-    if (statusEl) statusEl.textContent = 'Đang upload lên NAS...';
-
     const token = await _authGetToken();
     if (!token) throw new Error('Chưa đăng nhập — vui lòng login lại');
 
+    // ── Dùng multipart/form-data (binary) thay Base64 ─
+    //   Giảm 33% kích thước → upload nhanh hơn, ít tốn RAM Edge Function.
+    const fd = new FormData();
+    fd.append('assetKey',    makeAssetKey(r));
+    fd.append('tram',        r.Tram || '');
+    fd.append('capDienAp',   String(r.Cap_dien_ap ?? ''));
+    fd.append('loaiThietBi', r.Phan_loai_thiet_bi || '');
+    fd.append('tenThietBi',  r.Ten_thiet_bi || '');
+    fd.append('nganThietBi', r.Ngan_thiet_bi || '');
+    fd.append('fileName',    file.name);
+    fd.append('mimeType',    file.type || 'application/octet-stream');
+    fd.append('fileSize',    String(file.size));
+    fd.append('fileType',    fileType);
+    fd.append('note',        note);
+    fd.append('file',        file, file.name);   // ← binary stream
+
     const url = _AUTH_SB_URL.replace(/\/$/, '') + '/functions/v1/asset-upload';
+    const ctrl = new AbortController();
+    const tid  = setTimeout(() => ctrl.abort(), 120_000);  // 2 phút cho file 25MB qua ngrok
     const resp = await fetch(url, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        // KHÔNG đặt Content-Type → browser tự thêm boundary cho multipart
         'Authorization': 'Bearer ' + token,
         'apikey': _AUTH_SB_KEY,
+        'ngrok-skip-browser-warning': 'true',
       },
-      body: JSON.stringify({
-        assetKey:    makeAssetKey(r),
-        tram:        r.Tram,
-        capDienAp:   r.Cap_dien_ap,
-        loaiThietBi: r.Phan_loai_thiet_bi,
-        tenThietBi:  r.Ten_thiet_bi,
-        nganThietBi: r.Ngan_thiet_bi,
-        fileName:    file.name,
-        mimeType:    file.type,
-        fileSize:    file.size,
-        fileType,
-        note,
-        fileBase64,
-      }),
-    });
+      body: fd,
+      signal: ctrl.signal,
+    }).finally(() => clearTimeout(tid));
 
-    const result = await resp.json();
-    if (!result.success) throw new Error(result.error || `HTTP ${resp.status}`);
+    let result;
+    try { result = await resp.json(); }
+    catch (_) {
+      const txt = await resp.text().catch(() => '');
+      throw new Error(`HTTP ${resp.status} — ${(txt || resp.statusText).slice(0,200)}`);
+    }
+    if (!resp.ok || !result.success) throw new Error(result?.error || `HTTP ${resp.status}`);
 
     if (statusEl) {
       statusEl.style.color = '#00e676';
@@ -10334,7 +10479,8 @@ async function _assetDoUpload(idx) {
     setTimeout(() => _assetLoadGallery(idx), 300);
 
   } catch (e) {
-    if (statusEl) { statusEl.style.color = '#ff5252'; statusEl.textContent = '✗ ' + e.message; }
+    const msg = e?.name === 'AbortError' ? 'Quá thời gian chờ (120s) — kiểm tra ngrok/NAS' : (e.message || 'Lỗi không xác định');
+    if (statusEl) { statusEl.style.color = '#ff5252'; statusEl.textContent = '✗ ' + msg; }
     console.error('[_assetDoUpload]', e);
   }
 
@@ -10351,12 +10497,16 @@ async function _assetView(id) {
       return;
     }
     const url = _AUTH_SB_URL.replace(/\/$/, '') + '/functions/v1/asset-download?id=' + id;
+    const ctrl = new AbortController();
+    const tid  = setTimeout(() => ctrl.abort(), 90_000);
     const resp = await fetch(url, {
       headers: {
         'Authorization': 'Bearer ' + token,
         'apikey': _AUTH_SB_KEY,
+        'ngrok-skip-browser-warning': 'true',
       },
-    });
+      signal: ctrl.signal,
+    }).finally(() => clearTimeout(tid));
     if (!resp.ok) {
       const txt = await resp.text().catch(() => '');
       throw new Error(`HTTP ${resp.status} ${txt.slice(0,100)}`);
@@ -10366,7 +10516,7 @@ async function _assetView(id) {
     window.open(blobUrl, '_blank');
     setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
   } catch (e) {
-    alert('Không mở được file: ' + e.message);
+    alert('Không mở được file: ' + (e?.name === 'AbortError' ? 'Quá lâu (90s)' : e.message));
     console.error('[_assetView]', e);
   }
 }

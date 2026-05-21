@@ -1,0 +1,13 @@
+# File backup tạm
+*.bak
+*.backup-*
+
+# Bundle dev (không commit lên GitHub Pages)
+evnhanoi-nas-fix-*.zip
+test-nas.sh
+test.html
+nas-health-check-*.ts
+asset-upload-*.ts
+
+# Docker compose chỉ tham khảo
+synology/
