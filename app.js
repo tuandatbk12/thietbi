@@ -9453,7 +9453,12 @@ function _bbtnRenderItems(items, path, rootPath, depth) {
     if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
     return (b/1024/1024).toFixed(1) + ' MB';
   };
-  const fmtDate = d => d ? d.toLocaleDateString('vi-VN', {day:'2-digit',month:'2-digit',year:'numeric'}) + ' ' + d.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}) : '';
+  const fmtDate = d => {
+    if (!d) return '';
+    const dt = d instanceof Date ? d : new Date(d);
+    if (isNaN(dt.getTime())) return '';
+    return dt.toLocaleDateString('vi-VN', {day:'2-digit',month:'2-digit',year:'numeric'}) + ' ' + dt.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});
+  };
   const folders = items.filter(it => it.isFolder);
   const files   = items.filter(it => !it.isFolder);
 
