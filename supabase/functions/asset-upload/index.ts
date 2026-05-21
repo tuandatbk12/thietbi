@@ -104,8 +104,8 @@ Deno.serve(async (req: Request) => {
 
     // 2. Validate
     if (!meta.fileName) throw new HttpError(400, 'Thiếu fileName');
-    const MAX = 25 * 1024 * 1024;
-    if (bytes.byteLength > MAX) throw new HttpError(413, `File quá lớn (${(bytes.byteLength/1024/1024).toFixed(1)}MB) — tối đa 25MB`);
+    const MAX = 40 * 1024 * 1024;
+    if (bytes.byteLength > MAX) throw new HttpError(413, `File quá lớn (${(bytes.byteLength/1024/1024).toFixed(1)}MB) — tối đa 40MB`);
 
     // 3. Build NAS path
     const cfg = getNasConfig();

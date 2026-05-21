@@ -9307,7 +9307,7 @@ function _bbtnBuildEdgeError(status, text, fallback) {
 // Lý do: ngrok free có cold-start 3-5s, NAS PROPFIND lớn 10-30s
 //   → cần timeout rộng tay + retry 1 lần khi gặp timeout/lỗi mạng.
 const _bbtnListCache = new Map();   // path → { ts, items }
-const _BBTN_LIST_TTL = 60_000;       // 60s — đủ để điều hướng nhanh
+const _BBTN_LIST_TTL = 300_000;      // 5 phút — navigate giữa folder cùng level nhanh, tránh fetch lại NAS
 let   _bbtnInflight  = new Map();    // path → Promise (chống double-fetch)
 
 function _bbtnSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -9570,15 +9570,42 @@ function _bbtnCopyLink(url) {
  *
  * NB: timeout 120s + 1 retry; file lớn (PDF scan 20MB) qua ngrok có thể chậm
  *     nhưng Edge Function ta đã stream nên không bị memory bound.
+ *
+ * Quan trọng: window.open() phải gọi NGAY khi user click (sync), vì user activation
+ *     chỉ giữ qua 1 task. Async fetch xong thì activation đã hết → browser block popup.
  */
 async function _bbtnViewFile(relativePath, forceDownload) {
   if (!relativePath) { showChangeNotif('error','Lỗi','Không có đường dẫn file'); return; }
   const fileName = decodeURIComponent(relativePath.split('/').pop() || 'file');
-  if (!forceDownload) showChangeNotif('info', 'Đang tải file...', fileName);
+
+  // ── Mở tab NGAY (sync) để giữ user activation ──
+  // Phải làm trước khi await bất kỳ promise nào.
+  let tab = null;
+  if (!forceDownload) {
+    tab = window.open('about:blank', '_blank');
+    if (tab) {
+      // Hiển thị loading trong tab mới trong khi đợi fetch
+      try {
+        tab.document.write('<!doctype html><title>Đang tải ' + fileName + '...</title>' +
+          '<style>body{font-family:system-ui;background:#0d1117;color:#e6edf3;display:flex;' +
+          'align-items:center;justify-content:center;height:100vh;margin:0;text-align:center}' +
+          '.s{width:32px;height:32px;border:3px solid #30363d;border-top-color:#58a6ff;' +
+          'border-radius:50%;animation:s 1s linear infinite;margin:0 auto 16px}' +
+          '@keyframes s{to{transform:rotate(360deg)}}</style>' +
+          '<div><div class="s"></div>Đang tải file...<br><small style="opacity:.6">' + fileName + '</small></div>');
+      } catch (_) { /* same-origin restrict */ }
+    } else {
+      // Popup bị chặn từ đầu → tự động fallback sang download
+      showChangeNotif('warn', 'Popup bị chặn — đang tải về', fileName);
+      forceDownload = true;
+    }
+  }
+
+  if (forceDownload) showChangeNotif('info', 'Đang tải file...', fileName);
 
   try {
     const token = await _authGetToken();
-    if (!token) { showChangeNotif('error','Chưa đăng nhập','Vui lòng đăng nhập lại'); return; }
+    if (!token) { showChangeNotif('error','Chưa đăng nhập','Vui lòng đăng nhập lại'); if (tab) tab.close(); return; }
 
     const edgeBase = _AUTH_SB_URL.replace(/\/$/, '') + '/functions/v1/bbtn-download';
     const url = edgeBase + '?path=' + encodeURIComponent(relativePath) + (forceDownload ? '&download=1' : '');
@@ -9595,16 +9622,13 @@ async function _bbtnViewFile(relativePath, forceDownload) {
       setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
       showChangeNotif('success', 'Đang tải xuống', fileName);
     } else {
-      const tab = window.open(blobUrl, '_blank');
+      // Tab đã mở từ đầu — set location tới blob
+      tab.location.href = blobUrl;
       setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
-      if (!tab) {
-        showChangeNotif('warn', 'Popup bị chặn — đang tải về', fileName);
-        const a = document.createElement('a');
-        a.href = blobUrl; a.download = fileName; a.click();
-      }
     }
   } catch (err) {
     console.error('[_bbtnViewFile]', err);
+    if (tab && !tab.closed) tab.close();
     showChangeNotif('error', 'Lỗi tải file', err.message || 'Vui lòng thử lại');
   }
 }
@@ -10419,7 +10443,7 @@ async function _assetDoUpload(idx) {
   const fileType = file.type.startsWith('image/') ? 'image' : 'document';
 
   // Limit kích thước file để tránh kẹt Edge Function (Supabase free = 50MB max)
-  const MAX_MB = 25;
+  const MAX_MB = 40;
   if (file.size > MAX_MB * 1024 * 1024) {
     if (statusEl) { statusEl.style.color = '#ff5252'; statusEl.textContent = `✗ File quá lớn (${(file.size/1024/1024).toFixed(1)}MB) — tối đa ${MAX_MB}MB`; }
     return;
