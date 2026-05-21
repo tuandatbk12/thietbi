@@ -10192,7 +10192,8 @@ function _assetFileChosen(idx) {
   const f = inp?.files?.[0];
   if (!f || !lbl) return;
   const mb = (f.size / 1024 / 1024).toFixed(1);
-  const max = f.type.startsWith('image/') ? 10 : 20;
+  // Đồng bộ với _assetDoUpload (40MB) và Edge Function asset-upload (40MB)
+  const max = 40;
   if (parseFloat(mb) > max) {
     lbl.innerHTML = `<span style="color:#ff5252">⚠ File quá lớn (${mb}MB) — tối đa ${max}MB</span>`;
     inp.value = '';
