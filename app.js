@@ -8460,6 +8460,7 @@ create policy allow_all on evn_user_profiles for all using (true);</pre></div>`;
             <div style="font-size:12px;font-weight:700;color:var(--text-primary)">${u.name||'—'}</div>
             <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${u.email||'—'} - <span class="auth-role-badge ${badgeCls(u.role)}">${u.role==='admin'?'ADMIN':'USER'}</span>${!u.active?'<span style="color:#ff5252;font-size:9px;margin-left:6px">VO HIEU</span>':''}</div>
           </div>
+          <button onclick="_adminResetPwd('${u.id}','${(u.name||'').replace(/'/g,&quot;&#39;&quot;)}','${u.email||''}')" style="padding:4px 10px;border-radius:6px;border:1px solid rgba(255,215,64,.35);background:rgba(255,215,64,.08);color:#ffd740;font-size:10px;cursor:pointer;margin-right:6px" title="Đổi mật khẩu user"><i class="fas fa-key"></i> Đổi MK</button>
           <button onclick="_adminToggleUser('${u.id}',${!u.active})" style="padding:4px 10px;border-radius:6px;border:1px solid ${u.active?'rgba(255,82,82,.3)':'rgba(0,230,118,.3)'};background:${u.active?'rgba(255,82,82,.07)':'rgba(0,230,118,.07)'};color:${u.active?'#ff5252':'#00e676'};font-size:10px;cursor:pointer">
             <i class="fas ${u.active?'fa-ban':'fa-check'}"></i> ${u.active?'Vo hieu':'Kich hoat'}</button>
         </div>`).join('')}
@@ -10778,3 +10779,75 @@ window.addEventListener('beforeunload', () => {
   style.textContent = css;
   document.head.appendChild(style);
 })();
+
+// ━━ ADMIN RESET PASSWORD (appended) ━━
+function _adminResetPwd(uid, userName, userEmail) {
+  const ex = document.getElementById('_resetPwdModal');
+  if (ex) ex.remove();
+  const modal = document.createElement('div');
+  modal.id = '_resetPwdModal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center';
+  modal.innerHTML = `<div style="background:var(--bg-surface);border:1px solid rgba(255,215,64,.3);border-radius:14px;padding:28px 32px;width:420px;box-shadow:0 8px 48px rgba(0,0,0,.8)">
+    <div style="font-size:14px;font-weight:800;color:var(--text-primary);margin-bottom:6px">
+      <i class="fas fa-key" style="color:#ffd740;margin-right:8px"></i>Đổi mật khẩu user
+    </div>
+    <div style="font-size:11.5px;color:var(--text-secondary);margin-bottom:14px;background:rgba(255,215,64,.06);border:1px solid rgba(255,215,64,.2);border-radius:7px;padding:9px 11px">
+      <i class="fas fa-user" style="margin-right:5px;color:#ffd740"></i><b>${userName||'(không tên)'}</b>
+      <div style="font-size:10px;margin-top:3px;color:var(--text-muted)">${userEmail||''}</div>
+    </div>
+    <div style="font-size:10.5px;color:#ff9100;background:rgba(255,145,0,.08);border:1px solid rgba(255,145,0,.2);border-radius:6px;padding:8px 10px;margin-bottom:14px;line-height:1.5">
+      <i class="fas fa-info-circle" style="margin-right:5px"></i>Sau khi đổi, mọi phiên đăng nhập cũ của user sẽ bị huỷ. User PHẢI login lại bằng mật khẩu mới.
+    </div>
+    <div style="margin-bottom:11px">
+      <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Mật khẩu mới (tối thiểu 6 ký tự)</label>
+      <input id="_rpwNew" type="password" class="auth-input" placeholder="Nhập mật khẩu mới" autocomplete="new-password">
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Xác nhận mật khẩu mới</label>
+      <input id="_rpwCfm" type="password" class="auth-input" placeholder="Nhập lại" autocomplete="new-password">
+    </div>
+    <div id="_rpwErr" style="font-size:11px;color:var(--red);min-height:14px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px">
+      <button id="_rpwBtn" class="auth-btn" style="flex:1;background:linear-gradient(135deg,#ffd740,#ff9100);color:#000" onclick="_doAdminResetPwd('${uid}')">
+        <i class="fas fa-save" style="margin-right:5px"></i>Đổi mật khẩu
+      </button>
+      <button onclick="document.getElementById('_resetPwdModal').remove()" style="flex:0.5;padding:10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:13px;cursor:pointer">Huỷ</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  setTimeout(() => { const el = document.getElementById('_rpwNew'); if (el) el.focus(); }, 100);
+}
+
+async function _doAdminResetPwd(targetUid) {
+  const nw = document.getElementById('_rpwNew').value;
+  const cf = document.getElementById('_rpwCfm').value;
+  const er = document.getElementById('_rpwErr');
+  const btn = document.getElementById('_rpwBtn');
+  er.textContent = '';
+  if (!nw || nw.length < 6) { er.textContent = 'Mật khẩu mới tối thiểu 6 ký tự'; return; }
+  if (nw !== cf) { er.textContent = 'Xác nhận không khớp'; return; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang đổi...'; }
+  try {
+    const token = await _authGetToken();
+    if (!token) { er.textContent = 'Phiên hết hạn, đăng nhập lại'; return; }
+    const url = _AUTH_SB_URL.replace(/\/$/, '') + '/functions/v1/admin-reset-password';
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'apikey': _AUTH_SB_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ target_user_id: targetUid, new_password: nw }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) { er.textContent = data.error || ('Lỗi ' + resp.status); return; }
+    _authAddLog('ADMIN_RESET_PASSWORD', 'Đổi pass cho ' + (data.user_name || targetUid), data.user_email || '');
+    document.getElementById('_resetPwdModal').remove();
+    showChangeNotif('success', 'Đổi mật khẩu thành công', data.message || '');
+  } catch (err) {
+    er.textContent = 'Lỗi: ' + err.message;
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save" style="margin-right:5px"></i>Đổi mật khẩu'; }
+  }
+}
