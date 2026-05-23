@@ -17,16 +17,19 @@
 │  └───────────────┴─────────────────┴──────────────────┘    │
 │  Đọc secrets: NAS_BASE_URL, NAS_USERNAME, NAS_PASSWORD...   │
 │  Verify JWT từ Supabase Auth                                │
-│  ↓ HTTPS WebDAV                                              │
+│  ↓ HTTPS                                                     │
 │                                                              │
 ├─────────────────────────────────────────────────────────────┤
-│ NGROK TUNNEL (slicing-requisite-custodian.ngrok-free.dev)   │
-│  Reserved subdomain (free tier)                             │
-│  → host.docker.internal:5006 (HTTPS WebDAV)                 │
+│ CLOUDFLARE TUNNEL (nas.dulieuvanhanh.pro.vn)                │
+│  Tunnel name: evn-nas-webdav                                │
+│  Public hostname → http://192.168.1.2:5005                  │
+│  Unlimited bandwidth, auto HTTPS, anti-DDoS                 │
+│  PoP HAN (Hanoi) — latency ~300-700ms                       │
 │                                                              │
 ├─────────────────────────────────────────────────────────────┤
-│ SYNOLOGY NAS                                                │
-│  WebDAV server (Apache module)                              │
+│ SYNOLOGY NAS (LAN 192.168.1.2)                              │
+│  Container: cloudflared (outbound tunnel, no port forward)  │
+│  WebDAV server (port 5005 HTTP, internal only)              │
 │  User: evn_webdav (R/W trên BBTN + THIETBI)                 │
 │  Shared folders: /BBTN, /THIETBI                            │
 └─────────────────────────────────────────────────────────────┘
@@ -36,7 +39,7 @@
 
 | Secret | Giá trị mẫu | Khi nào đổi |
 |---|---|---|
-| `NAS_BASE_URL`     | `https://slicing-requisite-custodian.ngrok-free.dev` | Khi đổi tunnel (vd chuyển sang Cloudflare) |
+| `NAS_BASE_URL`     | `https://nas.dulieuvanhanh.pro.vn` | Khi đổi tên domain hoặc tunnel |
 | `NAS_USERNAME`     | `evn_webdav` | Khi tạo user mới trên NAS |
 | `NAS_PASSWORD`     | (hidden) | Khi reset password NAS — 90 ngày khuyến nghị |
 | `NAS_BBTN_PATH`    | `/BBTN` | Khi đổi cấu trúc thư mục NAS |
@@ -148,14 +151,14 @@ select cron.schedule(
 
 ### "NAS_TIMEOUT" trong dashboard
 
-1. Kiểm tra ngrok container trên Synology: vào Container Manager → ngrok-webdav → phải green dot
-2. Test trực tiếp ngrok:
+1. Kiểm tra cloudflared container trên Synology: vào Container Manager → cloudflared-nas → phải green dot
+2. Test trực tiếp Cloudflare Tunnel:
    ```bash
-   curl -I -H "ngrok-skip-browser-warning: true" https://slicing-requisite-custodian.ngrok-free.dev/
+   curl -I https://nas.dulieuvanhanh.pro.vn/BBTN/
    ```
    Phải HTTP 401 hoặc 404 — không phải timeout.
 3. Chạy debug endpoint (xem bên trên) để biết error chính xác.
-4. Last resort: restart container ngrok-webdav trên Synology.
+4. Last resort: restart container cloudflared-nas trên Synology.
 
 ### Upload thất bại với file lớn
 
@@ -179,7 +182,7 @@ select cron.schedule(
 | Thứ | Tần suất |
 |---|---|
 | Đổi password user `evn_webdav` trên NAS | 6 tháng |
-| Renew ngrok authtoken | Khi đổi tài khoản ngrok |
+|  Renew Cloudflare Tunnel token | 6 tháng/lần (security) |
 | Audit `equipment_attachments` orphans | Hàng tháng (xem query phần Monitoring) |
 | Backup `nas_health_log` | 1 lần/quý nếu cần (table tự tích lũy) |
 
