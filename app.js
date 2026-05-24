@@ -8449,9 +8449,17 @@ create policy allow_all on evn_user_profiles for all using (true);</pre></div>`;
     const badgeCls=r=>r==='admin'?'auth-role-admin':'auth-role-user';
     body.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <span style="font-size:12px;font-weight:700;color:var(--text-primary)">${(profiles||[]).length} tai khoan</span>
-        <button onclick="_adminAddUser()" style="padding:6px 14px;border-radius:7px;border:1px solid rgba(0,200,255,.4);background:rgba(0,200,255,.08);color:var(--accent);font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
-          <i class="fas fa-user-plus"></i> Them tai khoan
-        </button></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <button onclick="_openCsvUpload('TongHopThietBi')" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(0,230,118,.4);background:rgba(0,230,118,.08);color:#00e676;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px" title="Upload CSV thay thế dữ liệu Thiết bị">
+            <i class="fas fa-file-csv"></i> CSV Thiết bị
+          </button>
+          <button onclick="_openCsvUpload('CongTacThiNghiem')" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(255,215,64,.4);background:rgba(255,215,64,.08);color:#ffd740;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px" title="Upload CSV thay thế dữ liệu Công tác TN">
+            <i class="fas fa-file-csv"></i> CSV TN
+          </button>
+          <button onclick="_adminAddUser()" style="padding:6px 14px;border-radius:7px;border:1px solid rgba(0,200,255,.4);background:rgba(0,200,255,.08);color:var(--accent);font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+            <i class="fas fa-user-plus"></i> Them tai khoan
+          </button>
+        </div></div>
       <div style="display:flex;flex-direction:column;gap:7px">
         ${(profiles||[]).map(u=>`<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:12px">
           <div style="width:34px;height:34px;border-radius:50%;background:${capColor(u.role)};display:flex;align-items:center;justify-content:center;flex-shrink:0">
