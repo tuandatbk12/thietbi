@@ -11144,17 +11144,25 @@ window.addEventListener('beforeunload', () => {
     try {
       var token = await _authGetToken();
       if (!token) return;
-      var me = (typeof _authGetCurrentUser === 'function') ? await _authGetCurrentUser() : null;
-      if (!me) return;
-      var resp = await fetch(_AUTH_SB_URL + '/rest/v1/evn_user_profiles?id=eq.' + me.id + '&select=role', {
+      // Lấy user qua /auth/v1/user trực tiếp (không cần _authGetCurrentUser)
+      var userResp = await fetch(_AUTH_SB_URL + '/auth/v1/user', {
         headers: { 'Authorization': 'Bearer ' + token, 'apikey': _AUTH_SB_KEY },
       });
-      var rows = await resp.json();
-      if (rows[0] && rows[0].role === 'admin') {
+      if (!userResp.ok) return;
+      var user = await userResp.json();
+      if (!user || !user.id) return;
+      // Check admin role
+      var profResp = await fetch(_AUTH_SB_URL + '/rest/v1/evn_user_profiles?id=eq.' + user.id + '&select=role', {
+        headers: { 'Authorization': 'Bearer ' + token, 'apikey': _AUTH_SB_KEY },
+      });
+      var rows = profResp.ok ? await profResp.json() : [];
+      var isAdmin = (rows[0] && rows[0].role === 'admin')
+                  || user.email === 'admin@example.com'
+                  || (user.user_metadata && user.user_metadata.role === 'admin');
+      if (isAdmin) {
         document.getElementById('_chatFab').style.display = 'flex';
-        // Show upload CSV buttons (will be triggered manually from admin panel)
       }
-    } catch (e) { /* */ }
+    } catch (e) { console.warn('[_checkAdminFeatures]', e); }
   }
 
   if (document.readyState === 'loading') {
