@@ -11094,13 +11094,9 @@ window.addEventListener('beforeunload', () => {
       var token = await _authGetToken();
       if (!token) throw new Error('Chưa đăng nhập');
 
-      var resp = await fetch(CHAT_ENDPOINT, {
+      var resp = await _authedFetch(CHAT_ENDPOINT, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token,
-          'apikey': _AUTH_SB_KEY,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: question }),
       });
       _removeTyping();
@@ -11182,3 +11178,58 @@ window.addEventListener('beforeunload', () => {
   // Expose globally
   window._openCsvUpload = _openCsvUpload;
 })();
+
+
+// ━━ _authedFetch (auto-refresh JWT khi 401) ━━
+async function _authedFetch(url, options) {
+  options = options || {};
+  options.headers = options.headers || {};
+  
+  async function _refreshAccessToken() {
+    try {
+      const authKey = Object.keys(localStorage).find(k => k.includes('auth-token'));
+      if (!authKey) return null;
+      const session = JSON.parse(localStorage.getItem(authKey));
+      const refreshToken = session && session.refresh_token;
+      if (!refreshToken) return null;
+      console.log('[_authedFetch] Refreshing JWT...');
+      const resp = await fetch(_AUTH_SB_URL + '/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST',
+        headers: { 'apikey': _AUTH_SB_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!resp.ok) { console.warn('[_authedFetch] Refresh failed:', resp.status); return null; }
+      const data = await resp.json();
+      const newSession = {
+        ...session,
+        access_token: data.access_token,
+        refresh_token: data.refresh_token || refreshToken,
+        expires_at: Math.floor(Date.now()/1000) + (data.expires_in || 3600),
+        expires_in: data.expires_in,
+      };
+      localStorage.setItem(authKey, JSON.stringify(newSession));
+      console.log('[_authedFetch] Token refreshed OK');
+      return data.access_token;
+    } catch (e) { console.warn('[_authedFetch] Refresh error:', e.message); return null; }
+  }
+  
+  let token = await _authGetToken();
+  const headers1 = Object.assign({}, options.headers, {
+    'Authorization': 'Bearer ' + token,
+    'apikey': _AUTH_SB_KEY,
+  });
+  let resp = await fetch(url, Object.assign({}, options, { headers: headers1 }));
+  
+  if (resp.status === 401) {
+    const newToken = await _refreshAccessToken();
+    if (newToken) {
+      const headers2 = Object.assign({}, options.headers, {
+        'Authorization': 'Bearer ' + newToken,
+        'apikey': _AUTH_SB_KEY,
+      });
+      resp = await fetch(url, Object.assign({}, options, { headers: headers2 }));
+      console.log('[_authedFetch] Retried after refresh:', resp.status);
+    }
+  }
+  return resp;
+}
