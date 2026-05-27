@@ -10087,8 +10087,9 @@ const _navExtMapBBTN = {
       el.classList.add('active');
       const ov=document.getElementById('tbPageOverlay'),cv=document.getElementById('canvasArea'),rp=document.querySelector('.props-panel');
       if(ov){if(cv)cv.style.display='none';if(rp)rp.style.display='none';ov.style.display='block';}
-      if(_tnRawData.length||_tnAllData.length){_bbtnRenderPage();}
-      else{if(ov)ov.innerHTML='<div style="padding:40px;text-align:center;color:rgba(180,200,220,.6)"><i class="fas fa-spinner fa-spin" style="color:var(--accent);margin-right:8px"></i>Đang tải...</div>';if(typeof _tnFetchData==='function')_tnFetchData().then(()=>_bbtnRenderPage());}
+      const _handler=_navExtMapBBTN[text];
+      if(_tnRawData.length||_tnAllData.length){_handler();}
+      else{if(ov)ov.innerHTML='<div style="padding:40px;text-align:center;color:rgba(180,200,220,.6)"><i class="fas fa-spinner fa-spin" style="color:var(--accent);margin-right:8px"></i>Đang tải...</div>';if(typeof _tnFetchData==='function')_tnFetchData().then(()=>_handler());}
       return;
     }
     // Đóng upload section nếu đang mở (khi navigate sang trang khác)
@@ -11236,7 +11237,7 @@ async function _authedFetch(url, options) {
 
 // ━━ TNDK UI MODULE (appended via apply-tndk-ui.sh) ━━
 // ════════════════════════════════════════════════════════════════
-// TNDK UI Patch — Công tác TNĐK module
+// TNDK UI Patch — Báo cáo, theo dõi kết quả thực hiện module
 //
 // Append vào app.js:
 //   - _tndkRenderPage() — main page renderer
@@ -11247,11 +11248,11 @@ async function _authedFetch(url, options) {
 // Cần thêm menu item HTML vào index.html (sau "Upload TNĐK"):
 //   <a href="#" class="nav-item nav-user-allowed" onclick="navActivate(this)">
 //     <i class="fas fa-clipboard-check"></i>
-//     <span>Công tác TNĐK</span>
+//     <span>Báo cáo, theo dõi kết quả thực hiện</span>
 //   </a>
 //
 // Và đăng ký vào _navExtMapBBTN:
-//   'Công tác TNĐK': _tndkRenderPage,
+//   'Báo cáo, theo dõi kết quả thực hiện': _tndkRenderPage,
 // ════════════════════════════════════════════════════════════════
 
 (function() {
@@ -11406,7 +11407,7 @@ async function _authedFetch(url, options) {
     const monthOpts = months.map(m => `<option value="${m}">${m}</option>`).join('');
     
     pageEl.innerHTML = `
-      <h2><i class="fas fa-clipboard-check"></i> Công tác TNĐK</h2>
+      <h2><i class="fas fa-clipboard-check"></i> Báo cáo, theo dõi kết quả thực hiện</h2>
       
       <div class="tndk-toolbar">
         <button class="tndk-btn-primary" onclick="_tndkOpenAddModal()">
@@ -11755,7 +11756,9 @@ async function _authedFetch(url, options) {
   // REGISTER với navExtMapBBTN
   // ──────────────────────────────────────────────────────────────
   if (typeof _navExtMapBBTN === 'object') {
-    _navExtMapBBTN['Công tác TNĐK'] = _tndkRenderPage;
+    _navExtMapBBTN['Báo cáo, theo dõi kết quả thực hiện'] = _tndkRenderPage;
+    _navExtMapBBTN['Báo cáo, theo dõi kết quả thực hiện'] = _tndkRenderPage;
+    _navExtMapBBTN['Báo cáo kết quả'] = _tndkRenderPage;
   }
   
   console.log('[TNDK] Module loaded');
