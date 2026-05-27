@@ -14,3 +14,14 @@ synology/
 
 # Supabase CLI cache (per-machine)
 supabase/.temp/
+token.txt
+gk.txt
+*.bak
+*.bak
+*.txt
+/tmp/
+*.zip
+fix-*.sh
+apply-*.sh
+quick-win-*.sh
+NODEEOF
