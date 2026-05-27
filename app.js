@@ -11407,7 +11407,7 @@ async function _authedFetch(url, options) {
     const monthOpts = months.map(m => `<option value="${m}">${m}</option>`).join('');
     
     pageEl.innerHTML = `
-      <h2><i class="fas fa-clipboard-check"></i> Báo cáo, theo dõi kết quả thực hiện</h2>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px"><h2 style="margin:0"><i class="fas fa-clipboard-check"></i> Báo cáo, theo dõi kết quả thực hiện</h2><button onclick="navActivate(document.querySelector(&apos;.nav-item&apos;))" style="padding:6px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:var(--text-primary,#eef);font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="fas fa-arrow-left"></i> Dashboard</button></div>
       
       <div class="tndk-toolbar">
         <button class="tndk-btn-primary" onclick="_tndkOpenAddModal()">
