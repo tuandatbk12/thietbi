@@ -8258,7 +8258,7 @@ async function _authLogout(){
   const drop=document.getElementById('userMenuDropdown');
   if(drop)drop.classList.remove('open');
   const wrap=document.getElementById('_userMenuWrap');
-  if(wrap)wrap.remove();
+  if(wrap)wrap.remove(); setTimeout(function(){ location.reload(); }, 100);
 }
 
 function _authInitUserMenu(){
