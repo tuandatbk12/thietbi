@@ -12090,7 +12090,7 @@ async function _authedFetch(url, options) {
       const email = await _getEmail();
       if (email) {
         clearInterval(poll);
-        _injectWatermark();
+        /* _injectWatermark(); disabled by user */
         logAction('session_active', null, {
           ua: navigator.userAgent.slice(0, 100),
           screen: `${screen.width}x${screen.height}`,
