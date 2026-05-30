@@ -13603,3 +13603,48 @@ async function _authedFetch(url, options) {
     setTimeout(_init, 500);
   }
 })();
+
+// ━━━━ BBTN OCR Button Fix (MutationObserver) ━━━━
+(function() {
+  if (window._bbtnButtonObserverInstalled) return;
+  window._bbtnButtonObserverInstalled = true;
+
+  function _tryInjectBtn() {
+    const overlay = document.getElementById('tbPageOverlay');
+    if (!overlay || overlay.style.display === 'none') return;
+    const backBtn = Array.from(overlay.querySelectorAll('button')).find(b =>
+      b.textContent.trim().includes('Dashboard') && b.onclick !== null
+    );
+    if (!backBtn) return;
+    if (overlay.querySelector('#bbtnUploadOcrBtn')) return;
+    const sess = (typeof _authGetSession === 'function') ? _authGetSession() : null;
+    if (sess?.role !== 'admin') return;
+    const hasReportContext = overlay.textContent.includes('Thêm công tác') ||
+                              overlay.textContent.includes('Báo cáo') ||
+                              overlay.textContent.includes('công tác TNĐK');
+    if (!hasReportContext) return;
+    const btn = document.createElement('button');
+    btn.id = 'bbtnUploadOcrBtn';
+    btn.type = 'button';
+    btn.onclick = function() { window._bbtnOcrOpenModal(); };
+    btn.style.cssText = 'padding:6px 14px;border-radius:7px;border:1px solid rgba(0,200,255,.4);background:linear-gradient(135deg,rgba(0,200,255,.15),rgba(0,136,255,.15));color:#00c8ff;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-right:8px';
+    btn.innerHTML = '<i class="fas fa-file-import"></i> Upload BBTN OCR';
+    backBtn.parentNode.insertBefore(btn, backBtn);
+    console.log('[BBTN OCR] Upload button injected');
+  }
+
+  function _install() {
+    const overlay = document.getElementById('tbPageOverlay');
+    if (!overlay) { setTimeout(_install, 500); return; }
+    const observer = new MutationObserver(_tryInjectBtn);
+    observer.observe(overlay, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] });
+    console.log('[BBTN OCR] Observer installed');
+    _tryInjectBtn();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _install);
+  } else {
+    _install();
+  }
+})();
