@@ -12231,7 +12231,7 @@ async function _authedFetch(url, options) {
               <button class="bbtn-btn-primary" onclick="document.getElementById('bbtnFileInput').click()">
                 <i class="fas fa-folder-open"></i> Chọn tệp...
               </button>
-              <div class="bbtn-upload-hint">Hỗ trợ JPG, PNG, PDF — max 22MB/file. Có thể chọn nhiều file.</div>
+              <div class="bbtn-upload-hint">Hỗ trợ JPG, PNG, PDF — max 50MB/file (file >20MB dùng File API, chậm hơn). Có thể chọn nhiều file.</div>
               <input type="file" id="bbtnFileInput" multiple accept="image/jpeg,image/png,image/webp,application/pdf" style="display:none" onchange="_bbtnOcrFilesChanged(this)" />
             </div>
             <div class="bbtn-progress-wrap" id="bbtnProgressWrap" style="display:none">
@@ -12296,8 +12296,8 @@ async function _authedFetch(url, options) {
         _toast(`File ${f.name}: định dạng không hỗ trợ`, 'warn');
         return false;
       }
-      if (f.size > 22 * 1024 * 1024) {
-        _toast(`File ${f.name}: quá lớn (>22MB)`, 'warn');
+      if (f.size > 50 * 1024 * 1024) {
+        _toast(`File ${f.name}: quá lớn (>50MB)`, 'warn');
         return false;
       }
       return true;
@@ -12974,7 +12974,7 @@ async function _authedFetch(url, options) {
               <button class="bbtn-btn-primary" onclick="document.getElementById('bbtnFileInput').click()">
                 <i class="fas fa-folder-open"></i> Chọn tệp...
               </button>
-              <div class="bbtn-upload-hint">Hỗ trợ JPG, PNG, PDF — max 22MB/file. Có thể chọn nhiều file.</div>
+              <div class="bbtn-upload-hint">Hỗ trợ JPG, PNG, PDF — max 50MB/file (file >20MB dùng File API, chậm hơn). Có thể chọn nhiều file.</div>
               <input type="file" id="bbtnFileInput" multiple accept="image/jpeg,image/png,image/webp,application/pdf" style="display:none" onchange="_bbtnOcrFilesChanged(this)" />
             </div>
             <div class="bbtn-progress-wrap" id="bbtnProgressWrap" style="display:none">
@@ -13039,8 +13039,8 @@ async function _authedFetch(url, options) {
         _toast(`File ${f.name}: định dạng không hỗ trợ`, 'warn');
         return false;
       }
-      if (f.size > 22 * 1024 * 1024) {
-        _toast(`File ${f.name}: quá lớn (>22MB)`, 'warn');
+      if (f.size > 50 * 1024 * 1024) {
+        _toast(`File ${f.name}: quá lớn (>50MB)`, 'warn');
         return false;
       }
       return true;
