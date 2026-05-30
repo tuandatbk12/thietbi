@@ -14239,3 +14239,36 @@ async function _authedFetch(url, options) {
     setTimeout(_register, 100);
   }
 })();
+
+// ━━━━ BBTN Mgmt navActivate Override (final fix) ━━━━
+(function() {
+  function _install() {
+    if (typeof window.navActivate !== 'function') {
+      setTimeout(_install, 300); return;
+    }
+    if (window._bbtnMgmtNavOverridden) return;
+    window._bbtnMgmtNavOverridden = true;
+
+    const _origNavActivate = window.navActivate;
+    window.navActivate = function(el) {
+      const text = (el?.querySelector?.('span')?.textContent || el?.textContent || '').trim();
+      if (text === 'Quản lý BBTN OCR' && typeof window._bbtnMgmtRenderPage === 'function') {
+        document.querySelectorAll('.nav-item.active,.nav-sub-item.active').forEach(e => e.classList.remove('active'));
+        el.classList.add('active');
+        const ov = document.getElementById('tbPageOverlay');
+        const cv = document.getElementById('canvasArea');
+        const rp = document.querySelector('.props-panel');
+        if (ov) { if (cv) cv.style.display='none'; if (rp) rp.style.display='none'; ov.style.display='block'; }
+        window._bbtnMgmtRenderPage();
+        return;
+      }
+      return _origNavActivate.apply(this, arguments);
+    };
+    console.log('[BBTN Mgmt] navActivate overridden');
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _install);
+  } else {
+    setTimeout(_install, 100);
+  }
+})();
