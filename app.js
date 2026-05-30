@@ -14201,3 +14201,41 @@ async function _authedFetch(url, options) {
     setTimeout(_bbtnMgmtInjectMenu, 800);
   }
 })();
+
+// ━━━━ BBTN Mgmt Register Fix ━━━━
+(function() {
+  function _register() {
+    if (typeof window._navExtMapBBTN === 'undefined') {
+      setTimeout(_register, 500); return;
+    }
+    if (typeof window._bbtnMgmtRenderPage !== 'function') {
+      setTimeout(_register, 500); return;
+    }
+    window._navExtMapBBTN['Quản lý BBTN OCR'] = window._bbtnMgmtRenderPage;
+    console.log('[BBTN Mgmt] Handler registered');
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _register);
+  } else {
+    setTimeout(_register, 100);
+  }
+})();
+
+// ━━━━ BBTN Mgmt Register Fix ━━━━
+(function() {
+  function _register() {
+    if (typeof window._navExtMapBBTN === 'undefined') {
+      setTimeout(_register, 500); return;
+    }
+    if (typeof window._bbtnMgmtRenderPage !== 'function') {
+      setTimeout(_register, 500); return;
+    }
+    window._navExtMapBBTN['Quản lý BBTN OCR'] = window._bbtnMgmtRenderPage;
+    console.log('[BBTN Mgmt] Handler registered');
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _register);
+  } else {
+    setTimeout(_register, 100);
+  }
+})();
