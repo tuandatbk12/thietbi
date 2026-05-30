@@ -12153,6 +12153,10 @@ async function _authedFetch(url, options) {
     ngay_kiem_dinh: '📅 Ngày KĐ',
     dang_kiem_dinh: 'Dạng KĐ',
     vi_tri_lap_dat: 'Vị trí lắp đặt',
+      sfra: '🔬 SFRA (chỉ MBA)',
+      tiet_dien: '📏 Tiết diện (chỉ Cáp)',
+    sfra: '🔬 SFRA (chỉ MBA)',
+    tiet_dien: '📏 Tiết diện (chỉ Cáp)',
   };
 
   // State: tất cả items đang preview (chưa save)
@@ -12525,6 +12529,8 @@ async function _authedFetch(url, options) {
           ngay_kiem_dinh: it.ngay_kiem_dinh,
           dang_kiem_dinh: it.dang_kiem_dinh,
           vi_tri_lap_dat: it.vi_tri_lap_dat,
+          sfra: it.sfra,
+          tiet_dien: it.tiet_dien,
           ocr_raw: { page_start: it.page_start, page_end: it.page_end },
           ocr_provider: 'gemini',
           match_status: 'pending',
@@ -13310,6 +13316,8 @@ async function _authedFetch(url, options) {
         'Ngày KĐ': r.ngay_kiem_dinh || '',
         'Dạng KĐ': r.dang_kiem_dinh || '',
         'Vị trí lắp đặt': r.vi_tri_lap_dat || '',
+        'SFRA (MBA)': r.sfra === true ? '' : (r.sfra === false ? '' : ''),
+        'Tiết diện (Cáp)': r.tiet_dien || '',
         'Trang BBTN': (r.ocr_raw?.page_start && r.ocr_raw?.page_end)
           ? (r.ocr_raw.page_start === r.ocr_raw.page_end ? `${r.ocr_raw.page_start}` : `${r.ocr_raw.page_start}-${r.ocr_raw.page_end}`)
           : '',
