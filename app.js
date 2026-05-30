@@ -14272,3 +14272,70 @@ async function _authedFetch(url, options) {
     setTimeout(_install, 100);
   }
 })();
+
+// ━━━━ BBTN Move Upload Button: Mgmt page only ━━━━
+// 1. Disable button trong module Báo cáo
+// 2. Add button vào trang Quản lý BBTN OCR (cạnh nút Export Excel)
+(function() {
+  if (window._bbtnBtnMovedToMgmt) return;
+  window._bbtnBtnMovedToMgmt = true;
+
+  function _removeBtnFromBaoCao() {
+    const overlay = document.getElementById('tbPageOverlay');
+    if (!overlay) return;
+    const oldBtn = overlay.querySelector('#bbtnUploadOcrBtn');
+    // Nếu đang ở Quản lý OCR, giữ nguyên; nếu ở Báo cáo, xóa
+    if (oldBtn) {
+      const isMgmtPage = overlay.textContent.includes('Quản lý BBTN OCR') &&
+                         overlay.querySelector('#bbtnFilterTram');
+      if (!isMgmtPage) oldBtn.remove();
+    }
+  }
+
+  function _injectBtnToMgmt() {
+    const overlay = document.getElementById('tbPageOverlay');
+    if (!overlay) return;
+    // Chỉ inject khi đang ở trang Quản lý BBTN OCR
+    const isMgmtPage = overlay.querySelector('#bbtnFilterTram');
+    if (!isMgmtPage) return;
+    // Avoid dup
+    if (overlay.querySelector('#bbtnUploadOcrBtnMgmt')) return;
+
+    // Check admin
+    const sess = (typeof _authGetSession === 'function') ? _authGetSession() : null;
+    if (sess?.role !== 'admin') return;
+
+    // Tìm nút Export Excel — chèn trước nó
+    const exportBtn = overlay.querySelector('#bbtnMgmtBtnExport');
+    if (!exportBtn) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'bbtnUploadOcrBtnMgmt';
+    btn.type = 'button';
+    btn.onclick = function() { window._bbtnOcrOpenModal(); };
+    btn.style.cssText = 'padding:7px 14px;border-radius:7px;border:1px solid rgba(0,200,255,.4);background:linear-gradient(135deg,rgba(0,200,255,.15),rgba(0,136,255,.15));color:#00c8ff;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px';
+    btn.innerHTML = '<i class="fas fa-file-import"></i> Upload BBTN OCR';
+
+    exportBtn.parentNode.insertBefore(btn, exportBtn);
+  }
+
+  function _check() {
+    _removeBtnFromBaoCao();
+    _injectBtnToMgmt();
+  }
+
+  function _install() {
+    const overlay = document.getElementById('tbPageOverlay');
+    if (!overlay) { setTimeout(_install, 300); return; }
+    const observer = new MutationObserver(_check);
+    observer.observe(overlay, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] });
+    _check();
+    console.log('[BBTN] Upload button moved to Mgmt page');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _install);
+  } else {
+    setTimeout(_install, 100);
+  }
+})();

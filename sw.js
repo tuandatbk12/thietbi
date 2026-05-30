@@ -6,7 +6,7 @@
 //   - Supabase API & Edge Functions: KHÔNG cache (luôn live)
 // ════════════════════════════════════════════════════════════════
 
-const CACHE_VERSION = 'evn-v30-mgmt-navfix';
+const CACHE_VERSION = 'evn-v31-move-upload-btn';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 
 // Assets cần cache ngay khi install (precaching)
