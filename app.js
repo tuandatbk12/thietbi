@@ -14339,3 +14339,44 @@ async function _authedFetch(url, options) {
     setTimeout(_install, 100);
   }
 })();
+
+// ━━━━ BBTN Mgmt: Register vào _navExtMapBBTN global (v3) ━━━━
+// _navExtMapBBTN là const trong scope, không expose ra window.
+// Hack: dùng eval() để register, vì eval chạy trong scope hiện tại
+// → có thể đọc/ghi const declared cùng scope
+(function() {
+  function _register() {
+    if (typeof window._bbtnMgmtRenderPage !== 'function') {
+      setTimeout(_register, 300); return;
+    }
+    try {
+      // eval trick: access _navExtMapBBTN from global closure
+      // KHÔNG dùng được vì const declared trong IIFE scope khác
+      // Workaround: tự handle click event riêng cho menu này
+      const menu = document.getElementById('bbtnMgmtMenu');
+      if (!menu) { setTimeout(_register, 300); return; }
+
+      // Remove onclick cũ, add event listener mới
+      menu.onclick = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        document.querySelectorAll('.nav-item.active,.nav-sub-item.active').forEach(el => el.classList.remove('active'));
+        menu.classList.add('active');
+        const ov = document.getElementById('tbPageOverlay');
+        const cv = document.getElementById('canvasArea');
+        const rp = document.querySelector('.props-panel');
+        if (ov) { if (cv) cv.style.display='none'; if (rp) rp.style.display='none'; ov.style.display='block'; }
+        window._bbtnMgmtRenderPage();
+        return false;
+      };
+      console.log('[BBTN Mgmt v3] Custom click handler installed');
+    } catch (err) {
+      console.error('[BBTN Mgmt v3] Error:', err);
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _register);
+  } else {
+    setTimeout(_register, 500);
+  }
+})();
