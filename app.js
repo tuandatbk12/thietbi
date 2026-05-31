@@ -13554,7 +13554,9 @@ async function _authedFetch(url, options) {
         return;
       }
       
-      const res = await fetch(`${sbUrl}/storage/v1/object/sign/bbtn-files/${encodeURIComponent(path)}`, {
+      // Encode từng segment (KHÔNG encode '/' để giữ path structure)
+      const pathSafe = path.split('/').map(encodeURIComponent).join('/');
+      const res = await fetch(`${sbUrl}/storage/v1/object/sign/bbtn-files/${pathSafe}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
