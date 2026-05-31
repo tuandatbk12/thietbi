@@ -13592,3 +13592,1124 @@ async function _authedFetch(url, options) {
   
   console.log('[BBTN] _bbtnMgmtOpenFile installed');
 })();
+
+// ━━━━ PMIS Compare CSS injection ━━━━
+(function() {
+  if (document.getElementById('pmisCompareStyle')) return;
+  const style = document.createElement('style');
+  style.id = 'pmisCompareStyle';
+  style.textContent = `/* ━━━━ PMIS Compare Module CSS ━━━━ */
+
+.pmis-modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7); 
+  z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.pmis-modal-card {
+  background: #1e2530; 
+  border-radius: 10px;
+  width: 95%; max-width: 1400px; 
+  max-height: 92vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+}
+.pmis-modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 15px 20px; border-bottom: 1px solid #2c3744;
+}
+.pmis-modal-title {
+  color: #00c8ff; font-weight: 600; font-size: 17px;
+}
+.pmis-modal-close {
+  background: rgba(255,255,255,0.1); border: none;
+  color: #fff; width: 32px; height: 32px; border-radius: 50%;
+  cursor: pointer; font-size: 14px;
+}
+.pmis-modal-close:hover { background: rgba(255,82,82,0.3); }
+.pmis-modal-body {
+  flex: 1; overflow: auto; padding: 20px;
+}
+
+/* Upload zone */
+.pmis-upload-zone {
+  border: 2px dashed #2c3744; border-radius: 10px;
+  padding: 30px; cursor: pointer; transition: border-color 0.2s;
+}
+.pmis-upload-zone:hover { border-color: #00c8ff; }
+
+.pmis-btn-primary {
+  background: #00c8ff; color: #000; border: none;
+  padding: 10px 22px; border-radius: 5px; font-weight: 600;
+  cursor: pointer; font-size: 14px;
+}
+.pmis-btn-primary:hover { background: #00b3e6; }
+
+/* Progress */
+.pmis-progress-wrap {
+  padding: 40px; text-align: center;
+}
+.pmis-progress-bar {
+  width: 100%; height: 8px; background: rgba(255,255,255,0.1);
+  border-radius: 4px; overflow: hidden; margin-bottom: 15px;
+}
+.pmis-progress-fill {
+  height: 100%; background: linear-gradient(90deg, #00c8ff, #4caf50);
+  width: 100%;
+  animation: pmis-pulse 2s infinite;
+}
+@keyframes pmis-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+.pmis-progress-text { color: #aaa; font-size: 13px; }
+
+/* Tabs */
+.pmis-tabs {
+  display: flex; gap: 5px; border-bottom: 1px solid #2c3744;
+  margin-bottom: 20px; flex-wrap: wrap;
+}
+.pmis-tab {
+  background: transparent; border: none;
+  color: #aaa; padding: 10px 16px;
+  cursor: pointer; font-size: 12px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+.pmis-tab:hover { color: #fff; }
+.pmis-tab.active {
+  color: #00c8ff;
+  border-bottom-color: #00c8ff;
+  font-weight: 600;
+}
+
+/* KPI Cards */
+.pmis-kpi-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+}
+.pmis-kpi {
+  background: rgba(0,200,255,0.08); padding: 15px; border-radius: 8px;
+  border-left: 3px solid #00c8ff;
+}
+.pmis-kpi-label {
+  color: #aaa; font-size: 11px; text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.pmis-kpi-value {
+  color: #fff; font-size: 22px; font-weight: 700;
+}
+
+/* Groups */
+.pmis-group-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px; margin-top: 12px;
+}
+.pmis-group {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px;
+}
+.pmis-group-icon { font-size: 18px; }
+.pmis-group-label { flex: 1; color: #ddd; font-size: 12px; }
+.pmis-group-count { color: #fff; font-weight: 700; font-size: 15px; }
+
+/* Table */
+.pmis-table-wrap { max-height: 60vh; overflow: auto; border: 1px solid #2c3744; border-radius: 6px; }
+.pmis-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 12px; color: #ddd;
+}
+.pmis-table thead {
+  background: #243140; position: sticky; top: 0; z-index: 1;
+}
+.pmis-table th {
+  text-align: left; padding: 10px 12px;
+  color: #fff; font-weight: 600;
+  border-bottom: 2px solid #1a242f;
+}
+.pmis-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #2c3744;
+}
+.pmis-table tbody tr:hover { background: rgba(0,200,255,0.05); }
+
+/* Input */
+.pmis-input {
+  background: #fff !important;
+  color: #000 !important;
+  border: 1px solid #d0d7de;
+  padding: 8px 12px; border-radius: 4px;
+  width: 250px; font-size: 13px;
+}
+.pmis-input:focus { outline: 2px solid #00c8ff; }
+
+/* Menu sidebar */
+.pmis-menu:hover {
+  background: rgba(0,200,255,0.1) !important;
+}`;
+  document.head.appendChild(style);
+  console.log('[PMIS Compare] CSS injected');
+})();
+
+// ━━━━ PMIS Compare Module (Core) ━━━━
+// ════════════════════════════════════════════════════════════════
+// PMIS COMPARE MODULE — So sánh PMIS vs Dashboard EVN Hà Nội
+// 
+// Tính năng:
+//   - Upload file PMIS_TBA_*.xlsb hoặc .xlsx
+//   - Parse 89 sheet, ~40K thiết bị
+//   - So sánh 3 tầng: tổng hợp / chi tiết vận hành / định danh
+//   - Phân loại 7 nhóm kết quả sai khác
+//   - Export Excel 13 sheet báo cáo
+//
+// Triển khai:
+//   - Phase 1: Parser + Match engine + UI shell (FILE NÀY)
+//   - Phase 2: Render bảng + biểu đồ
+//   - Phase 3: Export Excel
+// ════════════════════════════════════════════════════════════════
+(function() {
+  if (window._pmisCompareLoaded) return;
+  window._pmisCompareLoaded = true;
+
+  // ────────────────────────────────────────────────────────────
+  // CONSTANTS
+  // ────────────────────────────────────────────────────────────
+  
+  // Mapping: sheet name PMIS → Phan_loai_thiet_bi trong DB
+  const SHEET_TO_TYPE = {
+    'Máy cắt 110kV': 'MC', 'Máy cắt 22kV': 'MC', 'Máy cắt 35kV': 'MC',
+    'Máy cắt 220kV (GIS)': 'MC', 'Máy cắt HGIS 110kV': 'MC', 'Máy cắt 110kV (GIS)': 'MC',
+    'Máy biến áp 110kV': 'MBA', 'Máy biến áp 220kV': 'MBA',
+    'Máy biến áp 35kV': 'MBA', 'Máy biến áp 22kV': 'MBA',
+    'Máy biến áp tự dùng 22kV': 'MBATD', 'Máy biến áp tự dùng 35kV': 'MBATD',
+    'Dao cách ly 110kV': 'DCL', 'Dao cách ly 22kV': 'DCL', 'Dao cách ly 35kV': 'DCL',
+    'Dao cách ly 220kV (GIS)': 'DCL', 'Dao cách ly 110kV (GIS)': 'DCL', 'Dao cách ly HGIS 110kV': 'DCL',
+    'Biến dòng điện 110kV': 'TI', 'Biến dòng điện 22kV': 'TI', 'Biến dòng điện 35kV': 'TI',
+    'Biến dòng điện 6kV': 'TI', 'Biến dòng điện 10kV': 'TI', 'Biến dòng điện 220kV': 'TI',
+    'Biến dòng điện 220kV (GIS)': 'TI', 'Biến dòng điện 110kV (GIS)': 'TI', 'Biến dòng điện HGIS 110kV': 'TI',
+    'Biến điện áp 110kV': 'TU', 'Biến điện áp 22kV': 'TU', 'Biến điện áp 35kV': 'TU',
+    'Biến điện áp 110kV (GIS)': 'TU', 'Biến điện áp 220kV (GIS)': 'TU', 'Biến điện áp HGIS 110kV': 'TU',
+    'Chống sét van 110kV': 'CSV', 'Chống sét van 22kV': 'CSV', 'Chống sét van 35kV': 'CSV',
+    'Chống sét van 220kV': 'CSV', 'Chống sét van 220kV (GIS)': 'CSV', 'Chống sét van 110kV (GIS)': 'CSV',
+    'Chống sét van 10kV': 'CSV',
+    'Tụ bù 110kV': 'TBN', 'Tụ bù 22kV': 'TBN', 'Tụ bù 35kV': 'TBN',
+    'Thanh cái 110kV': 'TC', 'Thanh cái 22kV': 'TC', 'Thanh cái 35kV': 'TC', 'Thanh cái 220kV': 'TC',
+    'Sứ 110kV': 'TIchânsứ', 'Sứ 22kV': 'TIchânsứ', 'Sứ 35kV': 'TIchânsứ',
+    'Sứ 6kV': 'TIchânsứ', 'Sứ 220kV': 'TIchânsứ',
+    'Đầu cáp 110kV': 'Cáp', 'Đầu cáp 22kV': 'Cáp', 'Đầu cáp 35kV': 'Cáp',
+    'Dây cáp ngầm 22kV': 'Cáp', 'Dây cáp ngầm 35kV': 'Cáp', 'Cáp ngầm 110kV': 'Cáp',
+    'Bộ HGIS 110kV': 'HGIS', 'Bộ GIS 110kV': 'GIS', 'Bộ GIS 220kV': 'GIS',
+    'Cầu dao phụ tải (LBS) 22kV': 'FCO',
+    'Role 0,4kV': 'RL',
+  };
+  
+  // Cột PMIS quan trọng (theo phân tích file mẫu)
+  const PMIS_COLS = {
+    TEN_FILE: 0,        // E1.1
+    MA_THIET_BI: 1,
+    DUONG_DAY_TBA: 2,   // E1.1 Đông Anh
+    MA_CHA: 3,
+    NGAN_LO: 4,         // 173 E1.1 Đông Anh
+    TEN_THIET_BI: 5,    // MC 173
+    SO_CHE_TAO: 7,
+    NGAY_VAN_HANH: 8,
+    TINH_TRANG: 11,     // Đang sử dụng
+    HANG_SX: 13,
+    NUOC_SX: 15,
+    NGAY_LAP_DAT: 17,
+    NAM_SX: 18,
+    MA_HIEU: 25,
+    DIEN_AP: 26,
+    CHUNG_LOAI: 27,
+    DONG_DIEN: 29,
+  };
+  
+  // 7 nhóm kết quả
+  const RESULT_GROUPS = {
+    N1_MISSING_DB: 'Thiếu trong DB (có PMIS, không có DB)',
+    N2_EXTRA_DB: 'Thừa trong DB (có DB, không có PMIS)',
+    N3_QUANTITY: 'Lệch số lượng',
+    N4_SERIAL: 'Lệch serial',
+    N5_HANG: 'Lệch hãng SX',
+    N6_KIEU: 'Lệch kiểu/model',
+    N7_MISSING_INFO: 'Thiếu thông tin quan trọng',
+  };
+  
+  // State
+  let _state = {
+    pmisData: [],          // Array of devices
+    dbData: [],
+    matchResults: null,    // { matched, unmatched_pmis, unmatched_db, ... }
+    pmisStats: null,
+    dbStats: null,
+    parsing: false,
+    fileName: '',
+  };
+  
+  // ────────────────────────────────────────────────────────────
+  // LIBRARY LOADER
+  // ────────────────────────────────────────────────────────────
+  function _loadLib(name, url) {
+    return new Promise((resolve, reject) => {
+      if (window[name]) { resolve(window[name]); return; }
+      const s = document.createElement('script');
+      s.src = url;
+      s.onload = () => resolve(window[name]);
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+  
+  async function _ensureSheetJS() {
+    if (window.XLSX) return window.XLSX;
+    await _loadLib('XLSX', 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+    return window.XLSX;
+  }
+  
+  // ────────────────────────────────────────────────────────────
+  // NORMALIZE HELPERS
+  // ────────────────────────────────────────────────────────────
+  function _normTram(tram) {
+    if (!tram) return '';
+    return String(tram).trim().toUpperCase()
+      .replace(/^(TBA|TRẠM)\s+/i, '')
+      .replace(/\s+ĐÔNG ANH$|\s+THANH XUÂN$|\s+ĐỐNG ĐA$/i, ''); // bỏ tên huyện
+  }
+  function _normName(name) {
+    if (!name) return '';
+    return String(name).trim().toLowerCase().replace(/\s+/g, '');
+  }
+  function _normSerial(s) {
+    if (!s) return '';
+    return String(s).trim().replace(/^0+/, '').toLowerCase();
+  }
+  function _normVoltage(v) {
+    if (!v) return '';
+    const n = parseFloat(String(v).replace(/[^\d.]/g,''));
+    if (isNaN(n)) return '';
+    // PMIS dùng số: 145 → 110kV, 22 → 22kV, etc.
+    if (n >= 110 && n <= 170) return '110kV';
+    if (n >= 200 && n <= 250) return '220kV';
+    if (n >= 33 && n <= 40) return '35kV';
+    if (n >= 20 && n <= 24) return '22kV';
+    if (n >= 8 && n <= 12) return '10kV';
+    if (n >= 5 && n <= 8) return '6kV';
+    return n + 'kV';
+  }
+  
+  // ────────────────────────────────────────────────────────────
+  // PARSE PMIS FILE
+  // ────────────────────────────────────────────────────────────
+  async function _parsePmisFile(file, onProgress) {
+    const XLSX = await _ensureSheetJS();
+    if (onProgress) onProgress('Đang đọc file...');
+    
+    const arrayBuffer = await file.arrayBuffer();
+    let wb;
+    try {
+      wb = XLSX.read(arrayBuffer, { type: 'array', cellDates: false, cellNF: false, cellText: false });
+    } catch (err) {
+      throw new Error('Không đọc được file. Có thể file .xlsb không support — hãy convert sang .xlsx trước (Mở Excel → Save As → Excel Workbook .xlsx).');
+    }
+    
+    if (onProgress) onProgress(`Đã mở file: ${wb.SheetNames.length} sheets`);
+    
+    const allDevices = [];
+    const sheetStats = {};
+    const unmappedSheets = [];
+    
+    for (let i = 0; i < wb.SheetNames.length; i++) {
+      const sheetName = wb.SheetNames[i];
+      if (sheetName === 'MENU') continue;
+      
+      const dbType = SHEET_TO_TYPE[sheetName];
+      if (!dbType) {
+        unmappedSheets.push(sheetName);
+        continue;
+      }
+      
+      if (onProgress && i % 10 === 0) {
+        onProgress(`Parsing sheet ${i+1}/${wb.SheetNames.length}: ${sheetName}`);
+      }
+      
+      const ws = wb.Sheets[sheetName];
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
+      
+      // Extract rows (start from row 2, skip header)
+      for (let R = range.s.r + 1; R <= range.e.r; R++) {
+        const getCell = (C) => {
+          const addr = XLSX.utils.encode_cell({ r: R, c: C });
+          const cell = ws[addr];
+          return cell ? cell.v : null;
+        };
+        
+        const tenFile = getCell(PMIS_COLS.TEN_FILE);
+        const tenThietBi = getCell(PMIS_COLS.TEN_THIET_BI);
+        if (!tenFile && !tenThietBi) continue; // empty row
+        
+        allDevices.push({
+          // Identity
+          tram: _normTram(tenFile),
+          tram_full: getCell(PMIS_COLS.DUONG_DAY_TBA) || tenFile,
+          ngan_lo: getCell(PMIS_COLS.NGAN_LO) || '',
+          ten_thiet_bi: String(tenThietBi || '').trim(),
+          loai_thiet_bi: dbType,
+          cap_dien_ap: _normVoltage(getCell(PMIS_COLS.DIEN_AP)) || '',
+          
+          // Details
+          so_che_tao: String(getCell(PMIS_COLS.SO_CHE_TAO) || '').trim(),
+          hang_san_xuat: String(getCell(PMIS_COLS.HANG_SX) || '').trim(),
+          nuoc_san_xuat: String(getCell(PMIS_COLS.NUOC_SX) || '').trim(),
+          nam_san_xuat: getCell(PMIS_COLS.NAM_SX) || null,
+          kieu: String(getCell(PMIS_COLS.MA_HIEU) || '').trim(),
+          chung_loai: String(getCell(PMIS_COLS.CHUNG_LOAI) || '').trim(),
+          dong_dien: getCell(PMIS_COLS.DONG_DIEN) || null,
+          tinh_trang: String(getCell(PMIS_COLS.TINH_TRANG) || '').trim(),
+          
+          // Source
+          sheet_name: sheetName,
+          row_num: R + 1,
+        });
+      }
+      
+      sheetStats[sheetName] = { type: dbType, count: 0 };
+    }
+    
+    // Lọc thiết bị "Đang sử dụng" (bỏ thiết bị đã dừng)
+    const activeDevices = allDevices.filter(d => 
+      !d.tinh_trang || d.tinh_trang.includes('Đang sử dụng') || d.tinh_trang.includes('Vận hành')
+    );
+    
+    return { devices: activeDevices, totalRaw: allDevices.length, unmappedSheets };
+  }
+  
+  // ────────────────────────────────────────────────────────────
+  // FETCH DASHBOARD DATA
+  // ────────────────────────────────────────────────────────────
+  async function _fetchDbData(onProgress) {
+    if (onProgress) onProgress('Đang tải dữ liệu Dashboard...');
+    
+    // Use existing cached data if available
+    if (window._TH && Array.isArray(window._TH) && window._TH.length > 0) {
+      if (onProgress) onProgress(`Đã có cache: ${window._TH.length} thiết bị`);
+      return window._TH.map(r => ({
+        tram: _normTram(r.Tram || r.tram),
+        ten_thiet_bi: String(r.Ten_thiet_bi || '').trim(),
+        loai_thiet_bi: r.Phan_loai_thiet_bi || '',
+        cap_dien_ap: String(r.Cap_dien_ap || '').trim(),
+        ngan_lo: r.Ngan_thiet_bi || '',
+        nhom: r.Nhom_thiet_bi || '',
+      }));
+    }
+    
+    // Fetch from Supabase
+    const SB_URL = 'https://xqqmfmljwycpehfyknoy.supabase.co';
+    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxcW1mbWxqd3ljcGVoZnlrbm95Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODM4MDQsImV4cCI6MjA4Nzg1OTgwNH0.J_z0cFqq_Yet-n2X2L_VREdkcAqbkRFpYUp-ti3Fukc';
+    
+    // Get token
+    let token = null;
+    try {
+      if (window._sbClient) {
+        const { data: { session } } = await window._sbClient.auth.getSession();
+        token = session?.access_token;
+      }
+    } catch (e) {}
+    if (!token) {
+      const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
+      if (key) {
+        try { token = JSON.parse(localStorage.getItem(key))?.access_token; } catch (e) {}
+      }
+    }
+    if (!token) throw new Error('Chưa đăng nhập');
+    
+    const headers = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + token };
+    const all = [];
+    const BATCH = 1000;
+    let offset = 0;
+    while (true) {
+      if (onProgress) onProgress(`Tải DB rows ${offset+1}-${offset+BATCH}...`);
+      const res = await fetch(`${SB_URL}/rest/v1/TongHopThietBi?select=Tram,Ten_thiet_bi,Phan_loai_thiet_bi,Cap_dien_ap,Ngan_thiet_bi,Nhom_thiet_bi&offset=${offset}&limit=${BATCH}`, { headers });
+      if (!res.ok) throw new Error(`Fetch DB fail: ${res.status}`);
+      const batch = await res.json();
+      if (!batch.length) break;
+      all.push(...batch);
+      offset += BATCH;
+      if (batch.length < BATCH) break;
+    }
+    
+    return all.map(r => ({
+      tram: _normTram(r.Tram),
+      ten_thiet_bi: String(r.Ten_thiet_bi || '').trim(),
+      loai_thiet_bi: r.Phan_loai_thiet_bi || '',
+      cap_dien_ap: String(r.Cap_dien_ap || '').trim(),
+      ngan_lo: r.Ngan_thiet_bi || '',
+      nhom: r.Nhom_thiet_bi || '',
+    }));
+  }
+  
+  // ────────────────────────────────────────────────────────────
+  // MATCH ENGINE — 3 tầng so sánh
+  // ────────────────────────────────────────────────────────────
+  function _runComparison(pmisData, dbData) {
+    // ── Tầng 1: TỔNG HỢP (tram × loai × cấp ĐA) ──
+    const tier1 = {};
+    function _addT1(map, dev, src) {
+      const key = `${dev.tram}|${dev.loai_thiet_bi}|${dev.cap_dien_ap}`;
+      if (!map[key]) map[key] = { tram: dev.tram, loai: dev.loai_thiet_bi, cap_dien_ap: dev.cap_dien_ap, pmis: 0, db: 0, diff: 0 };
+      map[key][src]++;
+    }
+    pmisData.forEach(d => _addT1(tier1, d, 'pmis'));
+    dbData.forEach(d => _addT1(tier1, d, 'db'));
+    Object.values(tier1).forEach(r => r.diff = r.pmis - r.db);
+    
+    // ── Tầng 2: NGĂN LỘ (tram × cấp ĐA × ngăn lộ × loại) ──
+    const tier2 = {};
+    function _addT2(map, dev, src) {
+      const key = `${dev.tram}|${dev.cap_dien_ap}|${dev.ngan_lo}|${dev.loai_thiet_bi}`;
+      if (!map[key]) map[key] = { tram: dev.tram, cap_dien_ap: dev.cap_dien_ap, ngan_lo: dev.ngan_lo, loai: dev.loai_thiet_bi, pmis: 0, db: 0 };
+      map[key][src]++;
+    }
+    pmisData.forEach(d => _addT2(tier2, d, 'pmis'));
+    dbData.forEach(d => _addT2(tier2, d, 'db'));
+    
+    // ── Tầng 3: ĐỊNH DANH (match từng thiết bị) ──
+    const tier3 = { matched: [], unmatched_pmis: [], unmatched_db: [], conflicts: [] };
+    const dbByKey = {};
+    dbData.forEach((d, i) => {
+      const k1 = `${d.tram}|${_normName(d.ten_thiet_bi)}|${d.loai_thiet_bi}`;
+      const k2 = `${d.tram}|${_normName(d.ten_thiet_bi)}`;
+      if (!dbByKey[k1]) dbByKey[k1] = [];
+      dbByKey[k1].push({ ...d, _idx: i });
+      if (!dbByKey[k2]) dbByKey[k2] = [];
+      dbByKey[k2].push({ ...d, _idx: i });
+    });
+    const dbMatchedIdx = new Set();
+    
+    pmisData.forEach(p => {
+      const k1 = `${p.tram}|${_normName(p.ten_thiet_bi)}|${p.loai_thiet_bi}`;
+      const k2 = `${p.tram}|${_normName(p.ten_thiet_bi)}`;
+      let match = null;
+      if (dbByKey[k1]?.length) match = dbByKey[k1].find(d => !dbMatchedIdx.has(d._idx));
+      if (!match && dbByKey[k2]?.length) match = dbByKey[k2].find(d => !dbMatchedIdx.has(d._idx));
+      
+      if (match) {
+        dbMatchedIdx.add(match._idx);
+        const score = _scoreMatch(p, match);
+        if (score < 100) tier3.conflicts.push({ pmis: p, db: match, score });
+        tier3.matched.push({ pmis: p, db: match, score });
+      } else {
+        tier3.unmatched_pmis.push(p); // N1: Thiếu trong DB
+      }
+    });
+    
+    dbData.forEach((d, i) => {
+      if (!dbMatchedIdx.has(i)) tier3.unmatched_db.push(d); // N2: Thừa trong DB
+    });
+    
+    // ── 7 nhóm kết quả ──
+    const groups = {
+      N1: tier3.unmatched_pmis,
+      N2: tier3.unmatched_db,
+      N3: Object.values(tier1).filter(r => r.diff !== 0),
+      N4: tier3.conflicts.filter(c => !c.pmis.so_che_tao || c.pmis.so_che_tao !== (c.db.so_che_tao || '')),
+      N5: tier3.conflicts.filter(c => c.pmis.hang_san_xuat && c.db.hang_san_xuat && c.pmis.hang_san_xuat.toLowerCase() !== (c.db.hang_san_xuat || '').toLowerCase()),
+      N6: tier3.conflicts.filter(c => c.pmis.kieu && c.db.kieu && c.pmis.kieu.toLowerCase() !== (c.db.kieu || '').toLowerCase()),
+      N7: pmisData.filter(p => !p.so_che_tao || !p.hang_san_xuat || !p.nam_san_xuat),
+    };
+    
+    return { tier1, tier2, tier3, groups };
+  }
+  
+  function _scoreMatch(pmis, db) {
+    let score = 100;
+    if (pmis.so_che_tao && db.so_che_tao && _normSerial(pmis.so_che_tao) !== _normSerial(db.so_che_tao)) score -= 30;
+    if (pmis.hang_san_xuat && db.hang_san_xuat && pmis.hang_san_xuat.toLowerCase() !== db.hang_san_xuat.toLowerCase()) score -= 20;
+    if (pmis.kieu && db.kieu && pmis.kieu.toLowerCase() !== db.kieu.toLowerCase()) score -= 15;
+    return Math.max(0, score);
+  }
+  
+  // ────────────────────────────────────────────────────────────
+  // STATS
+  // ────────────────────────────────────────────────────────────
+  function _computeStats(data) {
+    const trams = new Set();
+    const byType = {};
+    const byVoltage = {};
+    data.forEach(d => {
+      trams.add(d.tram);
+      byType[d.loai_thiet_bi] = (byType[d.loai_thiet_bi] || 0) + 1;
+      if (d.cap_dien_ap) byVoltage[d.cap_dien_ap] = (byVoltage[d.cap_dien_ap] || 0) + 1;
+    });
+    return { total: data.length, trams: trams.size, byType, byVoltage };
+  }
+  
+  // ────────────────────────────────────────────────────────────
+  // PUBLIC API
+  // ────────────────────────────────────────────────────────────
+  window._pmisCompareState = _state;
+  window._pmisCompareRun = async function(file, onProgress) {
+    _state.parsing = true;
+    _state.fileName = file.name;
+    try {
+      // Parse PMIS file
+      const parseResult = await _parsePmisFile(file, onProgress);
+      _state.pmisData = parseResult.devices;
+      _state.pmisStats = _computeStats(parseResult.devices);
+      
+      if (onProgress) onProgress(`Đã parse ${parseResult.devices.length} thiết bị PMIS`);
+      
+      // Fetch DB data
+      _state.dbData = await _fetchDbData(onProgress);
+      _state.dbStats = _computeStats(_state.dbData);
+      
+      if (onProgress) onProgress(`Đã tải ${_state.dbData.length} thiết bị DB. Đang so sánh...`);
+      
+      // Run comparison
+      _state.matchResults = _runComparison(_state.pmisData, _state.dbData);
+      
+      if (onProgress) onProgress('Hoàn thành!');
+      _state.parsing = false;
+      return _state;
+    } catch (err) {
+      _state.parsing = false;
+      throw err;
+    }
+  };
+  
+  // Util exports
+  window._pmisCompareUtils = {
+    normTram: _normTram,
+    normName: _normName,
+    normVoltage: _normVoltage,
+    SHEET_TO_TYPE,
+    RESULT_GROUPS,
+  };
+  
+  console.log('[PMIS Compare] Module loaded');
+})();
+
+// ━━━━ PMIS Compare Module (UI) ━━━━
+// ════════════════════════════════════════════════════════════════
+// PMIS COMPARE UI MODULE — Inject menu + Modal + Render results
+// ════════════════════════════════════════════════════════════════
+(function() {
+  if (window._pmisCompareUiLoaded) return;
+  window._pmisCompareUiLoaded = true;
+
+  // Wait for sidebar to load before injecting menu
+  function _injectMenu() {
+    const sidebar = document.querySelector('#sidebarMenu, .sidebar-nav, .sidebar-menu, nav.sidebar');
+    if (!sidebar) {
+      setTimeout(_injectMenu, 1000);
+      return;
+    }
+    
+    if (document.getElementById('pmisCompareMenu')) return; // Already injected
+    
+    // Find a good place to insert (after BBTN Mgmt menu)
+    const bbtnMenu = document.getElementById('bbtnMgmtMenu') || sidebar.lastElementChild;
+    
+    const menu = document.createElement('a');
+    menu.id = 'pmisCompareMenu';
+    menu.className = (bbtnMenu?.className || 'sidebar-item') + ' pmis-menu';
+    menu.href = '#';
+    menu.innerHTML = `<i class="fas fa-balance-scale" style="margin-right:8px"></i> <span>📊 So sánh PMIS vs DB</span>`;
+    menu.style.cssText = 'display:flex;align-items:center;padding:10px 15px;color:#fff;text-decoration:none;cursor:pointer;font-size:13px';
+    
+    menu.onclick = (e) => {
+      e.preventDefault();
+      _openPmisModal();
+    };
+    
+    if (bbtnMenu && bbtnMenu.parentNode) {
+      bbtnMenu.parentNode.insertBefore(menu, bbtnMenu.nextSibling);
+    } else {
+      sidebar.appendChild(menu);
+    }
+    
+    console.log('[PMIS Compare UI] Menu injected');
+  }
+  
+  // ────────────────────────────────────────────────────────────
+  // OPEN MODAL
+  // ────────────────────────────────────────────────────────────
+  function _openPmisModal() {
+    // Remove old modal if exists
+    document.getElementById('pmisCompareModal')?.remove();
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'pmisCompareModal';
+    overlay.className = 'pmis-modal-overlay';
+    overlay.innerHTML = `
+      <div class="pmis-modal-card">
+        <div class="pmis-modal-header">
+          <div class="pmis-modal-title">
+            <i class="fas fa-balance-scale" style="margin-right:8px"></i>
+            So sánh PMIS vs Dashboard
+          </div>
+          <button class="pmis-modal-close" onclick="document.getElementById('pmisCompareModal').remove()">✕</button>
+        </div>
+        <div class="pmis-modal-body" id="pmisModalBody">
+          <div class="pmis-upload-zone" id="pmisUploadZone">
+            <div style="text-align:center;padding:30px">
+              <i class="fas fa-cloud-upload-alt" style="font-size:48px;color:#00c8ff;margin-bottom:15px"></i>
+              <h3 style="color:#fff;margin:10px 0">Kéo thả file PMIS vào đây hoặc</h3>
+              <button class="pmis-btn-primary" onclick="document.getElementById('pmisFileInput').click()">
+                <i class="fas fa-folder-open"></i> Chọn tệp PMIS...
+              </button>
+              <input type="file" id="pmisFileInput" accept=".xlsb,.xlsx,.xls" style="display:none">
+              <p style="color:#aaa;font-size:12px;margin-top:15px">
+                Hỗ trợ: <strong>.xlsb</strong>, <strong>.xlsx</strong>, .xls — max 20MB<br>
+                File phải có cấu trúc PMIS_TBA_*.xlsb (89 sheet, ~40K thiết bị)
+              </p>
+            </div>
+          </div>
+          
+          <div class="pmis-progress-wrap" id="pmisProgressWrap" style="display:none">
+            <div class="pmis-progress-bar"><div class="pmis-progress-fill" id="pmisProgressFill"></div></div>
+            <div class="pmis-progress-text" id="pmisProgressText">Đang xử lý...</div>
+          </div>
+          
+          <div id="pmisResultWrap" style="display:none"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    
+    _attachUpload();
+  }
+  
+  // ────────────────────────────────────────────────────────────
+  // ATTACH UPLOAD HANDLERS
+  // ────────────────────────────────────────────────────────────
+  function _attachUpload() {
+    const zone = document.getElementById('pmisUploadZone');
+    const input = document.getElementById('pmisFileInput');
+    
+    zone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      zone.style.borderColor = '#00c8ff';
+    });
+    zone.addEventListener('dragleave', () => {
+      zone.style.borderColor = '';
+    });
+    zone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      zone.style.borderColor = '';
+      const file = e.dataTransfer.files[0];
+      if (file) _handleFile(file);
+    });
+    
+    input.addEventListener('change', () => {
+      if (input.files[0]) _handleFile(input.files[0]);
+    });
+  }
+  
+  async function _handleFile(file) {
+    if (file.size > 20 * 1024 * 1024) {
+      alert('File quá lớn (>20MB). Vui lòng nén hoặc tách file trước.');
+      return;
+    }
+    
+    document.getElementById('pmisUploadZone').style.display = 'none';
+    document.getElementById('pmisProgressWrap').style.display = 'block';
+    document.getElementById('pmisResultWrap').style.display = 'none';
+    
+    const onProgress = (msg) => {
+      document.getElementById('pmisProgressText').textContent = msg;
+    };
+    
+    try {
+      const state = await window._pmisCompareRun(file, onProgress);
+      document.getElementById('pmisProgressWrap').style.display = 'none';
+      _renderResults(state);
+    } catch (err) {
+      document.getElementById('pmisProgressText').innerHTML = 
+        `<span style="color:#ff5252">❌ Lỗi: ${err.message}</span><br>
+        <button class="pmis-btn-primary" style="margin-top:10px" onclick="document.getElementById('pmisUploadZone').style.display='block';document.getElementById('pmisProgressWrap').style.display='none'">↻ Thử lại</button>`;
+      console.error('[PMIS] Error:', err);
+    }
+  }
+  
+  // ────────────────────────────────────────────────────────────
+  // RENDER RESULTS (Tabbed)
+  // ────────────────────────────────────────────────────────────
+  function _renderResults(state) {
+    const wrap = document.getElementById('pmisResultWrap');
+    wrap.style.display = 'block';
+    
+    const { pmisStats, dbStats, matchResults } = state;
+    const groups = matchResults.groups;
+    
+    wrap.innerHTML = `
+      <div class="pmis-tabs">
+        <button class="pmis-tab active" data-tab="overview"><i class="fas fa-chart-pie"></i> Tổng quan</button>
+        <button class="pmis-tab" data-tab="tier1"><i class="fas fa-layer-group"></i> Theo trạm + loại</button>
+        <button class="pmis-tab" data-tab="tier2"><i class="fas fa-sitemap"></i> Theo ngăn lộ</button>
+        <button class="pmis-tab" data-tab="missing"><i class="fas fa-exclamation-triangle"></i> Thiếu DB (${groups.N1.length})</button>
+        <button class="pmis-tab" data-tab="extra"><i class="fas fa-plus-circle"></i> Thừa DB (${groups.N2.length})</button>
+        <button class="pmis-tab" data-tab="conflicts"><i class="fas fa-not-equal"></i> Lệch (${matchResults.tier3.conflicts.length})</button>
+        <button class="pmis-tab" data-tab="export"><i class="fas fa-file-excel"></i> Export</button>
+      </div>
+      <div class="pmis-tab-content" id="pmisTabContent"></div>
+    `;
+    
+    document.querySelectorAll('.pmis-tab').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.pmis-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _renderTab(btn.dataset.tab, state);
+      };
+    });
+    
+    _renderTab('overview', state);
+  }
+  
+  function _renderTab(tab, state) {
+    const c = document.getElementById('pmisTabContent');
+    const { pmisStats, dbStats, matchResults } = state;
+    const groups = matchResults.groups;
+    
+    if (tab === 'overview') {
+      const matchPct = ((matchResults.tier3.matched.length / (pmisStats.total || 1)) * 100).toFixed(1);
+      c.innerHTML = `
+        <div class="pmis-kpi-grid">
+          <div class="pmis-kpi"><div class="pmis-kpi-label">Tổng PMIS</div><div class="pmis-kpi-value">${pmisStats.total.toLocaleString()}</div></div>
+          <div class="pmis-kpi"><div class="pmis-kpi-label">Tổng DB</div><div class="pmis-kpi-value">${dbStats.total.toLocaleString()}</div></div>
+          <div class="pmis-kpi"><div class="pmis-kpi-label">Khớp được</div><div class="pmis-kpi-value" style="color:#4caf50">${matchResults.tier3.matched.length.toLocaleString()} (${matchPct}%)</div></div>
+          <div class="pmis-kpi"><div class="pmis-kpi-label">Số trạm</div><div class="pmis-kpi-value">${pmisStats.trams}</div></div>
+        </div>
+        
+        <h3 style="color:#fff;margin-top:25px">7 nhóm sai khác</h3>
+        <div class="pmis-group-grid">
+          <div class="pmis-group" data-group="N1"><span class="pmis-group-icon" style="color:#ff5252">❌</span> <span class="pmis-group-label">N1: Thiếu DB</span><span class="pmis-group-count">${groups.N1.length.toLocaleString()}</span></div>
+          <div class="pmis-group" data-group="N2"><span class="pmis-group-icon" style="color:#ff9100">➕</span> <span class="pmis-group-label">N2: Thừa DB</span><span class="pmis-group-count">${groups.N2.length.toLocaleString()}</span></div>
+          <div class="pmis-group" data-group="N3"><span class="pmis-group-icon" style="color:#fbc02d">⚖️</span> <span class="pmis-group-label">N3: Lệch số lượng</span><span class="pmis-group-count">${groups.N3.length.toLocaleString()}</span></div>
+          <div class="pmis-group" data-group="N4"><span class="pmis-group-icon" style="color:#9c27b0">🔢</span> <span class="pmis-group-label">N4: Lệch serial</span><span class="pmis-group-count">${groups.N4.length.toLocaleString()}</span></div>
+          <div class="pmis-group" data-group="N5"><span class="pmis-group-icon" style="color:#03a9f4">🏭</span> <span class="pmis-group-label">N5: Lệch hãng</span><span class="pmis-group-count">${groups.N5.length.toLocaleString()}</span></div>
+          <div class="pmis-group" data-group="N6"><span class="pmis-group-icon" style="color:#00bcd4">📦</span> <span class="pmis-group-label">N6: Lệch kiểu</span><span class="pmis-group-count">${groups.N6.length.toLocaleString()}</span></div>
+          <div class="pmis-group" data-group="N7"><span class="pmis-group-icon" style="color:#607d8b">❓</span> <span class="pmis-group-label">N7: Thiếu info</span><span class="pmis-group-count">${groups.N7.length.toLocaleString()}</span></div>
+        </div>
+        
+        <h3 style="color:#fff;margin-top:25px">Phân bố theo loại</h3>
+        <table class="pmis-table">
+          <thead><tr><th>Loại</th><th>PMIS</th><th>DB</th><th>Chênh lệch</th></tr></thead>
+          <tbody>
+            ${_renderTypeBreakdown(pmisStats.byType, dbStats.byType)}
+          </tbody>
+        </table>
+      `;
+    } else if (tab === 'tier1') {
+      const rows = Object.values(matchResults.tier1).sort((a,b) => Math.abs(b.diff) - Math.abs(a.diff));
+      c.innerHTML = `
+        <div style="margin-bottom:10px"><input type="text" id="t1Filter" placeholder="Lọc trạm..." class="pmis-input" oninput="window._pmisFilterT1(this.value)"></div>
+        <div class="pmis-table-wrap">
+          <table class="pmis-table" id="pmisT1Table">
+            <thead><tr><th>Trạm</th><th>Loại</th><th>Cấp ĐA</th><th>PMIS</th><th>DB</th><th>Chênh lệch</th></tr></thead>
+            <tbody>${_renderTier1Rows(rows)}</tbody>
+          </table>
+        </div>
+      `;
+      window._pmisFilterT1 = (q) => {
+        const filtered = q ? rows.filter(r => (r.tram||'').toLowerCase().includes(q.toLowerCase())) : rows;
+        document.querySelector('#pmisT1Table tbody').innerHTML = _renderTier1Rows(filtered);
+      };
+    } else if (tab === 'tier2') {
+      const rows = Object.values(matchResults.tier2)
+        .filter(r => r.pmis !== r.db)
+        .sort((a,b) => Math.abs(b.pmis - b.db) - Math.abs(a.pmis - a.db))
+        .slice(0, 500);
+      c.innerHTML = `
+        <p style="color:#aaa">Hiển thị 500 ngăn lộ có chênh lệch cao nhất.</p>
+        <div class="pmis-table-wrap">
+          <table class="pmis-table">
+            <thead><tr><th>Trạm</th><th>Cấp ĐA</th><th>Ngăn lộ</th><th>Loại</th><th>PMIS</th><th>DB</th><th>Δ</th></tr></thead>
+            <tbody>${rows.map(r => `<tr><td>${_esc(r.tram)}</td><td>${_esc(r.cap_dien_ap)}</td><td>${_esc(r.ngan_lo)}</td><td>${_esc(r.loai)}</td><td>${r.pmis}</td><td>${r.db}</td><td style="color:${r.pmis>r.db?'#ff5252':'#ff9100'}">${r.pmis-r.db}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>
+      `;
+    } else if (tab === 'missing') {
+      c.innerHTML = _renderDeviceList(groups.N1, 'Thiết bị có trong PMIS nhưng KHÔNG có trong DB', true);
+    } else if (tab === 'extra') {
+      c.innerHTML = _renderDeviceList(groups.N2, 'Thiết bị có trong DB nhưng KHÔNG có trong PMIS', false);
+    } else if (tab === 'conflicts') {
+      c.innerHTML = _renderConflicts(matchResults.tier3.conflicts);
+    } else if (tab === 'export') {
+      c.innerHTML = `
+        <div style="padding:30px;text-align:center">
+          <h3 style="color:#fff">Export báo cáo Excel</h3>
+          <p style="color:#aaa">Báo cáo gồm 13 sheet theo yêu cầu</p>
+          <button class="pmis-btn-primary" onclick="window._pmisExportExcel()">
+            <i class="fas fa-file-excel"></i> Tải báo cáo Excel
+          </button>
+          <p style="color:#666;font-size:11px;margin-top:20px">
+            Bao gồm: Dashboard, DM_Tram, Tong_hop_theo_tram, Tong_hop_theo_loai_TB,<br>
+            So_sanh_tram_loai_capdienap, So_sanh_ngan_lo, So_sanh_serial,<br>
+            So_sanh_hang_model, Thiet_bi_PMIS_chua_co_TNDK, Thiet_bi_TNDK_chua_co_PMIS,<br>
+            Du_lieu_thieu_thong_tin, Bang_quy_doi_loai_TB, Bang_chuan_hoa_hang
+          </p>
+        </div>
+      `;
+    }
+  }
+  
+  function _renderTier1Rows(rows) {
+    return rows.map(r => {
+      let color = '#aaa';
+      if (r.diff > 0) color = '#ff5252'; // PMIS nhiều hơn → thiếu DB
+      else if (r.diff < 0) color = '#ff9100'; // DB nhiều hơn → thừa
+      else color = '#4caf50'; // bằng nhau
+      return `<tr>
+        <td>${_esc(r.tram)}</td>
+        <td>${_esc(r.loai)}</td>
+        <td>${_esc(r.cap_dien_ap)}</td>
+        <td>${r.pmis}</td>
+        <td>${r.db}</td>
+        <td style="color:${color};font-weight:600">${r.diff > 0 ? '+' : ''}${r.diff}</td>
+      </tr>`;
+    }).join('');
+  }
+  
+  function _renderTypeBreakdown(pmisTypes, dbTypes) {
+    const allTypes = new Set([...Object.keys(pmisTypes), ...Object.keys(dbTypes)]);
+    return [...allTypes].sort().map(t => {
+      const p = pmisTypes[t] || 0;
+      const d = dbTypes[t] || 0;
+      const diff = p - d;
+      const color = diff > 0 ? '#ff5252' : (diff < 0 ? '#ff9100' : '#4caf50');
+      return `<tr>
+        <td><strong>${_esc(t)}</strong></td>
+        <td>${p.toLocaleString()}</td>
+        <td>${d.toLocaleString()}</td>
+        <td style="color:${color}">${diff > 0 ? '+' : ''}${diff.toLocaleString()}</td>
+      </tr>`;
+    }).join('');
+  }
+  
+  function _renderDeviceList(devices, title, isPmis) {
+    if (!devices.length) return `<p style="color:#aaa;text-align:center;padding:40px">✅ Không có thiết bị nào trong nhóm này</p>`;
+    const shown = devices.slice(0, 500);
+    return `
+      <h3 style="color:#fff">${title} (Hiển thị ${shown.length}/${devices.length})</h3>
+      <div class="pmis-table-wrap">
+        <table class="pmis-table">
+          <thead><tr><th>Trạm</th><th>Tên TB</th><th>Loại</th><th>Cấp ĐA</th>${isPmis ? '<th>Hãng</th><th>Năm SX</th>' : ''}</tr></thead>
+          <tbody>
+            ${shown.map(d => `<tr>
+              <td>${_esc(d.tram)}</td>
+              <td>${_esc(d.ten_thiet_bi)}</td>
+              <td>${_esc(d.loai_thiet_bi)}</td>
+              <td>${_esc(d.cap_dien_ap)}</td>
+              ${isPmis ? `<td>${_esc(d.hang_san_xuat||'')}</td><td>${d.nam_san_xuat||''}</td>` : ''}
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+  
+  function _renderConflicts(conflicts) {
+    if (!conflicts.length) return `<p style="color:#aaa;text-align:center;padding:40px">✅ Không có conflict nào</p>`;
+    const shown = conflicts.slice(0, 200);
+    return `
+      <h3 style="color:#fff">Conflict matched nhưng khác chi tiết (${shown.length}/${conflicts.length})</h3>
+      <div class="pmis-table-wrap">
+        <table class="pmis-table">
+          <thead><tr><th>Trạm</th><th>Tên</th><th>Loại</th><th>Score</th><th>PMIS serial</th><th>DB serial</th><th>PMIS hãng</th><th>DB hãng</th></tr></thead>
+          <tbody>
+            ${shown.map(c => `<tr>
+              <td>${_esc(c.pmis.tram)}</td>
+              <td>${_esc(c.pmis.ten_thiet_bi)}</td>
+              <td>${_esc(c.pmis.loai_thiet_bi)}</td>
+              <td style="color:${c.score >= 80 ? '#4caf50' : c.score >= 50 ? '#ff9100' : '#ff5252'};font-weight:600">${c.score}</td>
+              <td>${_esc(c.pmis.so_che_tao||'-')}</td>
+              <td>${_esc(c.db.so_che_tao||'-')}</td>
+              <td>${_esc(c.pmis.hang_san_xuat||'-')}</td>
+              <td>${_esc(c.db.hang_san_xuat||'-')}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+  
+  function _esc(s) {
+    if (s === null || s === undefined) return '';
+    return String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]);
+  }
+  
+  // Init
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _injectMenu);
+  } else {
+    _injectMenu();
+  }
+  setTimeout(_injectMenu, 2000); // Retry after 2s
+  setTimeout(_injectMenu, 5000); // Retry after 5s
+  
+  console.log('[PMIS Compare UI] Loaded');
+})();
+
+// ━━━━ PMIS Compare Module (Export) ━━━━
+// ════════════════════════════════════════════════════════════════
+// PMIS COMPARE EXPORT — Export Excel báo cáo 13 sheet
+// ════════════════════════════════════════════════════════════════
+(function() {
+  if (window._pmisExportLoaded) return;
+  window._pmisExportLoaded = true;
+  
+  window._pmisExportExcel = async function() {
+    if (!window.XLSX) {
+      alert('Đang tải thư viện Excel...');
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+    
+    const state = window._pmisCompareState;
+    if (!state || !state.matchResults) {
+      alert('Chưa có dữ liệu so sánh');
+      return;
+    }
+    
+    const XLSX = window.XLSX;
+    const wb = XLSX.utils.book_new();
+    const { pmisStats, dbStats, matchResults, fileName } = state;
+    const groups = matchResults.groups;
+    
+    // ── Sheet 1: Dashboard ──
+    const dashboardRows = [
+      ['BÁO CÁO SO SÁNH PMIS vs DASHBOARD'],
+      ['File PMIS', fileName],
+      ['Ngày export', new Date().toLocaleString('vi-VN')],
+      [],
+      ['CHỈ TIÊU', 'PMIS', 'Dashboard', 'Chênh lệch'],
+      ['Tổng thiết bị', pmisStats.total, dbStats.total, pmisStats.total - dbStats.total],
+      ['Số trạm', pmisStats.trams, dbStats.trams, pmisStats.trams - dbStats.trams],
+      [],
+      ['NHÓM SAI KHÁC', 'SỐ LƯỢNG'],
+      ['N1: Thiếu trong DB', groups.N1.length],
+      ['N2: Thừa trong DB', groups.N2.length],
+      ['N3: Lệch số lượng (cấp trạm + loại)', groups.N3.length],
+      ['N4: Lệch serial', groups.N4.length],
+      ['N5: Lệch hãng SX', groups.N5.length],
+      ['N6: Lệch kiểu/model', groups.N6.length],
+      ['N7: Thiếu thông tin', groups.N7.length],
+      [],
+      ['MATCH SCORE'],
+      ['Khớp được', matchResults.tier3.matched.length],
+      ['Conflict (matched nhưng khác chi tiết)', matchResults.tier3.conflicts.length],
+      ['Match rate (%)', ((matchResults.tier3.matched.length / pmisStats.total) * 100).toFixed(2)],
+    ];
+    const ws1 = XLSX.utils.aoa_to_sheet(dashboardRows);
+    ws1['!cols'] = [{wch:40},{wch:15},{wch:15},{wch:15}];
+    XLSX.utils.book_append_sheet(wb, ws1, 'Dashboard');
+    
+    // ── Sheet 2: DM_Tram ──
+    const trams = new Set([...state.pmisData.map(d=>d.tram), ...state.dbData.map(d=>d.tram)]);
+    const tramRows = [['Trạm', 'Có trong PMIS', 'Có trong DB', 'TB PMIS', 'TB DB', 'Chênh lệch']];
+    [...trams].sort().forEach(t => {
+      const pmisCount = state.pmisData.filter(d => d.tram === t).length;
+      const dbCount = state.dbData.filter(d => d.tram === t).length;
+      tramRows.push([t, pmisCount > 0 ? 'Có' : '-', dbCount > 0 ? 'Có' : '-', pmisCount, dbCount, pmisCount - dbCount]);
+    });
+    const ws2 = XLSX.utils.aoa_to_sheet(tramRows);
+    ws2['!cols'] = [{wch:15},{wch:15},{wch:15},{wch:12},{wch:12},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, ws2, 'DM_Tram');
+    
+    // ── Sheet 3: Tong_hop_theo_tram ──
+    const tramAgg = {};
+    state.pmisData.forEach(d => { tramAgg[d.tram] = tramAgg[d.tram] || {pmis:0,db:0}; tramAgg[d.tram].pmis++; });
+    state.dbData.forEach(d => { tramAgg[d.tram] = tramAgg[d.tram] || {pmis:0,db:0}; tramAgg[d.tram].db++; });
+    const ws3rows = [['Trạm', 'PMIS', 'DB', 'Chênh lệch', 'Mức ưu tiên']];
+    Object.entries(tramAgg).sort((a,b) => Math.abs(b[1].pmis - b[1].db) - Math.abs(a[1].pmis - a[1].db)).forEach(([t, c]) => {
+      const diff = c.pmis - c.db;
+      const priority = Math.abs(diff) > 50 ? 'CAO' : Math.abs(diff) > 10 ? 'TRUNG BÌNH' : 'THẤP';
+      ws3rows.push([t, c.pmis, c.db, diff, priority]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws3rows), 'Tong_hop_theo_tram');
+    
+    // ── Sheet 4: Tong_hop_theo_loai_TB ──
+    const allTypes = new Set([...Object.keys(pmisStats.byType), ...Object.keys(dbStats.byType)]);
+    const ws4rows = [['Loại thiết bị', 'PMIS', 'DB', 'Chênh lệch']];
+    [...allTypes].sort().forEach(t => {
+      ws4rows.push([t, pmisStats.byType[t] || 0, dbStats.byType[t] || 0, (pmisStats.byType[t] || 0) - (dbStats.byType[t] || 0)]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws4rows), 'Tong_hop_theo_loai_TB');
+    
+    // ── Sheet 5: So_sanh_tram_loai_capdienap ──
+    const ws5rows = [['Trạm', 'Loại', 'Cấp điện áp', 'PMIS', 'DB', 'Chênh lệch']];
+    Object.values(matchResults.tier1).sort((a,b) => Math.abs(b.diff) - Math.abs(a.diff)).forEach(r => {
+      ws5rows.push([r.tram, r.loai, r.cap_dien_ap, r.pmis, r.db, r.diff]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws5rows), 'So_sanh_tram_loai_capdienap');
+    
+    // ── Sheet 6: So_sanh_ngan_lo ──
+    const ws6rows = [['Trạm', 'Cấp ĐA', 'Ngăn lộ', 'Loại', 'PMIS', 'DB', 'Chênh lệch']];
+    Object.values(matchResults.tier2).filter(r => r.pmis !== r.db).sort((a,b) => Math.abs(b.pmis-b.db) - Math.abs(a.pmis-a.db)).slice(0, 5000).forEach(r => {
+      ws6rows.push([r.tram, r.cap_dien_ap, r.ngan_lo, r.loai, r.pmis, r.db, r.pmis - r.db]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws6rows), 'So_sanh_ngan_lo');
+    
+    // ── Sheet 7: So_sanh_serial ──
+    const ws7rows = [['Trạm', 'Tên TB', 'Loại', 'PMIS Serial', 'DB Serial', 'Match score']];
+    groups.N4.slice(0, 5000).forEach(c => {
+      ws7rows.push([c.pmis.tram, c.pmis.ten_thiet_bi, c.pmis.loai_thiet_bi, c.pmis.so_che_tao||'', c.db.so_che_tao||'', c.score]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws7rows), 'So_sanh_serial');
+    
+    // ── Sheet 8: So_sanh_hang_model ──
+    const ws8rows = [['Trạm', 'Tên TB', 'Loại', 'PMIS Hãng', 'DB Hãng', 'PMIS Kiểu', 'DB Kiểu']];
+    const hangModelDiffs = [...groups.N5, ...groups.N6].slice(0, 5000);
+    hangModelDiffs.forEach(c => {
+      ws8rows.push([c.pmis.tram, c.pmis.ten_thiet_bi, c.pmis.loai_thiet_bi, c.pmis.hang_san_xuat||'', c.db.hang_san_xuat||'', c.pmis.kieu||'', c.db.kieu||'']);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws8rows), 'So_sanh_hang_model');
+    
+    // ── Sheet 9: Thiet_bi_PMIS_chua_co_TNDK ──
+    const ws9rows = [['Trạm', 'Ngăn lộ', 'Tên TB', 'Loại', 'Cấp ĐA', 'Serial', 'Hãng', 'Năm SX', 'Kiểu']];
+    groups.N1.slice(0, 10000).forEach(d => {
+      ws9rows.push([d.tram, d.ngan_lo||'', d.ten_thiet_bi, d.loai_thiet_bi, d.cap_dien_ap, d.so_che_tao||'', d.hang_san_xuat||'', d.nam_san_xuat||'', d.kieu||'']);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws9rows), 'PMIS_chua_co_DB');
+    
+    // ── Sheet 10: Thiet_bi_TNDK_chua_co_PMIS ──
+    const ws10rows = [['Trạm', 'Ngăn lộ', 'Tên TB', 'Loại', 'Cấp ĐA']];
+    groups.N2.slice(0, 10000).forEach(d => {
+      ws10rows.push([d.tram, d.ngan_lo||'', d.ten_thiet_bi, d.loai_thiet_bi, d.cap_dien_ap]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws10rows), 'DB_chua_co_PMIS');
+    
+    // ── Sheet 11: Du_lieu_thieu_thong_tin ──
+    const ws11rows = [['Trạm', 'Tên TB', 'Loại', 'Thiếu Serial?', 'Thiếu Hãng?', 'Thiếu Năm SX?']];
+    groups.N7.slice(0, 10000).forEach(d => {
+      ws11rows.push([d.tram, d.ten_thiet_bi, d.loai_thiet_bi, !d.so_che_tao ? 'X' : '', !d.hang_san_xuat ? 'X' : '', !d.nam_san_xuat ? 'X' : '']);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws11rows), 'Thieu_thong_tin');
+    
+    // ── Sheet 12: Bang_quy_doi_loai_TB ──
+    const map = window._pmisCompareUtils.SHEET_TO_TYPE;
+    const ws12rows = [['Sheet PMIS', 'Loại DB']];
+    Object.entries(map).forEach(([k,v]) => ws12rows.push([k, v]));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws12rows), 'Bang_quy_doi_loai_TB');
+    
+    // ── Sheet 13: Bang_chuan_hoa_hang ──
+    const hangs = new Set();
+    state.pmisData.forEach(d => { if (d.hang_san_xuat) hangs.add(d.hang_san_xuat); });
+    state.dbData.forEach(d => { if (d.hang_san_xuat) hangs.add(d.hang_san_xuat); });
+    const ws13rows = [['Hãng (raw)', 'Hãng chuẩn hóa (gợi ý)']];
+    [...hangs].sort().forEach(h => ws13rows.push([h, h.replace(/Group|Inc|Ltd|Co.|\(.*?\)/gi,'').trim()]));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws13rows), 'Bang_chuan_hoa_hang');
+    
+    // Write
+    const dateStr = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, `BaoCao_SoSanh_PMIS_DB_${dateStr}.xlsx`);
+  };
+  
+  console.log('[PMIS Export] Module loaded');
+})();
