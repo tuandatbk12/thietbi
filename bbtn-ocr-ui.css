@@ -368,3 +368,81 @@ select[id^="bbtnFilter"] option {
   background: #ffffff !important;
   color: #000000 !important;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   ĐỒNG NHẤT DROPDOWN: nền đen chữ trắng + font hỗ trợ tiếng Việt
+   Áp dụng TOÀN BỘ dashboard (mọi <select> và <option>)
+   ════════════════════════════════════════════════════════════════ */
+
+/* Mọi select trong dashboard */
+select {
+  background: #1e2530 !important;
+  color: #ffffff !important;
+  border: 1px solid #2c3744 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", 
+               "Helvetica Neue", "Arial", "Noto Sans", "Liberation Sans", 
+               sans-serif !important;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 4px;
+}
+
+/* Options bên trong dropdown */
+select option {
+  background: #1e2530 !important;
+  color: #ffffff !important;
+  font-family: inherit !important;
+  padding: 6px 10px;
+}
+
+/* Option đang hover hoặc đang chọn */
+select option:hover,
+select option:checked,
+select option:focus,
+select option[selected] {
+  background: #2196f3 !important;
+  color: #ffffff !important;
+}
+
+/* Khi select đang focus (mở dropdown) */
+select:focus {
+  outline: 2px solid #2196f3 !important;
+  background: #1e2530 !important;
+  color: #ffffff !important;
+}
+
+/* EXCEPTION: dropdown trong các module dùng nền trắng chữ đen (Filter BBTN OCR + Card OCR) */
+#bbtnFilterTram,
+#bbtnFilterLoai,
+#bbtnFilterStatus,
+#bbtnFilterSearch,
+#bbtnFilterDateFrom,
+#bbtnFilterDateTo,
+input[id^="bbtnFilter"],
+select[id^="bbtnFilter"],
+.bbtn-card-row input,
+.bbtn-card-row select,
+.bbtn-card input,
+.bbtn-card select,
+.bbtn-card-field input,
+.bbtn-card-field select {
+  background: #ffffff !important;
+  color: #000000 !important;
+}
+select[id^="bbtnFilter"] option,
+.bbtn-card select option,
+.bbtn-card-field select option {
+  background: #ffffff !important;
+  color: #000000 !important;
+}
+
+/* Dropdown PMIS module - chữ trắng theo theme dark */
+.pmis-modal select,
+.pmis-input {
+  background: #1e2530 !important;
+  color: #ffffff !important;
+}
+.pmis-modal select option {
+  background: #1e2530 !important;
+  color: #ffffff !important;
+}
