@@ -446,3 +446,26 @@ select[id^="bbtnFilter"] option,
   background: #1e2530 !important;
   color: #ffffff !important;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   FIX: Force font Vietnamese-safe cho TẤT CẢ select dropdown
+   "Segoe UI" Windows native, "Roboto" Android, đảm bảo render đầy đủ dấu
+   ════════════════════════════════════════════════════════════════ */
+
+select, select * {
+  font-family: "Segoe UI", "Roboto", "Helvetica Neue", "Arial Unicode MS", 
+               "Tahoma", "Verdana", sans-serif !important;
+  font-feature-settings: normal !important;
+  font-variant: normal !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Force consistent rendering across all options */
+option {
+  font-family: "Segoe UI", "Roboto", "Helvetica Neue", "Arial Unicode MS", 
+               "Tahoma", "Verdana", sans-serif !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
