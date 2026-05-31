@@ -13502,3 +13502,66 @@ async function _authedFetch(url, options) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _register);
   else setTimeout(_register, 500);
 })();
+
+// ━━━━ BBTN: Open file with signed URL (private bucket) ━━━━
+(function() {
+  if (window._bbtnMgmtOpenFile) return;
+  
+  window._bbtnMgmtOpenFile = async function(fileUrl) {
+    try {
+      if (!fileUrl || fileUrl.startsWith('pending://')) {
+        alert('File chưa upload xong, vui lòng đợi');
+        return;
+      }
+      const m = fileUrl.match(/\/storage\/v1\/object\/(?:public\/)?bbtn-files\/(.+)$/);
+      if (!m) {
+        alert('URL file không hợp lệ: ' + fileUrl);
+        return;
+      }
+      const path = decodeURIComponent(m[1]);
+      
+      const token = (typeof _authToken === 'function') ? await _authToken() : null;
+      const sbUrl = window._AUTH_SB_URL || 'https://xqqmfmljwycpehfyknoy.supabase.co';
+      const sbKey = window._AUTH_SB_KEY || '';
+      
+      if (!token) {
+        alert('Chưa đăng nhập');
+        return;
+      }
+      
+      const res = await fetch(`${sbUrl}/storage/v1/object/sign/bbtn-files/${encodeURIComponent(path)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': sbKey,
+          'Authorization': 'Bearer ' + token,
+        },
+        body: JSON.stringify({ expiresIn: 600 }),
+      });
+      
+      if (!res.ok) {
+        const errText = await res.text();
+        alert('Lỗi tạo URL ký (status ' + res.status + '): ' + errText.slice(0, 200));
+        return;
+      }
+      
+      const data = await res.json();
+      const signedPath = data.signedURL || data.signedUrl || '';
+      if (!signedPath) {
+        alert('Response không có signed URL: ' + JSON.stringify(data));
+        return;
+      }
+      
+      const fullUrl = signedPath.startsWith('http') 
+        ? signedPath 
+        : `${sbUrl}/storage/v1${signedPath}`;
+      
+      window.open(fullUrl, '_blank');
+    } catch (err) {
+      alert('Lỗi: ' + err.message);
+      console.error('[BBTN OpenFile]', err);
+    }
+  };
+  
+  console.log('[BBTN] _bbtnMgmtOpenFile installed');
+})();
