@@ -13520,12 +13520,37 @@ async function _authedFetch(url, options) {
       }
       const path = decodeURIComponent(m[1]);
       
-      const token = (typeof _authToken === 'function') ? await _authToken() : null;
-      const sbUrl = window._AUTH_SB_URL || 'https://xqqmfmljwycpehfyknoy.supabase.co';
-      const sbKey = window._AUTH_SB_KEY || '';
+      // Lấy token: ưu tiên _sbClient, fallback localStorage
+      let token = null;
+      const sbUrl = 'https://xqqmfmljwycpehfyknoy.supabase.co';
+      const sbKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxcW1mbWxqd3ljcGVoZnlrbm95Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODM4MDQsImV4cCI6MjA4Nzg1OTgwNH0.J_z0cFqq_Yet-n2X2L_VREdkcAqbkRFpYUp-ti3Fukc';
+      
+      // Cách 1: từ Supabase client
+      try {
+        if (window._sbClient && window._sbClient.auth) {
+          const { data: { session } } = await window._sbClient.auth.getSession();
+          token = session?.access_token || null;
+        }
+      } catch (e) { console.warn('_sbClient.auth.getSession failed:', e); }
+      
+      // Cách 2: từ localStorage (Supabase lưu session ở đây)
+      if (!token) {
+        try {
+          const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.includes('-auth-token'));
+          if (key) {
+            const stored = JSON.parse(localStorage.getItem(key));
+            token = stored?.access_token || null;
+          }
+        } catch (e) { console.warn('localStorage token failed:', e); }
+      }
+      
+      // Cách 3: gọi _authToken nếu có
+      if (!token && typeof _authToken === 'function') {
+        try { token = await _authToken(); } catch (e) {}
+      }
       
       if (!token) {
-        alert('Chưa đăng nhập');
+        alert('Không tìm thấy token đăng nhập. Hãy đăng nhập lại.');
         return;
       }
       
