@@ -14760,3 +14760,147 @@ async function _authedFetch(url, options) {
   
   console.log('[PMIS Export] Module loaded');
 })();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V54: USER-FRIENDLY ERROR MESSAGES
+// Convert technical errors → human-readable Vietnamese messages
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function() {
+  if (window._friendlyError) return;
+  
+  const ERROR_PATTERNS = [
+    // Database errors
+    { match: /PGRST204|column.*does not exist|schema cache/i,
+      friendly: '⚙️ Hệ thống cần được cập nhật.\n\nVui lòng liên hệ admin IT để chạy migration database.' },
+    
+    // Rate limiting
+    { match: /429|Quota exceeded|rate.?limit/i,
+      friendly: '⏳ Hệ thống đang quá tải.\n\nVui lòng đợi 1 phút rồi thử lại. Nếu vẫn lỗi, có thể đã hết quota OCR ngày hôm nay.' },
+    
+    // File access
+    { match: /InvalidSignature/i,
+      friendly: '🔒 Link file đã hết hạn (10 phút).\n\nVui lòng refresh trang (F5) rồi click lại để tạo link mới.' },
+    
+    // Network
+    { match: /Network|Failed to fetch|NetworkError|ERR_NETWORK/i,
+      friendly: '📡 Mất kết nối internet.\n\nVui lòng kiểm tra wifi/mạng rồi thử lại.' },
+    
+    // Auth
+    { match: /401|Unauthorized|JWT expired|Token.*expired/i,
+      friendly: '🔐 Phiên đăng nhập đã hết hạn.\n\nVui lòng đăng xuất và đăng nhập lại.' },
+    
+    { match: /403|Forbidden|RLS|policy|permission/i,
+      friendly: '🚫 Bạn không có quyền thực hiện thao tác này.\n\nLiên hệ admin để được cấp quyền.' },
+    
+    // Server errors
+    { match: /500|502|503|Bad Gateway|Edge Function.*error/i,
+      friendly: '🛠️ Hệ thống đang gặp lỗi tạm thời.\n\nĐợi 1-2 phút rồi thử lại. Nếu vẫn không được, báo admin IT.' },
+    
+    { match: /504|timeout|timed out/i,
+      friendly: '⏱️ Yêu cầu quá lâu, hệ thống tự hủy.\n\nThử lại với ít dữ liệu hơn hoặc đợi mạng ổn định.' },
+    
+    // File errors
+    { match: /File too large|exceed.*size|too big/i,
+      friendly: '📦 File quá lớn (tối đa 50MB).\n\nVui lòng nén hoặc tách file nhỏ hơn trước khi upload.' },
+    
+    { match: /Invalid file type|unsupported format/i,
+      friendly: '📄 Định dạng file không hỗ trợ.\n\nChỉ chấp nhận: JPG, PNG, PDF cho BBTN; XLSX/XLSB cho PMIS.' },
+    
+    // OCR specific
+    { match: /Gemini.*empty|OCR.*0 thiết bị|extract.*empty/i,
+      friendly: '🔍 OCR không đọc được nội dung.\n\nKiểm tra: file có rõ nét? Định dạng đúng BBTN EVN?' },
+    
+    { match: /JSON.*parse|Unexpected token/i,
+      friendly: '📋 Hệ thống nhận dữ liệu không đúng định dạng.\n\nĐợi 1 phút và thử lại.' },
+  ];
+  
+  window._friendlyError = function(err) {
+    const raw = String(err?.message || err?.error || err || 'Lỗi không xác định');
+    
+    // Skip nếu raw đã là Vietnamese (đã được làm thân thiện)
+    if (/[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i.test(raw) && raw.length < 200) {
+      return raw;
+    }
+    
+    for (const p of ERROR_PATTERNS) {
+      if (p.match.test(raw)) {
+        return p.friendly;
+      }
+    }
+    
+    // Fallback
+    return '⚠️ Có lỗi xảy ra:\n\n' + (raw.length > 250 ? raw.substring(0, 250) + '...' : raw);
+  };
+  
+  // Helper alert với friendly message
+  window._friendlyAlert = function(err) {
+    alert(window._friendlyError(err));
+  };
+  
+  console.log('[V54] _friendlyError installed');
+})();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V54: BBTN OCR PROGRESS WITH ETA
+// Hiển thị thời gian còn lại khi upload nhiều file
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function() {
+  if (window._bbtnOcrEtaInstalled) return;
+  window._bbtnOcrEtaInstalled = true;
+  
+  // Theo dõi text của progress element, tự inject ETA
+  const observerTarget = () => document.getElementById('bbtnOcrProgressText');
+  
+  let _startTime = null;
+  let _lastCompleted = 0;
+  
+  // Track when OCR starts
+  const interval = setInterval(() => {
+    const el = observerTarget();
+    if (!el) return;
+    
+    const text = el.textContent || '';
+    const match = text.match(/Đã OCR (\d+)\/(\d+) file/);
+    if (!match) {
+      _startTime = null;
+      _lastCompleted = 0;
+      return;
+    }
+    
+    const completed = parseInt(match[1]);
+    const total = parseInt(match[2]);
+    
+    if (completed === 0 || !_startTime) {
+      _startTime = Date.now();
+      _lastCompleted = 0;
+      return;
+    }
+    
+    if (completed === total) {
+      // Done
+      el.innerHTML = `✅ Hoàn thành ${total} file. Vui lòng kiểm tra preview bên dưới...`;
+      return;
+    }
+    
+    // Calculate ETA
+    if (completed > _lastCompleted) {
+      _lastCompleted = completed;
+    }
+    
+    const elapsedSec = (Date.now() - _startTime) / 1000;
+    const avgPerFile = elapsedSec / completed;
+    const remaining = total - completed;
+    const etaSec = Math.round(remaining * avgPerFile);
+    
+    let etaText = '';
+    if (etaSec > 90) etaText = `~${Math.round(etaSec / 60)} phút`;
+    else if (etaSec > 10) etaText = `~${etaSec} giây`;
+    else if (etaSec > 0) etaText = `gần xong`;
+    
+    if (etaText && !text.includes('Còn')) {
+      el.innerHTML = `Đã OCR ${completed}/${total} file... <span style="color:#ffd54f">Còn ${etaText}</span>`;
+    }
+  }, 1000); // check mỗi 1 giây
+  
+  console.log('[V54] BBTN OCR ETA installed');
+})();
