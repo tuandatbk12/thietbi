@@ -12317,14 +12317,16 @@ async function _authedFetch(url, options) {
 
     const token = await _authToken();
 
-    // Process với concurrency limit 3 (3x faster)
-    const CONCURRENCY = 3;
-    async function _processOne(i) {
-      const file = files[i];
-      const pct = Math.round((i / files.length) * 100);
-      progressText.textContent = `Đang OCR file ${i + 1}/${files.length}: ${file.name}...`;
-      progressFill.style.width = pct + '%';
-
+    // Concurrency 1 + delay 3s/file để tránh 429 Gemini Free tier (20 req/min)
+    const CONCURRENCY = 1;
+    const DELAY_MS = 3000;
+    let __completed = 0;
+    function _updateProgress() {
+      const pct = Math.round((__completed / files.length) * 100);
+      if (progressText) progressText.textContent = `Đã OCR ${__completed}/${files.length} file...`;
+      if (progressFill) progressFill.style.width = pct + '%';
+    }
+    async function _processOne(file) {
       try {
         const b64 = await _fileToBase64(file);
         const res = await fetch(OCR_ENDPOINT, {
@@ -12334,82 +12336,54 @@ async function _authedFetch(url, options) {
             'apikey': SB_KEY,
             'Authorization': token ? 'Bearer ' + token : '',
           },
-          body: JSON.stringify({
-            file_base64: b64,
-            mime_type: file.type,
-            file_name: file.name,
-          }),
+          body: JSON.stringify({ file_base64: b64, mime_type: file.type, file_name: file.name }),
         });
-
         const data = await res.json();
         if (!res.ok || !data.success) {
-          _toast(`OCR file ${file.name} fail: ${data.error || res.status}`, 'error');
+          _toast(`OCR ${file.name} fail: ${data.error || res.status}`, 'error');
           return;
         }
-
         const items = data.items || [];
         for (const item of items) {
           _ocrPreviewItems.push({
             item,
-            fileInfo: {
-              name: file.name,
-              size: file.size,
-              type: file.type,
-            },
+            fileInfo: { name: file.name, size: file.size, type: file.type },
             fileBase64: b64,
             selected: true,
           });
         }
-
         _toast(`✅ ${file.name}: ${items.length} thiết bị`, 'success');
       } catch (err) {
-        _toast(`OCR file ${file.name} error: ${err.message}`, 'error');
+        _toast(`OCR ${file.name} error: ${err.message}`, 'error');
         console.error(err);
-    }
-    const idxQueue = files.map((_, i) => i);
-    const inflight = new Set();
-    let __completed = 0;
-    function _updateProgress() {
-      const pct = Math.round((__completed / files.length) * 100);
-      if (progressText) progressText.textContent = `Da OCR ${__completed}/${files.length} file...`;
-      if (progressFill) progressFill.style.width = pct + "%";
+      } finally {
+        __completed++;
+        _updateProgress();
+      }
     }
     _updateProgress();
-    while (idxQueue.length > 0 || inflight.size > 0) {
-      while (inflight.size < CONCURRENCY && idxQueue.length > 0) {
-        const idx = idxQueue.shift();
-        const p = _processOne(idx).finally(() => {
-          inflight.delete(p);
-          __completed++;
-          _updateProgress();
-        });
-        inflight.add(p);
-      }
-      if (inflight.size > 0) await Promise.race(inflight);
-    }
-    }
-    // Queue runner: tối đa CONCURRENCY file OCR cùng lúc
-    const idxQueue = files.map((_, i) => i);
+    const queue = [...files];
     const inflight = new Set();
-    let completed = 0;
-    function _updateProgress() {
-      const pct = Math.round((completed / files.length) * 100);
-      if (progressText) progressText.textContent = `Đã OCR ${completed}/${files.length} file...`;
-      if (progressFill) progressFill.style.width = pct + '%';
-    }
-    _updateProgress();
-    while (idxQueue.length > 0 || inflight.size > 0) {
-      while (inflight.size < CONCURRENCY && idxQueue.length > 0) {
-        const idx = idxQueue.shift();
-        const p = _processOne(idx).finally(() => {
-          inflight.delete(p);
-          completed++;
-          _updateProgress();
-        });
+    while (queue.length > 0 || inflight.size > 0) {
+      while (inflight.size < CONCURRENCY && queue.length > 0) {
+        const file = queue.shift();
+        const p = _processOne(file);
         inflight.add(p);
+        p.finally(() => inflight.delete(p));
       }
-      if (inflight.size > 0) await Promise.race(inflight);
+      if (inflight.size > 0) {
+        await Promise.race(inflight);
+        if (queue.length > 0) await new Promise(r => setTimeout(r, DELAY_MS));
+      }
     }
+    // Dedupe theo loai + ten + tram (giữ item đầu tiên)
+    const _seen = new Set();
+    _ocrPreviewItems = _ocrPreviewItems.filter(it => {
+      const key = `${(it.item?.loai_thiet_bi||'').trim().toLowerCase()}|${(it.item?.ten_thiet_bi||'').trim().toLowerCase()}|${(it.item?.tram||'').trim().toLowerCase()}`;
+      if (_seen.has(key)) return false;
+      _seen.add(key);
+      return true;
+    });
 
     progressFill.style.width = '100%';
     progressText.textContent = `Hoàn thành: ${_ocrPreviewItems.length} thiết bị từ ${files.length} file`;
