@@ -8979,7 +8979,7 @@ function _bbtnPopulateFilters() {
   if (!data.length) return;
 
   // Đội
-  const dois = [...new Set(data.map(d => (d.Doi||'').trim()).filter(Boolean))]
+  const dois = [...new Set(data.map(d => (d.Doi||'').trim()).filter(Boolean).filter(d => !d.includes('\uFFFD')))]
     .sort((a,b) => a.localeCompare(b,'vi',{numeric:true}));
   const selDoi = document.getElementById('_bbtnSelDoi');
   if (selDoi) {
