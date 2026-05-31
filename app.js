@@ -12379,7 +12379,7 @@ async function _authedFetch(url, options) {
     // Dedupe theo loai + ten + tram (giữ item đầu tiên)
     const _seen = new Set();
     _ocrPreviewItems = _ocrPreviewItems.filter(it => {
-      const key = `${(it.item?.loai_thiet_bi||'').trim().toLowerCase()}|${(it.item?.ten_thiet_bi||'').trim().toLowerCase()}|${(it.item?.tram||'').trim().toLowerCase()}`;
+      const key = `${(it.item?.ten_thiet_bi||'').trim().toLowerCase()}|${(it.item?.tram||'').trim().toLowerCase()}`;
       if (_seen.has(key)) return false;
       _seen.add(key);
       return true;
