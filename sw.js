@@ -6,7 +6,7 @@
 //   - Supabase API & Edge Functions: KHÔNG cache (luôn live)
 // ════════════════════════════════════════════════════════════════
 
-const CACHE_VERSION = 'evn-v52-rename-filter-fffd';
+const CACHE_VERSION = 'evn-v53-perf-hints';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 
 // Assets cần cache ngay khi install (precaching)
@@ -15,6 +15,7 @@ const STATIC_ASSETS = [
   './index.html',
   './app.js',
   './styles.css',
+  './bbtn-ocr-ui.css',
 ];
 
 // CDN libraries — cache lâu vì version trong URL
