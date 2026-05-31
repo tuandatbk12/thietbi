@@ -335,3 +335,36 @@
 .bbtn-alert-row:hover {
   background: rgba(255, 152, 0, 0.12) !important;
 }
+
+/* ━━━━ Filter inputs/selects trong trang Quản lý BBTN OCR (chữ đen nền trắng) ━━━━ */
+#bbtnFilterTram,
+#bbtnFilterLoai,
+#bbtnFilterStatus,
+#bbtnFilterSearch,
+#bbtnFilterDateFrom,
+#bbtnFilterDateTo,
+input[id^="bbtnFilter"],
+select[id^="bbtnFilter"] {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border: 1px solid #d0d7de !important;
+  font-weight: 500 !important;
+  padding: 6px 10px !important;
+}
+input[id^="bbtnFilter"]::placeholder {
+  color: #999 !important;
+  font-style: italic;
+  font-weight: 400;
+}
+input[id^="bbtnFilter"]:focus,
+select[id^="bbtnFilter"]:focus {
+  outline: 2px solid #2196f3 !important;
+  background: #fff !important;
+  color: #000 !important;
+}
+
+/* Dropdown options trong filter */
+select[id^="bbtnFilter"] option {
+  background: #ffffff !important;
+  color: #000000 !important;
+}

@@ -12379,7 +12379,7 @@ async function _authedFetch(url, options) {
     // Dedupe theo loai + ten + tram (giữ item đầu tiên)
     const _seen = new Set();
     _ocrPreviewItems = _ocrPreviewItems.filter(it => {
-      const key = `${(it.item?.ten_thiet_bi||'').trim().toLowerCase()}|${(it.item?.tram||'').trim().toLowerCase()}`;
+      const key = `${(it.item?.ten_thiet_bi||'').toLowerCase().replace(/\s+/g,'')}|${(it.item?.tram||'').toLowerCase().replace(/\s+/g,'')}`;
       if (_seen.has(key)) return false;
       _seen.add(key);
       return true;
@@ -13164,7 +13164,7 @@ async function _authedFetch(url, options) {
       const dateStr = r.ngay_kiem_dinh ? new Date(r.ngay_kiem_dinh).toLocaleDateString('vi-VN') : '';
       const createdStr = r.created_at ? new Date(r.created_at).toLocaleDateString('vi-VN') : '';
       const fileBadge = r.file_url
-        ? `<a href="${_esc(r.file_url)}" target="_blank" style="color:#00c8ff;text-decoration:none;font-size:11px"><i class="fas fa-file"></i></a>`
+        ? `<a href="javascript:void(0)" onclick="_bbtnMgmtOpenFile('${_esc(r.file_url)}')" style="color:#00c8ff;text-decoration:none;font-size:14px" title="Xem file BBTN"><i class="fas fa-file-pdf"></i></a>`
         : '<span style="opacity:.4">—</span>';
 
       return `
