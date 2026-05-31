@@ -10555,7 +10555,7 @@ async function _assetView(id) {
     window.open(blobUrl, '_blank');
     setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
   } catch (e) {
-    alert('Không mở được file: ' + (e?.name === 'AbortError' ? 'Quá lâu (90s)' : e.message));
+    (window._friendlyAlert || alert)('Không mở được file: ' + (e?.name === 'AbortError' ? 'Quá lâu (>90s)' : (window._friendlyError ? window._friendlyError(e) : e.message)));
     console.error('[_assetView]', e);
   }
 }
@@ -10576,7 +10576,7 @@ async function _assetDelete(id, idx) {
     if (error) throw error;
     _assetLoadGallery(idx);
   } catch (e) {
-    alert('Lỗi xóa: ' + e.message);
+    (window._friendlyAlert || alert)('Lỗi xóa: ' + (window._friendlyError ? window._friendlyError(e) : e.message));
     console.error('[_assetDelete]', e);
   }
 }
@@ -12569,6 +12569,10 @@ async function _authedFetch(url, options) {
         if (!insRes.ok) {
           const errText = await insRes.text();
           console.error('Insert fail:', errText);
+          // V54: hiển thị friendly cho user
+          if (window._friendlyAlert) {
+            window._friendlyAlert('Lưu thiết bị thất bại: ' + errText);
+          }
           failCount++;
           continue;
         }

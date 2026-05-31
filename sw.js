@@ -6,7 +6,7 @@
 //   - Supabase API & Edge Functions: KHÔNG cache (luôn live)
 // ════════════════════════════════════════════════════════════════
 
-const CACHE_VERSION = 'evn-v54-friendly-ux';
+const CACHE_VERSION = 'evn-v55-friendly-applied';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 
 // Assets cần cache ngay khi install (precaching)
