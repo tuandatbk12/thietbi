@@ -14029,7 +14029,7 @@ async function _authedFetch(url, options) {
     let offset = 0;
     while (true) {
       if (onProgress) onProgress(`Tải DB rows ${offset+1}-${offset+BATCH}...`);
-      const res = await fetch(`${SB_URL}/rest/v1/TongHopThietBi?select=Tram,Ten_thiet_bi,Phan_loai_thiet_bi,Cap_dien_ap,Ngan_thiet_bi,Nhom_thiet_bi&offset=${offset}&limit=${BATCH}`, { headers });
+      const res = await fetch(`${SB_URL}/rest/v1/TongHopThietBi?select=Tram,Ten_thiet_bi,Phan_loai_thiet_bi,Cap_dien_ap,Ngan_thiet_bi&offset=${offset}&limit=${BATCH}`, { headers });
       if (!res.ok) throw new Error(`Fetch DB fail: ${res.status}`);
       const batch = await res.json();
       if (!batch.length) break;
@@ -14044,7 +14044,7 @@ async function _authedFetch(url, options) {
       loai_thiet_bi: r.Phan_loai_thiet_bi || '',
       cap_dien_ap: String(r.Cap_dien_ap || '').trim(),
       ngan_lo: r.Ngan_thiet_bi || '',
-      nhom: r.Nhom_thiet_bi || '',
+      nhom: '',
     }));
   }
   
