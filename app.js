@@ -13754,7 +13754,7 @@ async function _authedFetch(url, options) {
 
 // ━━━━ PMIS Compare Module (Core) ━━━━
 // ════════════════════════════════════════════════════════════════
-// PMIS COMPARE MODULE — So sánh PMIS vs Dashboard EVN Hà Nội
+// PMIS COMPARE MODULE — So sánh PMIS vs Đồng bộ EVN Hà Nội
 // 
 // Tính năng:
 //   - Upload file PMIS_TBA_*.xlsb hoặc .xlsx
@@ -14197,6 +14197,37 @@ async function _authedFetch(url, options) {
   if (window._pmisCompareUiLoaded) return;
   window._pmisCompareUiLoaded = true;
 
+  // ────────────────────────────────────────────────────────────
+  // Natural sort cho tên trạm (E1.2 < E1.10 < E10.1)
+  // ────────────────────────────────────────────────────────────
+  function _natSort(a, b) {
+    a = String(a || '');
+    b = String(b || '');
+    // Split thành phần số và chữ
+    const ax = a.split(/(\d+)/).filter(Boolean);
+    const bx = b.split(/(\d+)/).filter(Boolean);
+    for (let i = 0; i < Math.min(ax.length, bx.length); i++) {
+      const an = parseInt(ax[i]);
+      const bn = parseInt(bx[i]);
+      if (!isNaN(an) && !isNaN(bn)) {
+        if (an !== bn) return an - bn;
+      } else {
+        const cmp = ax[i].localeCompare(bx[i]);
+        if (cmp !== 0) return cmp;
+      }
+    }
+    return ax.length - bx.length;
+  }
+  function _sortByTramLoai(rows) {
+    return rows.slice().sort((a, b) => {
+      const t = _natSort(a.tram, b.tram);
+      if (t !== 0) return t;
+      return String(a.loai || '').localeCompare(String(b.loai || ''));
+    });
+  }
+  window._pmisNatSort = _natSort;
+  window._pmisSortByTramLoai = _sortByTramLoai;
+  
   // Wait for sidebar to load before injecting menu
   function _injectMenu() {
     const sidebar = document.querySelector('#sidebarMenu, .sidebar-nav, .sidebar-menu, nav.sidebar');
@@ -14214,7 +14245,7 @@ async function _authedFetch(url, options) {
     menu.id = 'pmisCompareMenu';
     menu.className = (bbtnMenu?.className || 'sidebar-item') + ' pmis-menu';
     menu.href = '#';
-    menu.innerHTML = `<i class="fas fa-balance-scale" style="margin-right:8px"></i> <span>📊 So sánh PMIS vs DB</span>`;
+    menu.innerHTML = `<i class="fas fa-balance-scale" style="margin-right:8px"></i> <span>📊 So sánh PMIS vs Đồng bộ</span>`;
     menu.style.cssText = 'display:flex;align-items:center;padding:10px 15px;color:#fff;text-decoration:none;cursor:pointer;font-size:13px';
     
     menu.onclick = (e) => {
@@ -14246,7 +14277,7 @@ async function _authedFetch(url, options) {
         <div class="pmis-modal-header">
           <div class="pmis-modal-title">
             <i class="fas fa-balance-scale" style="margin-right:8px"></i>
-            So sánh PMIS vs Dashboard
+            So sánh PMIS vs Đồng bộ
           </div>
           <button class="pmis-modal-close" onclick="document.getElementById('pmisCompareModal').remove()">✕</button>
         </div>
@@ -14347,8 +14378,8 @@ async function _authedFetch(url, options) {
         <button class="pmis-tab active" data-tab="overview"><i class="fas fa-chart-pie"></i> Tổng quan</button>
         <button class="pmis-tab" data-tab="tier1"><i class="fas fa-layer-group"></i> Theo trạm + loại</button>
         <button class="pmis-tab" data-tab="tier2"><i class="fas fa-sitemap"></i> Theo ngăn lộ</button>
-        <button class="pmis-tab" data-tab="missing"><i class="fas fa-exclamation-triangle"></i> Thiếu DB (${groups.N1.length})</button>
-        <button class="pmis-tab" data-tab="extra"><i class="fas fa-plus-circle"></i> Thừa DB (${groups.N2.length})</button>
+        <button class="pmis-tab" data-tab="missing"><i class="fas fa-exclamation-triangle"></i> Thiếu Đồng bộ (${groups.N1.length})</button>
+        <button class="pmis-tab" data-tab="extra"><i class="fas fa-plus-circle"></i> Thừa Đồng bộ (${groups.N2.length})</button>
         <button class="pmis-tab" data-tab="conflicts"><i class="fas fa-not-equal"></i> Lệch (${matchResults.tier3.conflicts.length})</button>
         <button class="pmis-tab" data-tab="export"><i class="fas fa-file-excel"></i> Export</button>
       </div>
@@ -14376,15 +14407,15 @@ async function _authedFetch(url, options) {
       c.innerHTML = `
         <div class="pmis-kpi-grid">
           <div class="pmis-kpi"><div class="pmis-kpi-label">Tổng PMIS</div><div class="pmis-kpi-value">${pmisStats.total.toLocaleString()}</div></div>
-          <div class="pmis-kpi"><div class="pmis-kpi-label">Tổng DB</div><div class="pmis-kpi-value">${dbStats.total.toLocaleString()}</div></div>
+          <div class="pmis-kpi"><div class="pmis-kpi-label">Tổng Đồng bộ</div><div class="pmis-kpi-value">${dbStats.total.toLocaleString()}</div></div>
           <div class="pmis-kpi"><div class="pmis-kpi-label">Khớp được</div><div class="pmis-kpi-value" style="color:#4caf50">${matchResults.tier3.matched.length.toLocaleString()} (${matchPct}%)</div></div>
           <div class="pmis-kpi"><div class="pmis-kpi-label">Số trạm</div><div class="pmis-kpi-value">${pmisStats.trams}</div></div>
         </div>
         
         <h3 style="color:#fff;margin-top:25px">7 nhóm sai khác</h3>
         <div class="pmis-group-grid">
-          <div class="pmis-group" data-group="N1"><span class="pmis-group-icon" style="color:#ff5252">❌</span> <span class="pmis-group-label">N1: Thiếu DB</span><span class="pmis-group-count">${groups.N1.length.toLocaleString()}</span></div>
-          <div class="pmis-group" data-group="N2"><span class="pmis-group-icon" style="color:#ff9100">➕</span> <span class="pmis-group-label">N2: Thừa DB</span><span class="pmis-group-count">${groups.N2.length.toLocaleString()}</span></div>
+          <div class="pmis-group" data-group="N1"><span class="pmis-group-icon" style="color:#ff5252">❌</span> <span class="pmis-group-label">N1: Thiếu Đồng bộ</span><span class="pmis-group-count">${groups.N1.length.toLocaleString()}</span></div>
+          <div class="pmis-group" data-group="N2"><span class="pmis-group-icon" style="color:#ff9100">➕</span> <span class="pmis-group-label">N2: Thừa Đồng bộ</span><span class="pmis-group-count">${groups.N2.length.toLocaleString()}</span></div>
           <div class="pmis-group" data-group="N3"><span class="pmis-group-icon" style="color:#fbc02d">⚖️</span> <span class="pmis-group-label">N3: Lệch số lượng</span><span class="pmis-group-count">${groups.N3.length.toLocaleString()}</span></div>
           <div class="pmis-group" data-group="N4"><span class="pmis-group-icon" style="color:#9c27b0">🔢</span> <span class="pmis-group-label">N4: Lệch serial</span><span class="pmis-group-count">${groups.N4.length.toLocaleString()}</span></div>
           <div class="pmis-group" data-group="N5"><span class="pmis-group-icon" style="color:#03a9f4">🏭</span> <span class="pmis-group-label">N5: Lệch hãng</span><span class="pmis-group-count">${groups.N5.length.toLocaleString()}</span></div>
@@ -14394,19 +14425,19 @@ async function _authedFetch(url, options) {
         
         <h3 style="color:#fff;margin-top:25px">Phân bố theo loại</h3>
         <table class="pmis-table">
-          <thead><tr><th>Loại</th><th>PMIS</th><th>DB</th><th>Chênh lệch</th></tr></thead>
+          <thead><tr><th>Loại</th><th>PMIS</th><th>Đồng bộ</th><th>Chênh lệch</th></tr></thead>
           <tbody>
             ${_renderTypeBreakdown(pmisStats.byType, dbStats.byType)}
           </tbody>
         </table>
       `;
     } else if (tab === 'tier1') {
-      const rows = Object.values(matchResults.tier1).sort((a,b) => Math.abs(b.diff) - Math.abs(a.diff));
+      const rows = _sortByTramLoai(Object.values(matchResults.tier1));
       c.innerHTML = `
         <div style="margin-bottom:10px"><input type="text" id="t1Filter" placeholder="Lọc trạm..." class="pmis-input" oninput="window._pmisFilterT1(this.value)"></div>
         <div class="pmis-table-wrap">
           <table class="pmis-table" id="pmisT1Table">
-            <thead><tr><th>Trạm</th><th>Loại</th><th>Cấp ĐA</th><th>PMIS</th><th>DB</th><th>Chênh lệch</th></tr></thead>
+            <thead><tr><th>Trạm</th><th>Loại</th><th>Cấp ĐA</th><th>PMIS</th><th>Đồng bộ</th><th>Chênh lệch</th></tr></thead>
             <tbody>${_renderTier1Rows(rows)}</tbody>
           </table>
         </div>
@@ -14418,21 +14449,27 @@ async function _authedFetch(url, options) {
     } else if (tab === 'tier2') {
       const rows = Object.values(matchResults.tier2)
         .filter(r => r.pmis !== r.db)
-        .sort((a,b) => Math.abs(b.pmis - b.db) - Math.abs(a.pmis - a.db))
+        .sort((a,b) => {
+          const t = _natSort(a.tram, b.tram);
+          if (t !== 0) return t;
+          const c = String(a.cap_dien_ap||'').localeCompare(String(b.cap_dien_ap||''));
+          if (c !== 0) return c;
+          return String(a.ngan_lo||'').localeCompare(String(b.ngan_lo||''));
+        })
         .slice(0, 500);
       c.innerHTML = `
         <p style="color:#aaa">Hiển thị 500 ngăn lộ có chênh lệch cao nhất.</p>
         <div class="pmis-table-wrap">
           <table class="pmis-table">
-            <thead><tr><th>Trạm</th><th>Cấp ĐA</th><th>Ngăn lộ</th><th>Loại</th><th>PMIS</th><th>DB</th><th>Δ</th></tr></thead>
+            <thead><tr><th>Trạm</th><th>Cấp ĐA</th><th>Ngăn lộ</th><th>Loại</th><th>PMIS</th><th>Đồng bộ</th><th>Δ</th></tr></thead>
             <tbody>${rows.map(r => `<tr><td>${_esc(r.tram)}</td><td>${_esc(r.cap_dien_ap)}</td><td>${_esc(r.ngan_lo)}</td><td>${_esc(r.loai)}</td><td>${r.pmis}</td><td>${r.db}</td><td style="color:${r.pmis>r.db?'#ff5252':'#ff9100'}">${r.pmis-r.db}</td></tr>`).join('')}</tbody>
           </table>
         </div>
       `;
     } else if (tab === 'missing') {
-      c.innerHTML = _renderDeviceList(groups.N1, 'Thiết bị có trong PMIS nhưng KHÔNG có trong DB', true);
+      c.innerHTML = _renderDeviceList(groups.N1, 'Thiết bị có trong PMIS nhưng KHÔNG có trong Đồng bộ', true);
     } else if (tab === 'extra') {
-      c.innerHTML = _renderDeviceList(groups.N2, 'Thiết bị có trong DB nhưng KHÔNG có trong PMIS', false);
+      c.innerHTML = _renderDeviceList(groups.N2, 'Thiết bị có trong Đồng bộ nhưng KHÔNG có trong PMIS', false);
     } else if (tab === 'conflicts') {
       c.innerHTML = _renderConflicts(matchResults.tier3.conflicts);
     } else if (tab === 'export') {
@@ -14446,7 +14483,7 @@ async function _authedFetch(url, options) {
           <p style="color:#666;font-size:11px;margin-top:20px">
             Bao gồm: Dashboard, DM_Tram, Tong_hop_theo_tram, Tong_hop_theo_loai_TB,<br>
             So_sanh_tram_loai_capdienap, So_sanh_ngan_lo, So_sanh_serial,<br>
-            So_sanh_hang_model, Thiet_bi_PMIS_chua_co_TNDK, Thiet_bi_TNDK_chua_co_PMIS,<br>
+            So_sanh_hang_model, Thiet_bi_PMIS_chua_co_DongBo, DongBo_chua_co_PMIS,<br>
             Du_lieu_thieu_thong_tin, Bang_quy_doi_loai_TB, Bang_chuan_hoa_hang
           </p>
         </div>
@@ -14516,7 +14553,7 @@ async function _authedFetch(url, options) {
       <h3 style="color:#fff">Conflict matched nhưng khác chi tiết (${shown.length}/${conflicts.length})</h3>
       <div class="pmis-table-wrap">
         <table class="pmis-table">
-          <thead><tr><th>Trạm</th><th>Tên</th><th>Loại</th><th>Score</th><th>PMIS serial</th><th>DB serial</th><th>PMIS hãng</th><th>DB hãng</th></tr></thead>
+          <thead><tr><th>Trạm</th><th>Tên</th><th>Loại</th><th>Score</th><th>PMIS serial</th><th>Đồng bộ serial</th><th>PMIS hãng</th><th>Đồng bộ hãng</th></tr></thead>
           <tbody>
             ${shown.map(c => `<tr>
               <td>${_esc(c.pmis.tram)}</td>
@@ -14588,7 +14625,7 @@ async function _authedFetch(url, options) {
       ['File PMIS', fileName],
       ['Ngày export', new Date().toLocaleString('vi-VN')],
       [],
-      ['CHỈ TIÊU', 'PMIS', 'Dashboard', 'Chênh lệch'],
+      ['CHỈ TIÊU', 'PMIS', 'Đồng bộ', 'Chênh lệch'],
       ['Tổng thiết bị', pmisStats.total, dbStats.total, pmisStats.total - dbStats.total],
       ['Số trạm', pmisStats.trams, dbStats.trams, pmisStats.trams - dbStats.trams],
       [],
@@ -14612,7 +14649,7 @@ async function _authedFetch(url, options) {
     
     // ── Sheet 2: DM_Tram ──
     const trams = new Set([...state.pmisData.map(d=>d.tram), ...state.dbData.map(d=>d.tram)]);
-    const tramRows = [['Trạm', 'Có trong PMIS', 'Có trong DB', 'TB PMIS', 'TB DB', 'Chênh lệch']];
+    const tramRows = [['Trạm', 'Có trong PMIS', 'Có trong Đồng bộ', 'TB PMIS', 'TB Đồng bộ', 'Chênh lệch']];
     [...trams].sort().forEach(t => {
       const pmisCount = state.pmisData.filter(d => d.tram === t).length;
       const dbCount = state.dbData.filter(d => d.tram === t).length;
@@ -14626,8 +14663,8 @@ async function _authedFetch(url, options) {
     const tramAgg = {};
     state.pmisData.forEach(d => { tramAgg[d.tram] = tramAgg[d.tram] || {pmis:0,db:0}; tramAgg[d.tram].pmis++; });
     state.dbData.forEach(d => { tramAgg[d.tram] = tramAgg[d.tram] || {pmis:0,db:0}; tramAgg[d.tram].db++; });
-    const ws3rows = [['Trạm', 'PMIS', 'DB', 'Chênh lệch', 'Mức ưu tiên']];
-    Object.entries(tramAgg).sort((a,b) => Math.abs(b[1].pmis - b[1].db) - Math.abs(a[1].pmis - a[1].db)).forEach(([t, c]) => {
+    const ws3rows = [['Trạm', 'PMIS', 'Đồng bộ', 'Chênh lệch', 'Mức ưu tiên']];
+    Object.entries(tramAgg).sort((a,b) => window._pmisNatSort ? window._pmisNatSort(a[0], b[0]) : a[0].localeCompare(b[0])).forEach(([t, c]) => {
       const diff = c.pmis - c.db;
       const priority = Math.abs(diff) > 50 ? 'CAO' : Math.abs(diff) > 10 ? 'TRUNG BÌNH' : 'THẤP';
       ws3rows.push([t, c.pmis, c.db, diff, priority]);
@@ -14636,54 +14673,64 @@ async function _authedFetch(url, options) {
     
     // ── Sheet 4: Tong_hop_theo_loai_TB ──
     const allTypes = new Set([...Object.keys(pmisStats.byType), ...Object.keys(dbStats.byType)]);
-    const ws4rows = [['Loại thiết bị', 'PMIS', 'DB', 'Chênh lệch']];
+    const ws4rows = [['Loại thiết bị', 'PMIS', 'Đồng bộ', 'Chênh lệch']];
     [...allTypes].sort().forEach(t => {
       ws4rows.push([t, pmisStats.byType[t] || 0, dbStats.byType[t] || 0, (pmisStats.byType[t] || 0) - (dbStats.byType[t] || 0)]);
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws4rows), 'Tong_hop_theo_loai_TB');
     
     // ── Sheet 5: So_sanh_tram_loai_capdienap ──
-    const ws5rows = [['Trạm', 'Loại', 'Cấp điện áp', 'PMIS', 'DB', 'Chênh lệch']];
-    Object.values(matchResults.tier1).sort((a,b) => Math.abs(b.diff) - Math.abs(a.diff)).forEach(r => {
+    const ws5rows = [['Trạm', 'Loại', 'Cấp điện áp', 'PMIS', 'Đồng bộ', 'Chênh lệch']];
+    Object.values(matchResults.tier1).sort((a,b) => {
+      const t = window._pmisNatSort ? window._pmisNatSort(a.tram, b.tram) : a.tram.localeCompare(b.tram);
+      if (t !== 0) return t;
+      return String(a.loai||'').localeCompare(String(b.loai||''));
+    }).forEach(r => {
       ws5rows.push([r.tram, r.loai, r.cap_dien_ap, r.pmis, r.db, r.diff]);
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws5rows), 'So_sanh_tram_loai_capdienap');
     
     // ── Sheet 6: So_sanh_ngan_lo ──
-    const ws6rows = [['Trạm', 'Cấp ĐA', 'Ngăn lộ', 'Loại', 'PMIS', 'DB', 'Chênh lệch']];
-    Object.values(matchResults.tier2).filter(r => r.pmis !== r.db).sort((a,b) => Math.abs(b.pmis-b.db) - Math.abs(a.pmis-a.db)).slice(0, 5000).forEach(r => {
+    const ws6rows = [['Trạm', 'Cấp ĐA', 'Ngăn lộ', 'Loại', 'PMIS', 'Đồng bộ', 'Chênh lệch']];
+    Object.values(matchResults.tier2).filter(r => r.pmis !== r.db).sort((a,b) => {
+      const t = window._pmisNatSort ? window._pmisNatSort(a.tram, b.tram) : a.tram.localeCompare(b.tram);
+      if (t !== 0) return t;
+      const c = String(a.cap_dien_ap||'').localeCompare(String(b.cap_dien_ap||''));
+      if (c !== 0) return c;
+      return String(a.ngan_lo||'').localeCompare(String(b.ngan_lo||''));
+    }).slice(0, 5000).forEach(r => {
       ws6rows.push([r.tram, r.cap_dien_ap, r.ngan_lo, r.loai, r.pmis, r.db, r.pmis - r.db]);
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws6rows), 'So_sanh_ngan_lo');
     
     // ── Sheet 7: So_sanh_serial ──
-    const ws7rows = [['Trạm', 'Tên TB', 'Loại', 'PMIS Serial', 'DB Serial', 'Match score']];
+    const ws7rows = [['Trạm', 'Tên TB', 'Loại', 'PMIS Serial', 'Đồng bộ Serial', 'Match score']];
     groups.N4.slice(0, 5000).forEach(c => {
       ws7rows.push([c.pmis.tram, c.pmis.ten_thiet_bi, c.pmis.loai_thiet_bi, c.pmis.so_che_tao||'', c.db.so_che_tao||'', c.score]);
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws7rows), 'So_sanh_serial');
     
     // ── Sheet 8: So_sanh_hang_model ──
-    const ws8rows = [['Trạm', 'Tên TB', 'Loại', 'PMIS Hãng', 'DB Hãng', 'PMIS Kiểu', 'DB Kiểu']];
+    const ws8rows = [['Trạm', 'Tên TB', 'Loại', 'PMIS Hãng', 'Đồng bộ Hãng', 'PMIS Kiểu', 'Đồng bộ Kiểu']];
     const hangModelDiffs = [...groups.N5, ...groups.N6].slice(0, 5000);
     hangModelDiffs.forEach(c => {
       ws8rows.push([c.pmis.tram, c.pmis.ten_thiet_bi, c.pmis.loai_thiet_bi, c.pmis.hang_san_xuat||'', c.db.hang_san_xuat||'', c.pmis.kieu||'', c.db.kieu||'']);
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws8rows), 'So_sanh_hang_model');
     
-    // ── Sheet 9: Thiet_bi_PMIS_chua_co_TNDK ──
+    // ── Sheet 9: Thiet_bi_PMIS_chua_co_DongBo ──
     const ws9rows = [['Trạm', 'Ngăn lộ', 'Tên TB', 'Loại', 'Cấp ĐA', 'Serial', 'Hãng', 'Năm SX', 'Kiểu']];
     groups.N1.slice(0, 10000).forEach(d => {
       ws9rows.push([d.tram, d.ngan_lo||'', d.ten_thiet_bi, d.loai_thiet_bi, d.cap_dien_ap, d.so_che_tao||'', d.hang_san_xuat||'', d.nam_san_xuat||'', d.kieu||'']);
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws9rows), 'PMIS_chua_co_DB');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws9rows), 'PMIS_chua_co_DongBo');
     
-    // ── Sheet 10: Thiet_bi_TNDK_chua_co_PMIS ──
+    // ── Sheet 10: DongBo_chua_co_PMIS ──
     const ws10rows = [['Trạm', 'Ngăn lộ', 'Tên TB', 'Loại', 'Cấp ĐA']];
     groups.N2.slice(0, 10000).forEach(d => {
       ws10rows.push([d.tram, d.ngan_lo||'', d.ten_thiet_bi, d.loai_thiet_bi, d.cap_dien_ap]);
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws10rows), 'DB_chua_co_PMIS');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws10rows), 'DongBo_chua_co_PMIS');
     
     // ── Sheet 11: Du_lieu_thieu_thong_tin ──
     const ws11rows = [['Trạm', 'Tên TB', 'Loại', 'Thiếu Serial?', 'Thiếu Hãng?', 'Thiếu Năm SX?']];
