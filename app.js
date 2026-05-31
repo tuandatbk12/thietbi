@@ -6703,7 +6703,7 @@ const _TN_CACHE_TTL = 12 * 60 * 60 * 1000;
 
 // Nav map
 const _tnNavMap = {
-  'TNĐK định kỳ':        { mode:'dinhky',  label:'Thí nghiệm định kỳ (TNĐK)',  icon:'fa-calendar-check', color:'#00c8ff' },
+  'Thí nghiệm định kỳ':        { mode:'dinhky',  label:'Thí nghiệm định kỳ',  icon:'fa-calendar-check', color:'#00c8ff' },
   'Thí nghiệm đột xuất': { mode:'dotxuat', label:'Thí nghiệm đột xuất (TNĐX)', icon:'fa-bolt',           color:'#f59e0b' },
 };
 
