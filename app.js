@@ -9548,7 +9548,7 @@ function _bbtnRenderItems(items, path, rootPath, depth) {
         <td style="padding:7px 12px;text-align:right;font-family:var(--font-mono);color:rgba(180,200,220,.65);font-size:10px">${fmtDate(f.modified)}</td>
         <td style="padding:7px 12px;text-align:center;white-space:nowrap">
           <button onclick="_bbtnViewFile('${safeRelPath}',false)" style="padding:3px 9px;border-radius:5px;border:1px solid rgba(0,200,255,.3);background:rgba(0,200,255,.08);color:var(--accent);font-size:9.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;margin-right:4px"><i class="fas fa-eye"></i> Xem</button>
-          <button onclick="_bbtnViewFile('${safeRelPath}',true)" style="padding:3px 9px;border-radius:5px;border:1px solid rgba(0,230,118,.3);background:rgba(0,230,118,.08);color:#00e676;font-size:9.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><i class="fas fa-download"></i> Tải</button>
+          <button onclick="_bbtnViewFile('${safeRelPath}',true)" style="padding:3px 9px;border-radius:5px;border:1px solid rgba(0,230,118,.3);background:rgba(0,230,118,.08);color:#00e676;font-size:9.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;margin-right:4px"><i class="fas fa-download"></i> Tải</button>${ext === 'pdf' ? `<button onclick="_bbtnOcrFromNas('${safeRelPath}', '${f.name.replace(/'/g,"\\'")}')" style="padding:3px 9px;border-radius:5px;border:1px solid rgba(255,193,7,.3);background:rgba(255,193,7,.1);color:#ffc107;font-size:9.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px" title="OCR file này bằng Gemini AI"><i class="fas fa-eye-low-vision"></i> OCR</button>` : ''}
         </td>
       </tr>`;
     });
@@ -14907,4 +14907,275 @@ async function _authedFetch(url, options) {
   }, 1000); // check mỗi 1 giây
   
   console.log('[V54] BBTN OCR ETA installed');
+})();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V57: OCR FILE BBTN TRỰC TIẾP TỪ NAS SYNOLOGY  
+// Không cần upload lên Supabase Storage - tận dụng file đã có trên NAS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function() {
+  if (window._bbtnOcrFromNasInstalled) return;
+  window._bbtnOcrFromNasInstalled = true;
+  
+  // Helper: convert Blob → base64 (KHÔNG có prefix data:...)
+  function _blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result;
+        const base64 = dataUrl.split(',')[1]; // remove "data:application/pdf;base64,"
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+  
+  // Main function: OCR 1 file PDF từ NAS
+  window._bbtnOcrFromNas = async function(nasPath, fileName) {
+    if (!nasPath) {
+      (window._friendlyAlert || alert)('Không có đường dẫn file');
+      return;
+    }
+    
+    // Show loading toast
+    if (window.showChangeNotif) {
+      showChangeNotif('info', '🔍 Đang OCR file...', fileName);
+    }
+    
+    try {
+      // 1. Auth check
+      const token = await _authGetToken();
+      if (!token) throw new Error('Chưa đăng nhập, vui lòng đăng nhập lại');
+      
+      // 2. Fetch file từ NAS qua bbtn-download (existing infrastructure)
+      const SB_URL = _AUTH_SB_URL.replace(/\/$/, '');
+      const downloadUrl = `${SB_URL}/functions/v1/bbtn-download?path=${encodeURIComponent(nasPath)}`;
+      
+      console.log('[OCR-NAS] Fetching:', nasPath);
+      const fileResp = await _bbtnFetchEdge(downloadUrl, token, { timeoutMs: 120000, maxRetries: 1 });
+      
+      if (!fileResp.ok) {
+        throw new Error(`Tải file thất bại: HTTP ${fileResp.status}`);
+      }
+      
+      const fileBlob = await fileResp.blob();
+      const fileSizeMB = fileBlob.size / 1024 / 1024;
+      console.log('[OCR-NAS] File size:', fileSizeMB.toFixed(2), 'MB');
+      
+      if (fileSizeMB > 50) {
+        throw new Error(`File quá lớn (${fileSizeMB.toFixed(1)}MB). Max 50MB.`);
+      }
+      
+      // 3. Convert to base64
+      const base64 = await _blobToBase64(fileBlob);
+      
+      // 4. Update toast
+      if (window.showChangeNotif) {
+        showChangeNotif('info', '⏳ Đang OCR với Gemini AI...', fileName);
+      }
+      
+      // 5. Call OCR Edge Function (snake_case input!)
+      const ocrUrl = `${SB_URL}/functions/v1/bbtn-ocr-extract`;
+      console.log('[OCR-NAS] Calling OCR API...');
+      const ocrResp = await fetch(ocrUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'apikey': _AUTH_SB_KEY,
+        },
+        body: JSON.stringify({
+          file_base64: base64,         // ⚠️ snake_case
+          mime_type: 'application/pdf', // ⚠️ snake_case
+          file_name: fileName,          // ⚠️ snake_case
+        }),
+      });
+      
+      if (!ocrResp.ok) {
+        const errText = await ocrResp.text();
+        throw new Error(`OCR failed (HTTP ${ocrResp.status}): ${errText.substring(0, 200)}`);
+      }
+      
+      const ocrData = await ocrResp.json();
+      console.log('[OCR-NAS] Result:', ocrData);
+      
+      // 6. Show preview modal
+      _showNasOcrPreview(ocrData, {
+        nasPath: nasPath,
+        fileName: fileName,
+        fileSize: fileBlob.size,
+      });
+      
+    } catch (e) {
+      console.error('[OCR-NAS] Error:', e);
+      const msg = window._friendlyError ? window._friendlyError(e) : e.message;
+      if (window.showChangeNotif) {
+        showChangeNotif('error', '❌ Lỗi OCR', msg);
+      } else {
+        alert('Lỗi OCR: ' + msg);
+      }
+    }
+  };
+  
+  // Preview modal với kết quả OCR
+  function _showNasOcrPreview(ocrData, meta) {
+    // Remove modal cũ nếu có
+    document.getElementById('bbtnNasOcrModal')?.remove();
+    
+    const thietBis = ocrData?.thiet_bi || [];
+    const count = thietBis.length;
+    
+    const modalHtml = `
+<div id="bbtnNasOcrModal" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#161b22;border:1px solid rgba(255,255,255,.1);border-radius:10px;max-width:1200px;width:100%;max-height:90vh;overflow:auto;padding:24px">
+    
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:12px">
+      <div>
+        <div style="font-weight:700;font-size:15px;color:#fff;display:flex;align-items:center;gap:8px">
+          <span style="background:rgba(255,193,7,.2);color:#ffc107;padding:3px 8px;border-radius:4px;font-size:11px">📁 NAS</span>
+          OCR: ${meta.fileName}
+        </div>
+        <div style="font-size:11px;color:rgba(180,200,220,.6);margin-top:4px">
+          Tìm thấy <b style="color:${count > 0 ? '#00e676' : '#ff5252'}">${count}</b> thiết bị
+          ${count > 0 ? '· Kiểm tra dưới đây trước khi lưu' : '· OCR không đọc được nội dung'}
+        </div>
+      </div>
+      <button onclick="document.getElementById('bbtnNasOcrModal').remove()" 
+              style="padding:6px 12px;background:transparent;color:#999;border:1px solid #444;border-radius:6px;cursor:pointer;font-size:12px">
+        ✕ Đóng
+      </button>
+    </div>
+    
+    ${count === 0 ? `
+      <div style="padding:30px;text-align:center;color:rgba(180,200,220,.6)">
+        <i class="fas fa-exclamation-triangle" style="font-size:32px;color:#ff5252;margin-bottom:10px"></i>
+        <div>OCR không đọc được thiết bị nào.</div>
+        <div style="font-size:11px;margin-top:6px">Có thể file scan không rõ hoặc không phải BBTN EVN chuẩn.</div>
+      </div>
+    ` : `
+      <div style="margin-bottom:16px;max-height:55vh;overflow:auto;border:1px solid rgba(255,255,255,.06);border-radius:6px">
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead>
+            <tr style="background:rgba(255,255,255,.06);position:sticky;top:0">
+              <th style="padding:8px 10px;text-align:left">#</th>
+              <th style="padding:8px 10px;text-align:left">Trạm</th>
+              <th style="padding:8px 10px;text-align:left">Loại</th>
+              <th style="padding:8px 10px;text-align:left">Tên TB</th>
+              <th style="padding:8px 10px;text-align:left">Kiểu</th>
+              <th style="padding:8px 10px;text-align:left">Serial</th>
+              <th style="padding:8px 10px;text-align:left">Hãng</th>
+              <th style="padding:8px 10px;text-align:left">Năm SX</th>
+              <th style="padding:8px 10px;text-align:left">Ngày KĐ</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${thietBis.map((tb, i) => `
+              <tr style="border-top:1px solid rgba(255,255,255,.04)">
+                <td style="padding:6px 10px;color:#666">${i+1}</td>
+                <td style="padding:6px 10px;color:#00c8ff">${tb.tram || '-'}</td>
+                <td style="padding:6px 10px;color:#ffc107;font-weight:600">${tb.loai || '-'}</td>
+                <td style="padding:6px 10px">${tb.ten || '-'}</td>
+                <td style="padding:6px 10px;font-family:monospace;font-size:10px">${tb.kieu || '-'}</td>
+                <td style="padding:6px 10px;font-family:monospace;font-size:10px">${tb.serial || '-'}</td>
+                <td style="padding:6px 10px">${tb.hang || '-'}</td>
+                <td style="padding:6px 10px">${tb.nam_sx || '-'}</td>
+                <td style="padding:6px 10px">${tb.ngay_kd || '-'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `}
+    
+    <div style="display:flex;gap:10px;justify-content:flex-end;border-top:1px solid rgba(255,255,255,.08);padding-top:14px">
+      <button onclick="document.getElementById('bbtnNasOcrModal').remove()" 
+              style="padding:9px 18px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;cursor:pointer">
+        Hủy
+      </button>
+      ${count > 0 ? `
+        <button onclick="_bbtnSaveNasOcrResult()" 
+                style="padding:9px 22px;background:#00e676;color:#000;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-size:12px">
+          <i class="fas fa-save" style="margin-right:6px"></i>Lưu ${count} thiết bị vào DB
+        </button>
+      ` : ''}
+    </div>
+  </div>
+</div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Lưu data tạm để save sau
+    window._lastNasOcrData = ocrData;
+    window._lastNasOcrMeta = meta;
+  }
+  
+  // Save kết quả vào bbtn_records với file_source='nas'
+  window._bbtnSaveNasOcrResult = async function() {
+    const data = window._lastNasOcrData;
+    const meta = window._lastNasOcrMeta;
+    
+    if (!data?.thiet_bi?.length) {
+      alert('Không có thiết bị để lưu');
+      return;
+    }
+    
+    try {
+      const token = await _authGetToken();
+      const SB_URL = _AUTH_SB_URL.replace(/\/$/, '');
+      
+      // Insert từng thiết bị với file_source='nas' + file_path=NAS path
+      const records = data.thiet_bi.map(tb => ({
+        tram: tb.tram || null,
+        loai: tb.loai || null,
+        ten_tb: tb.ten || null,
+        kieu: tb.kieu || null,
+        serial: tb.serial || null,
+        hang: tb.hang || null,
+        nam_sx: tb.nam_sx ? parseInt(tb.nam_sx) : null,
+        ngay_kd: tb.ngay_kd || null,
+        sfra: tb.sfra || null,
+        tiet_dien: tb.tiet_dien || null,
+        file_path: meta.nasPath,        // NAS path thay vì Storage path
+        file_name: meta.fileName,
+        file_source: 'nas',             // ⭐ marker
+      }));
+      
+      const insertResp = await fetch(`${SB_URL}/rest/v1/bbtn_records`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'apikey': _AUTH_SB_KEY,
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify(records),
+      });
+      
+      if (!insertResp.ok) {
+        const errText = await insertResp.text();
+        throw new Error(`Insert fail: ${errText}`);
+      }
+      
+      // Close modal + notify
+      document.getElementById('bbtnNasOcrModal')?.remove();
+      if (window.showChangeNotif) {
+        showChangeNotif('success', '✓ Đã lưu', `${records.length} thiết bị vào DB (từ NAS)`);
+      } else {
+        alert(`✓ Đã lưu ${records.length} thiết bị`);
+      }
+      
+      // Clean up
+      delete window._lastNasOcrData;
+      delete window._lastNasOcrMeta;
+      
+    } catch (e) {
+      console.error('[OCR-NAS] Save error:', e);
+      const msg = window._friendlyError ? window._friendlyError(e) : e.message;
+      alert('Lỗi lưu: ' + msg);
+    }
+  };
+  
+  console.log('[V57] _bbtnOcrFromNas installed (OCR từ NAS)');
 })();
