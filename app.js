@@ -15564,3 +15564,141 @@ async function _authedFetch(url, options) {
   
   console.log('[V59] Large file warning installed');
 })();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V60: FIX BULK OCR BUTTON - inject đúng vào nút "Tải lại" header BBTN
+// Trước đây v59 inject vào _bbtnInvalidateCache (chỉ có khi lỗi)
+// → V60 tìm element header thực sự
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function() {
+  if (window._bbtnBulkBtnV60) return;
+  window._bbtnBulkBtnV60 = true;
+  
+  function _injectBulkOcrButtonV60() {
+    // Tìm nút "Tải lại" trong header BBTN module
+    // Có nhiều cách identify - thử nhiều selector
+    const candidates = [];
+    
+    // Method 1: tìm button có text "Tải lại"
+    document.querySelectorAll('button').forEach(function(btn) {
+      const txt = (btn.textContent || '').trim();
+      if (txt === 'Tải lại' || txt.includes('Tải lại')) {
+        candidates.push(btn);
+      }
+    });
+    
+    // Method 2: tìm button có onclick chứa _bbtnRefresh
+    document.querySelectorAll('button[onclick*="_bbtnRefresh"]').forEach(function(btn) {
+      if (!candidates.includes(btn)) candidates.push(btn);
+    });
+    
+    // Method 3: tìm button có icon sync-alt trong vùng BBTN
+    document.querySelectorAll('button i.fa-sync-alt').forEach(function(icon) {
+      const btn = icon.closest('button');
+      if (btn && !candidates.includes(btn)) candidates.push(btn);
+    });
+    
+    if (candidates.length === 0) {
+      // Module BBTN chưa load - thử lại sau
+      return false;
+    }
+    
+    let injected = 0;
+    candidates.forEach(function(refreshBtn) {
+      if (refreshBtn.dataset.bulkBtnV60) return;
+      
+      // Đảm bảo là nút trong module BBTN (không phải các module khác)
+      // Tìm xem có element cha có chứa "Quản lý Biên bản" hoặc "BBTN" không
+      let parent = refreshBtn.parentElement;
+      let depth = 0;
+      let isBBTNModule = false;
+      while (parent && depth < 10) {
+        const txt = parent.textContent || '';
+        if (txt.includes('Biên bản thí nghiệm') || txt.includes('BBTN') || txt.includes('NAS Synology')) {
+          isBBTNModule = true;
+          break;
+        }
+        parent = parent.parentElement;
+        depth++;
+      }
+      
+      if (!isBBTNModule) return;
+      
+      // Tạo nút Bulk OCR
+      const bulkBtn = document.createElement('button');
+      bulkBtn.style.cssText = 'padding:8px 18px;border-radius:7px;border:1px solid rgba(255,193,7,.5);background:linear-gradient(135deg,#ffc107,#ff9800);color:#000;font-weight:700;cursor:pointer;font-size:11.5px;margin-right:8px;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(255,193,7,.25);transition:all .15s';
+      bulkBtn.innerHTML = '⚡ OCR tất cả PDF';
+      bulkBtn.title = 'Quét tất cả PDF trong folder hiện tại (kể cả thư mục con) và OCR tự động';
+      
+      bulkBtn.onmouseover = function() {
+        bulkBtn.style.transform = 'translateY(-1px)';
+        bulkBtn.style.boxShadow = '0 4px 12px rgba(255,193,7,.4)';
+      };
+      bulkBtn.onmouseout = function() {
+        bulkBtn.style.transform = '';
+        bulkBtn.style.boxShadow = '0 2px 8px rgba(255,193,7,.25)';
+      };
+      
+      bulkBtn.onclick = function() {
+        // Get current path từ breadcrumb hoặc window state
+        let currentPath = null;
+        
+        // Method 1: window._bbtnState
+        if (window._bbtnState && window._bbtnState.path) {
+          currentPath = window._bbtnState.path;
+        }
+        // Method 2: window._bbtnLastPath
+        else if (window._bbtnLastPath) {
+          currentPath = window._bbtnLastPath;
+        }
+        // Method 3: extract từ breadcrumb
+        else {
+          const breadcrumbItems = document.querySelectorAll('a[onclick*="_bbtnLoadPath"]');
+          if (breadcrumbItems.length > 0) {
+            const lastBreadcrumb = breadcrumbItems[breadcrumbItems.length - 1];
+            const m = lastBreadcrumb.getAttribute('onclick').match(/_bbtnLoadPath\(['"]([^'"]+)['"]/);
+            if (m) currentPath = m[1].replace(/\\'/g, "'");
+          }
+        }
+        
+        // Fallback: hỏi user
+        if (!currentPath) {
+          currentPath = prompt('Nhập đường dẫn NAS để OCR (ví dụ: /BBTN/Đội 1/2025):', '/BBTN');
+          if (!currentPath) return;
+        }
+        
+        if (typeof window._bbtnBulkOcrFolder === 'function') {
+          window._bbtnBulkOcrFolder(currentPath);
+        } else {
+          alert('Tính năng Bulk OCR chưa load. Vui lòng refresh trang (F5).');
+        }
+      };
+      
+      // Insert TRƯỚC nút "Tải lại" (để nút mới ở vị trí ưu tiên)
+      refreshBtn.parentNode.insertBefore(bulkBtn, refreshBtn);
+      refreshBtn.dataset.bulkBtnV60 = '1';
+      injected++;
+    });
+    
+    if (injected > 0) {
+      console.log('[V60] Injected ' + injected + ' Bulk OCR button(s)');
+    }
+    return injected > 0;
+  }
+  
+  // Theo dõi DOM
+  const observer = new MutationObserver(function() {
+    setTimeout(_injectBulkOcrButtonV60, 200);
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  
+  // Initial runs
+  setTimeout(_injectBulkOcrButtonV60, 1000);
+  setTimeout(_injectBulkOcrButtonV60, 3000);
+  setTimeout(_injectBulkOcrButtonV60, 5000);
+  
+  // Expose function để debug nếu cần
+  window._forceInjectBulkBtn = _injectBulkOcrButtonV60;
+  
+  console.log('[V60] Bulk OCR button injector (improved) loaded');
+})();
