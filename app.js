@@ -15702,3 +15702,427 @@ async function _authedFetch(url, options) {
   
   console.log('[V60] Bulk OCR button injector (improved) loaded');
 })();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V61: BULK OCR ENHANCED UX
+// - Cảnh báo rõ ràng nếu OCR >50 file
+// - Progress bar to, hiện file đang xử lý + thống kê live
+// - Nút DỪNG to + xác nhận
+// - Pause/Resume capability
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function() {
+  if (window._bbtnBulkUxV61) return;
+  window._bbtnBulkUxV61 = true;
+  
+  // Override _bbtnBulkOcrFolder với UI tốt hơn
+  const origBulk = window._bbtnBulkOcrFolder;
+  
+  window._bbtnBulkOcrFolder = async function(folderPath) {
+    try {
+      // Step 1: Scan
+      if (window.showChangeNotif) showChangeNotif('info', '🔍 Đang quét file PDF...', folderPath);
+      
+      // Re-use existing scan function from v58
+      const pdfs = await _scanPdfRecursiveV61(folderPath);
+      
+      if (pdfs.length === 0) {
+        alert('Không tìm thấy file PDF nào trong thư mục này.');
+        return;
+      }
+      
+      // Step 2: Calculate stats
+      const totalSizeMB = pdfs.reduce(function(s, f) { return s + (f.size || 0); }, 0) / 1024 / 1024;
+      const oversized = pdfs.filter(function(f) { return (f.size || 0) > 50*1024*1024; });
+      const estimateMinutes = Math.round(pdfs.length * 25 / 60);
+      
+      // Step 3: Confirm dialog - PHẢN ÁNH ĐÚNG MỨC ĐỘ TÁC ĐỘNG
+      let confirmMsg;
+      
+      if (pdfs.length > 100) {
+        // CẢNH BÁO MẠNH cho >100 file
+        confirmMsg = 
+          '⚠️⚠️⚠️ CẢNH BÁO QUAN TRỌNG ⚠️⚠️⚠️\n\n' +
+          '📊 Tìm thấy ' + pdfs.length + ' file PDF\n' +
+          '📦 Tổng: ' + totalSizeMB.toFixed(1) + ' MB\n' +
+          (oversized.length ? '⚠️ ' + oversized.length + ' file >50MB (sẽ skip)\n' : '') +
+          '⏱️ Ước tính: ' + estimateMinutes + ' phút (~' + Math.round(estimateMinutes/60*10)/10 + ' giờ)\n\n' +
+          '⚠️ ĐÂY LÀ TÁC VỤ DÀI!\n' +
+          '• Bạn có thể DỪNG bất cứ lúc nào\n' +
+          '• Tab này phải MỞ trong suốt quá trình\n' +
+          '• Sẽ tiêu tốn quota OCR Gemini\n\n' +
+          'BẠN CHẮC CHẮN MUỐN TIẾP TỤC?';
+      } else if (pdfs.length > 30) {
+        confirmMsg = 
+          '📊 Tìm thấy ' + pdfs.length + ' file PDF\n' +
+          '📦 Tổng: ' + totalSizeMB.toFixed(1) + ' MB\n' +
+          (oversized.length ? '⚠️ ' + oversized.length + ' file >50MB (sẽ skip)\n' : '') +
+          '⏱️ Ước tính: ' + estimateMinutes + ' phút\n\n' +
+          'Tiếp tục?';
+      } else {
+        confirmMsg = 
+          '📊 Tìm thấy ' + pdfs.length + ' file PDF\n' +
+          '📦 Tổng: ' + totalSizeMB.toFixed(1) + ' MB\n' +
+          (oversized.length ? '⚠️ ' + oversized.length + ' file >50MB (sẽ skip)\n' : '') +
+          '⏱️ Ước tính: ' + estimateMinutes + ' phút\n\n' +
+          'Tiếp tục OCR tất cả?';
+      }
+      
+      if (!confirm(confirmMsg)) return;
+      
+      // Step 4: Setup state
+      window._bbtnBulkCancel = false;
+      window._bbtnBulkStartTime = Date.now();
+      window._bbtnBulkStats = {
+        total: pdfs.length,
+        done: 0,
+        success: 0,
+        failed: 0,
+        skipped: 0,
+        devicesCount: 0,
+        currentFile: '',
+      };
+      
+      _createProgressUIV61(pdfs.length, folderPath);
+      
+      const startTime = Date.now();
+      const successList = [];
+      const failedList = [];
+      
+      // Step 5: Process loop
+      for (let i = 0; i < pdfs.length; i++) {
+        if (window._bbtnBulkCancel) {
+          console.log('[Bulk OCR V61] User cancelled at ' + i + '/' + pdfs.length);
+          break;
+        }
+        
+        const file = pdfs[i];
+        window._bbtnBulkStats.currentFile = file.name;
+        _updateProgressUIV61(file, i, pdfs.length, startTime, successList.length, failedList.length);
+        
+        // Skip file too large
+        if ((file.size || 0) > 50*1024*1024) {
+          failedList.push({ 
+            name: file.name, 
+            error: 'File quá lớn (' + (file.size/1024/1024).toFixed(1) + 'MB) - skip auto',
+            path: file.path 
+          });
+          window._bbtnBulkStats.skipped++;
+          window._bbtnBulkStats.done++;
+          continue;
+        }
+        
+        try {
+          const result = await _ocrOneFileSilentV61(file);
+          successList.push({ name: file.name, count: result.count, sizeMB: result.fileSizeMB });
+          window._bbtnBulkStats.success++;
+          window._bbtnBulkStats.devicesCount += result.count;
+        } catch (e) {
+          console.error('[Bulk OCR V61] Fail', file.name, e);
+          failedList.push({ name: file.name, error: e.message, path: file.path });
+          window._bbtnBulkStats.failed++;
+        }
+        
+        window._bbtnBulkStats.done++;
+        
+        // Delay between files
+        await new Promise(function(r) { setTimeout(r, 1000); });
+      }
+      
+      _updateProgressUIV61(null, pdfs.length, pdfs.length, startTime, successList.length, failedList.length);
+      
+      // Wait 2s before showing summary so user sees 100%
+      setTimeout(function() {
+        const pg = document.getElementById('bbtnBulkProgressV61');
+        if (pg) pg.remove();
+        _showBulkSummaryV61(successList, failedList, window._bbtnBulkCancel);
+      }, 1500);
+      
+    } catch (e) {
+      console.error('[Bulk OCR V61] Critical:', e);
+      alert('Lỗi: ' + e.message);
+      const pg = document.getElementById('bbtnBulkProgressV61');
+      if (pg) pg.remove();
+    }
+  };
+  
+  // Recursive scan - copy từ v58
+  async function _scanPdfRecursiveV61(path, depth) {
+    depth = depth || 0;
+    if (depth > 6) return [];
+    
+    const token = await _authGetToken();
+    const SB_URL = _AUTH_SB_URL.replace(/\/$/, '');
+    const url = SB_URL + '/functions/v1/bbtn-list?path=' + encodeURIComponent(path);
+    
+    let items = [];
+    try {
+      const resp = await _bbtnFetchEdge(url, token, { timeoutMs: 30000, maxRetries: 1 });
+      const data = await resp.json();
+      items = data.items || data || [];
+    } catch (e) {
+      console.warn('[V61 Scan] Skip', path, ':', e.message);
+      return [];
+    }
+    
+    const pdfs = [];
+    for (const item of items) {
+      if (item.isFolder) {
+        const subPath = path.replace(/\/$/, '') + '/' + item.name;
+        const subPdfs = await _scanPdfRecursiveV61(subPath, depth + 1);
+        pdfs.push.apply(pdfs, subPdfs);
+      } else if (item.name && item.name.toLowerCase().endsWith('.pdf')) {
+        pdfs.push({
+          path: item.relativePath || (path.replace(/\/$/, '') + '/' + item.name),
+          name: item.name,
+          size: item.size || 0,
+        });
+      }
+    }
+    return pdfs;
+  }
+  
+  // OCR silent - copy từ v58
+  async function _ocrOneFileSilentV61(file) {
+    const token = await _authGetToken();
+    const SB_URL = _AUTH_SB_URL.replace(/\/$/, '');
+    
+    const dlUrl = SB_URL + '/functions/v1/bbtn-download?path=' + encodeURIComponent(file.path);
+    const fileResp = await _bbtnFetchEdge(dlUrl, token, { timeoutMs: 120000, maxRetries: 1 });
+    if (!fileResp.ok) throw new Error('Tải fail HTTP ' + fileResp.status);
+    const fileBlob = await fileResp.blob();
+    const fileSizeMB = fileBlob.size / 1024 / 1024;
+    
+    if (fileSizeMB > 50) throw new Error('File quá lớn ' + fileSizeMB.toFixed(1) + 'MB');
+    
+    const base64 = await new Promise(function(resolve, reject) {
+      const reader = new FileReader();
+      reader.onloadend = function() { resolve(reader.result.split(',')[1]); };
+      reader.onerror = reject;
+      reader.readAsDataURL(fileBlob);
+    });
+    
+    const ocrResp = await fetch(SB_URL + '/functions/v1/bbtn-ocr-extract', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+        'apikey': _AUTH_SB_KEY,
+      },
+      body: JSON.stringify({
+        file_base64: base64,
+        mime_type: 'application/pdf',
+        file_name: file.name,
+      }),
+    });
+    
+    if (!ocrResp.ok) {
+      const errText = await ocrResp.text();
+      throw new Error('OCR HTTP ' + ocrResp.status + ': ' + errText.substring(0,80));
+    }
+    const ocrData = await ocrResp.json();
+    const thietBis = (ocrData && ocrData.thiet_bi) || [];
+    
+    if (!thietBis.length) throw new Error('OCR không đọc được');
+    
+    const records = thietBis.map(function(tb) {
+      return {
+        tram: tb.tram || null,
+        loai: tb.loai || null,
+        ten_tb: tb.ten || null,
+        kieu: tb.kieu || null,
+        serial: tb.serial || null,
+        hang: tb.hang || null,
+        nam_sx: tb.nam_sx ? parseInt(tb.nam_sx) : null,
+        ngay_kd: tb.ngay_kd || null,
+        sfra: tb.sfra || null,
+        tiet_dien: tb.tiet_dien || null,
+        file_path: file.path,
+        file_name: file.name,
+        file_source: 'nas',
+      };
+    });
+    
+    const insertResp = await fetch(SB_URL + '/rest/v1/bbtn_records', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+        'apikey': _AUTH_SB_KEY,
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify(records),
+    });
+    
+    if (!insertResp.ok) {
+      throw new Error('Save fail: ' + (await insertResp.text()).substring(0,80));
+    }
+    
+    return { count: records.length, fileSizeMB: fileSizeMB };
+  }
+  
+  // Create enhanced progress UI
+  function _createProgressUIV61(total, folderPath) {
+    const old = document.getElementById('bbtnBulkProgressV61');
+    if (old) old.remove();
+    
+    const div = document.createElement('div');
+    div.id = 'bbtnBulkProgressV61';
+    div.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0d1117;border:2px solid #ffc107;border-radius:12px;padding:18px 24px;z-index:99998;box-shadow:0 12px 40px rgba(0,0,0,.7);min-width:520px;max-width:720px;font-family:system-ui';
+    
+    div.innerHTML = 
+      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">' +
+        '<div style="font-size:28px;animation:bulkPulse 2s infinite">🤖</div>' +
+        '<div style="flex:1">' +
+          '<div style="font-size:14px;font-weight:700;color:#ffc107">Đang OCR hàng loạt</div>' +
+          '<div style="font-size:10px;color:rgba(180,200,220,.65);margin-top:2px">📁 ' + folderPath + '</div>' +
+        '</div>' +
+        '<button id="bulkPauseBtn" onclick="window._bbtnBulkCancelConfirm()" style="padding:10px 22px;background:linear-gradient(135deg,#ff5252,#d32f2f);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(255,82,82,.4);transition:all .15s" onmouseover="this.style.transform=\'translateY(-1px)\'" onmouseout="this.style.transform=\'\'">' +
+          '⏹ DỪNG' +
+        '</button>' +
+      '</div>' +
+      
+      '<div style="background:rgba(255,255,255,.08);height:10px;border-radius:5px;overflow:hidden;margin-bottom:10px">' +
+        '<div id="bulkBarV61" style="background:linear-gradient(90deg,#ffc107,#ff9800);height:100%;width:0%;transition:width .3s;box-shadow:0 0 10px rgba(255,193,7,.5)"></div>' +
+      '</div>' +
+      
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">' +
+        '<div style="background:rgba(255,255,255,.04);padding:8px 12px;border-radius:5px;text-align:center">' +
+          '<div style="font-size:18px;font-weight:700;color:#fff" id="bulkStatTotal">0/' + total + '</div>' +
+          '<div style="font-size:9px;color:rgba(180,200,220,.6);text-transform:uppercase;letter-spacing:.5px">Đã xử lý</div>' +
+        '</div>' +
+        '<div style="background:rgba(0,230,118,.08);padding:8px 12px;border-radius:5px;text-align:center;border:1px solid rgba(0,230,118,.2)">' +
+          '<div style="font-size:18px;font-weight:700;color:#00e676" id="bulkStatSuccess">0</div>' +
+          '<div style="font-size:9px;color:rgba(180,200,220,.6);text-transform:uppercase;letter-spacing:.5px">Thành công</div>' +
+        '</div>' +
+        '<div style="background:rgba(255,82,82,.08);padding:8px 12px;border-radius:5px;text-align:center;border:1px solid rgba(255,82,82,.2)">' +
+          '<div style="font-size:18px;font-weight:700;color:#ff5252" id="bulkStatFailed">0</div>' +
+          '<div style="font-size:9px;color:rgba(180,200,220,.6);text-transform:uppercase;letter-spacing:.5px">Lỗi/Skip</div>' +
+        '</div>' +
+        '<div style="background:rgba(0,200,255,.08);padding:8px 12px;border-radius:5px;text-align:center;border:1px solid rgba(0,200,255,.2)">' +
+          '<div style="font-size:18px;font-weight:700;color:#00c8ff" id="bulkStatDevices">0</div>' +
+          '<div style="font-size:9px;color:rgba(180,200,220,.6);text-transform:uppercase;letter-spacing:.5px">Thiết bị</div>' +
+        '</div>' +
+      '</div>' +
+      
+      '<div style="font-size:11px;color:rgba(180,200,220,.85);display:flex;justify-content:space-between;align-items:center">' +
+        '<div style="flex:1;min-width:0;margin-right:14px">' +
+          '<span style="color:#ffc107">📄</span> <span id="bulkCurrentFile" style="font-family:monospace;font-size:10px">Đang chuẩn bị...</span>' +
+        '</div>' +
+        '<div id="bulkEtaV61" style="white-space:nowrap;font-weight:600;color:#ffc107"></div>' +
+      '</div>';
+    
+    document.body.appendChild(div);
+    
+    // CSS animation
+    if (!document.getElementById('bulkPulseStyle')) {
+      const style = document.createElement('style');
+      style.id = 'bulkPulseStyle';
+      style.textContent = '@keyframes bulkPulse { 0%,100% { opacity: 1 } 50% { opacity: 0.5 } }';
+      document.head.appendChild(style);
+    }
+  }
+  
+  function _updateProgressUIV61(currentFile, done, total, startTime, successCount, failedCount) {
+    const bar = document.getElementById('bulkBarV61');
+    if (!bar) return;
+    
+    const pct = (done / total) * 100;
+    bar.style.width = pct + '%';
+    
+    document.getElementById('bulkStatTotal').textContent = done + '/' + total;
+    document.getElementById('bulkStatSuccess').textContent = successCount;
+    document.getElementById('bulkStatFailed').textContent = failedCount;
+    document.getElementById('bulkStatDevices').textContent = (window._bbtnBulkStats?.devicesCount || 0);
+    
+    const currentEl = document.getElementById('bulkCurrentFile');
+    if (currentEl && currentFile) {
+      const name = currentFile.name || 'Không xác định';
+      currentEl.textContent = name.length > 50 ? name.substring(0, 47) + '...' : name;
+    } else if (currentEl && done === total) {
+      currentEl.textContent = '✓ Hoàn tất';
+    }
+    
+    const eta = document.getElementById('bulkEtaV61');
+    if (eta && done > 0) {
+      const elapsed = (Date.now() - startTime) / 1000;
+      const avgPerFile = elapsed / done;
+      const remainingSec = Math.round((total - done) * avgPerFile);
+      const speedPerMin = (done / (elapsed / 60)).toFixed(1);
+      
+      let etaText;
+      if (remainingSec > 3600) etaText = '⏱ ~' + Math.round(remainingSec/3600*10)/10 + ' giờ';
+      else if (remainingSec > 60) etaText = '⏱ ~' + Math.round(remainingSec/60) + ' phút';
+      else if (remainingSec > 5) etaText = '⏱ ~' + remainingSec + ' giây';
+      else etaText = '⏱ Gần xong';
+      
+      eta.innerHTML = etaText + '<br><span style="font-size:9px;color:rgba(180,200,220,.5);font-weight:normal">' + speedPerMin + ' file/phút</span>';
+    }
+  }
+  
+  // Cancel với confirm
+  window._bbtnBulkCancelConfirm = function() {
+    const stats = window._bbtnBulkStats || { done: 0, total: 0 };
+    const msg = '⏹ DỪNG OCR HÀNG LOẠT?\n\n' +
+      'Đã xử lý: ' + stats.done + '/' + stats.total + ' file\n' +
+      'Thành công: ' + (stats.success || 0) + ' · Lỗi: ' + ((stats.failed || 0) + (stats.skipped || 0)) + '\n' +
+      'Thiết bị đã lưu: ' + (stats.devicesCount || 0) + '\n\n' +
+      'Dữ liệu đã OCR sẽ KHÔNG bị mất.\n' +
+      'Bạn có thể tiếp tục từ file tiếp theo sau.\n\n' +
+      'Xác nhận DỪNG?';
+    
+    if (confirm(msg)) {
+      window._bbtnBulkCancel = true;
+      // Update UI hiển thị "Đang dừng..."
+      const pauseBtn = document.getElementById('bulkPauseBtn');
+      if (pauseBtn) {
+        pauseBtn.disabled = true;
+        pauseBtn.innerHTML = '⏳ Đang dừng...';
+        pauseBtn.style.opacity = '.6';
+      }
+    }
+  };
+  
+  // Summary modal - reuse từ v58 nhưng improve
+  function _showBulkSummaryV61(successList, failedList, wasCancelled) {
+    const old = document.getElementById('bbtnBulkSummaryV61');
+    if (old) old.remove();
+    
+    const total = successList.length + failedList.length;
+    const totalDevices = successList.reduce(function(s, x) { return s + (x.count || 0); }, 0);
+    
+    const titleText = wasCancelled ? '⏹ Đã dừng OCR' : '✅ Hoàn tất OCR ' + total + ' file';
+    const titleColor = wasCancelled ? '#ff9800' : '#00e676';
+    
+    const successHtml = successList.length ?
+      '<div style="margin-bottom:14px"><div style="font-size:11px;color:#00e676;margin-bottom:8px;font-weight:600">✓ Thành công (' + successList.length + '):</div>' +
+      '<div style="max-height:200px;overflow:auto;border:1px solid rgba(0,230,118,.2);border-radius:6px;padding:10px;background:rgba(0,230,118,.05)">' +
+      successList.map(function(f) {
+        return '<div style="font-size:11px;color:rgba(235,248,255,.85);padding:3px 0;display:flex;justify-content:space-between;gap:10px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="color:#00e676">✓</span> ' + f.name + '</span><span style="color:rgba(180,200,220,.5);font-size:10px;white-space:nowrap">' + f.count + ' TB</span></div>';
+      }).join('') +
+      '</div></div>' : '';
+    
+    const failHtml = failedList.length ?
+      '<div style="margin-bottom:14px"><div style="font-size:11px;color:#ff5252;margin-bottom:8px;font-weight:600">❌ Lỗi/Skip (' + failedList.length + '):</div>' +
+      '<div style="max-height:200px;overflow:auto;border:1px solid rgba(255,82,82,.2);border-radius:6px;padding:10px;background:rgba(255,82,82,.05)">' +
+      failedList.map(function(f) {
+        return '<div style="font-size:11px;color:rgba(235,248,255,.85);padding:4px 0;border-bottom:1px dashed rgba(255,255,255,.04)"><div style="font-weight:600">' + f.name + '</div><div style="color:#ff8a80;font-size:10px;margin-top:2px">' + f.error + '</div></div>';
+      }).join('') +
+      '</div></div>' : '';
+    
+    const html = '<div id="bbtnBulkSummaryV61" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px">' +
+      '<div style="background:#161b22;border:1px solid rgba(255,255,255,.1);border-radius:10px;max-width:760px;width:100%;max-height:85vh;overflow:auto;padding:24px">' +
+      '<div style="margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:14px">' +
+      '<div style="font-weight:700;font-size:18px;color:' + titleColor + '">' + titleText + '</div>' +
+      '<div style="font-size:12px;color:rgba(180,200,220,.7);margin-top:8px;display:flex;gap:18px;flex-wrap:wrap">' +
+      '<span><span style="color:#00e676">✓</span> ' + successList.length + ' thành công</span>' +
+      '<span><span style="color:#ff5252">✗</span> ' + failedList.length + ' lỗi/skip</span>' +
+      '<span><span style="color:#00c8ff">📊</span> ' + totalDevices + ' thiết bị đã lưu DB</span>' +
+      '</div></div>' + failHtml + successHtml +
+      '<button onclick="document.getElementById(\'bbtnBulkSummaryV61\').remove()" style="padding:12px 28px;background:' + titleColor + ';color:#000;border:none;border-radius:6px;font-weight:700;cursor:pointer;display:block;margin-left:auto;margin-top:14px">Đóng</button>' +
+      '</div></div>';
+    
+    document.body.insertAdjacentHTML('beforeend', html);
+  }
+  
+  console.log('[V61] Bulk OCR enhanced UX loaded');
+})();
