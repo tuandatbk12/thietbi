@@ -15440,3 +15440,127 @@ async function _authedFetch(url, options) {
   
   console.log('[V58] Bulk OCR installed');
 })();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V59: BULK OCR BUTTON INJECTOR + LARGE FILE WARNING (re-apply)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function() {
+  if (window._bbtnBulkBtnV59) return;
+  window._bbtnBulkBtnV59 = true;
+  
+  function _injectBulkOcrButton() {
+    const refreshBtns = document.querySelectorAll('button[onclick*="_bbtnInvalidateCache"]');
+    
+    refreshBtns.forEach(function(refreshBtn) {
+      if (refreshBtn.dataset.bulkBtnV59) return;
+      
+      const onclickStr = refreshBtn.getAttribute('onclick') || '';
+      const m = onclickStr.match(/_bbtnLoadPath\(['"]([^'"]+)['"]/);
+      if (!m) return;
+      const currentPath = m[1].replace(/\\'/g, "'");
+      
+      const bulkBtn = document.createElement('button');
+      bulkBtn.style.cssText = 'padding:8px 18px;border-radius:7px;border:1px solid rgba(255,193,7,.5);background:linear-gradient(135deg,#ffc107,#ff9800);color:#000;font-weight:700;cursor:pointer;font-size:11.5px;margin-left:8px;display:inline-flex;align-items:center;gap:6px';
+      bulkBtn.innerHTML = '⚡ OCR tất cả PDF';
+      bulkBtn.title = 'Quét tất cả PDF trong folder này và OCR tự động';
+      
+      bulkBtn.onclick = function() {
+        if (typeof window._bbtnBulkOcrFolder === 'function') {
+          window._bbtnBulkOcrFolder(currentPath);
+        } else {
+          alert('Tính năng Bulk OCR chưa load. Vui lòng refresh trang (F5).');
+        }
+      };
+      
+      refreshBtn.parentNode.insertBefore(bulkBtn, refreshBtn.nextSibling);
+      refreshBtn.dataset.bulkBtnV59 = '1';
+    });
+  }
+  
+  const observer = new MutationObserver(function() {
+    setTimeout(_injectBulkOcrButton, 200);
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  
+  setTimeout(_injectBulkOcrButton, 1500);
+  setTimeout(_injectBulkOcrButton, 3000);
+  
+  console.log('[V59] Bulk OCR button injector loaded');
+})();
+
+// V59: Large File Warning
+(function() {
+  if (window._largeFileWarnV59) return;
+  window._largeFileWarnV59 = true;
+  
+  window._showLargeFileGuide = function(fileName, fileSizeMB) {
+    const old = document.getElementById('largeFileGuideModal');
+    if (old) old.remove();
+    
+    const html = '<div id="largeFileGuideModal" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px">' +
+      '<div style="background:#161b22;border:2px solid #ff9800;border-radius:10px;max-width:650px;width:100%;padding:24px">' +
+      '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:14px">' +
+      '<div style="font-size:36px">📦</div>' +
+      '<div><div style="font-weight:700;font-size:16px;color:#ff9800">File quá lớn để OCR</div>' +
+      '<div style="font-size:11px;color:rgba(180,200,220,.7);margin-top:4px">' + fileName + ' (' + fileSizeMB.toFixed(1) + ' MB)</div></div></div>' +
+      '<div style="background:rgba(255,82,82,.08);border-left:3px solid #ff5252;padding:12px;border-radius:4px;margin-bottom:14px">' +
+      '<div style="font-size:12px;color:#ff8a80;font-weight:600;margin-bottom:6px">⚠️ Giới hạn hệ thống</div>' +
+      '<div style="font-size:11px;color:rgba(235,248,255,.8);line-height:1.5">Gemini AI và Supabase chỉ chấp nhận file <b>tối đa 50MB</b>. File của bạn là ' + fileSizeMB.toFixed(1) + 'MB nên cần nén trước khi OCR.</div></div>' +
+      '<div style="font-size:12px;color:rgba(235,248,255,.92);font-weight:600;margin-bottom:10px">🛠️ Cách nén PDF (chọn 1):</div>' +
+      '<div style="display:grid;gap:10px;margin-bottom:18px">' +
+      '<div style="background:rgba(0,200,255,.06);border:1px solid rgba(0,200,255,.2);border-radius:6px;padding:12px">' +
+      '<div style="font-weight:600;color:#00c8ff;font-size:12px;margin-bottom:4px">1. Online (nhanh nhất)</div>' +
+      '<div style="font-size:11px;color:rgba(180,200,220,.85)">→ <a href="https://smallpdf.com/compress-pdf" target="_blank" style="color:#00c8ff">smallpdf.com/compress-pdf</a></div>' +
+      '<div style="font-size:11px;color:rgba(180,200,220,.85)">→ <a href="https://www.ilovepdf.com/compress_pdf" target="_blank" style="color:#00c8ff">ilovepdf.com/compress_pdf</a></div>' +
+      '<div style="font-size:10px;color:rgba(180,200,220,.55);margin-top:4px">Upload → chọn "Basic compression" → tải về → upload NAS lại</div></div>' +
+      '<div style="background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.2);border-radius:6px;padding:12px">' +
+      '<div style="font-weight:600;color:#00e676;font-size:12px;margin-bottom:4px">2. Adobe Acrobat</div>' +
+      '<div style="font-size:11px;color:rgba(180,200,220,.85)">File → Save As Other → Reduced Size PDF</div></div>' +
+      '<div style="background:rgba(255,193,7,.06);border:1px solid rgba(255,193,7,.2);border-radius:6px;padding:12px">' +
+      '<div style="font-weight:600;color:#ffc107;font-size:12px;margin-bottom:4px">3. Quét lại (file scan)</div>' +
+      '<div style="font-size:11px;color:rgba(180,200,220,.85)">Nếu file là scan ảnh: quét lại ở 200 DPI thay vì 600 DPI</div></div></div>' +
+      '<div style="background:rgba(0,200,255,.08);padding:10px;border-radius:5px;margin-bottom:14px">' +
+      '<div style="font-size:11px;color:rgba(235,248,255,.85)"><b style="color:#00c8ff">💡 Mục tiêu:</b> Nén còn dưới 30MB. Sau đó upload NAS lại → click OCR.</div></div>' +
+      '<button onclick="document.getElementById(\'largeFileGuideModal\').remove()" style="padding:10px 28px;background:#ff9800;color:#000;border:none;border-radius:6px;font-weight:700;cursor:pointer;float:right">Đã hiểu</button>' +
+      '<div style="clear:both"></div></div></div>';
+    
+    document.body.insertAdjacentHTML('beforeend', html);
+  };
+  
+  const origOcr = window._bbtnOcrFromNas;
+  if (origOcr) {
+    window._bbtnOcrFromNas = async function(nasPath, fileName) {
+      let sizeMB = null;
+      try {
+        const rows = document.querySelectorAll('table tr');
+        for (const row of rows) {
+          if (row.textContent.includes(fileName.substring(0, 30))) {
+            const sizeText = row.cells && row.cells[1] ? row.cells[1].textContent : '';
+            const m = sizeText.match(/([\d.]+)\s*(MB|KB|B)/);
+            if (m) {
+              const num = parseFloat(m[1]);
+              const unit = m[2];
+              sizeMB = unit === 'MB' ? num : unit === 'KB' ? num/1024 : num/1024/1024;
+            }
+            break;
+          }
+        }
+      } catch (e) {}
+      
+      if (sizeMB && sizeMB > 50) {
+        window._showLargeFileGuide(fileName, sizeMB);
+        return;
+      }
+      
+      if (sizeMB && sizeMB > 30) {
+        if (!confirm('⚠️ File ' + fileName + ' lớn (~' + sizeMB.toFixed(1) + 'MB)\n\nOCR có thể mất 60+ giây hoặc bị timeout. Tiếp tục?')) {
+          return;
+        }
+      }
+      
+      return await origOcr.call(this, nasPath, fileName);
+    };
+  }
+  
+  console.log('[V59] Large file warning installed');
+})();
