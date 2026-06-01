@@ -16266,3 +16266,212 @@ async function _authedFetch(url, options) {
   
   console.log('[V62] Big progress UI override loaded - sticky top');
 })();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V63: BULK OCR UI - REPLACEMENT via MutationObserver
+// Khi UI cũ (#bbtnBulkProgress hoặc V61) xuất hiện → REPLACE bằng UI to v63
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function() {
+  if (window._bbtnUiV63Installed) return;
+  window._bbtnUiV63Installed = true;
+  
+  // CSS
+  if (!document.getElementById('bulkV63Style')) {
+    const style = document.createElement('style');
+    style.id = 'bulkV63Style';
+    style.textContent = 
+      '@keyframes v63Pulse { 0%,100% { transform: scale(1) } 50% { transform: scale(1.15) } }' +
+      '@keyframes v63Shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }' +
+      '@keyframes v63Slide { from { transform: translateY(-100%); opacity: 0 } to { transform: translateY(0); opacity: 1 } }';
+    document.head.appendChild(style);
+  }
+  
+  // Tạo UI v63 to + sticky top
+  function _createBigUIV63(total, folderPath) {
+    const old = document.getElementById('bbtnBulkProgressV63');
+    if (old) old.remove();
+    
+    const div = document.createElement('div');
+    div.id = 'bbtnBulkProgressV63';
+    div.style.cssText = 'position:fixed;top:0;left:0;right:0;background:linear-gradient(135deg,#0d1117,#161b22);border-bottom:3px solid #ffc107;z-index:99999;padding:20px 30px;box-shadow:0 8px 32px rgba(0,0,0,.8);font-family:system-ui;animation:v63Slide .4s ease-out';
+    
+    div.innerHTML = 
+      '<div style="max-width:1400px;margin:0 auto">' +
+        '<div style="display:flex;align-items:center;gap:20px;margin-bottom:16px">' +
+          '<div style="font-size:48px;animation:v63Pulse 1.5s infinite">🤖</div>' +
+          '<div style="flex:1">' +
+            '<div style="font-size:22px;font-weight:800;color:#ffc107;margin-bottom:4px">⚡ ĐANG OCR HÀNG LOẠT</div>' +
+            '<div style="font-size:12px;color:rgba(180,200,220,.7)">📁 ' + folderPath + '</div>' +
+          '</div>' +
+          '<button id="v63StopBtn" style="padding:16px 36px;background:linear-gradient(135deg,#ff5252,#d32f2f);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 6px 18px rgba(255,82,82,.6);transition:all .15s;letter-spacing:.5px">⏹ DỪNG NGAY</button>' +
+        '</div>' +
+        '<div style="position:relative;background:rgba(255,255,255,.08);height:28px;border-radius:14px;overflow:hidden;margin-bottom:16px;box-shadow:inset 0 2px 4px rgba(0,0,0,.3)">' +
+          '<div id="v63Bar" style="background:linear-gradient(90deg,#ffc107,#ff9800,#ffc107);background-size:200% 100%;height:100%;width:0%;transition:width .5s ease;animation:v63Shimmer 2s linear infinite;box-shadow:0 0 16px rgba(255,193,7,.6)"></div>' +
+          '<div id="v63BarText" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.8)">0%</div>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px">' +
+          '<div style="background:rgba(255,255,255,.06);padding:14px;border-radius:8px;text-align:center;border:1px solid rgba(255,255,255,.08)">' +
+            '<div id="v63Total" style="font-size:28px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums">0 / ' + total + '</div>' +
+            '<div style="font-size:11px;color:rgba(180,200,220,.65);text-transform:uppercase;letter-spacing:.6px;margin-top:4px">Đã xử lý</div>' +
+          '</div>' +
+          '<div style="background:rgba(0,230,118,.1);padding:14px;border-radius:8px;text-align:center;border:1px solid rgba(0,230,118,.3)">' +
+            '<div id="v63Success" style="font-size:28px;font-weight:800;color:#00e676;font-variant-numeric:tabular-nums">0</div>' +
+            '<div style="font-size:11px;color:rgba(180,200,220,.65);text-transform:uppercase;letter-spacing:.6px;margin-top:4px">✓ Thành công</div>' +
+          '</div>' +
+          '<div style="background:rgba(255,82,82,.1);padding:14px;border-radius:8px;text-align:center;border:1px solid rgba(255,82,82,.3)">' +
+            '<div id="v63Failed" style="font-size:28px;font-weight:800;color:#ff5252;font-variant-numeric:tabular-nums">0</div>' +
+            '<div style="font-size:11px;color:rgba(180,200,220,.65);text-transform:uppercase;letter-spacing:.6px;margin-top:4px">✗ Lỗi / Skip</div>' +
+          '</div>' +
+          '<div style="background:rgba(0,200,255,.1);padding:14px;border-radius:8px;text-align:center;border:1px solid rgba(0,200,255,.3)">' +
+            '<div id="v63Devices" style="font-size:28px;font-weight:800;color:#00c8ff;font-variant-numeric:tabular-nums">0</div>' +
+            '<div style="font-size:11px;color:rgba(180,200,220,.65);text-transform:uppercase;letter-spacing:.6px;margin-top:4px">📊 Thiết bị</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="background:rgba(255,193,7,.08);border:1px solid rgba(255,193,7,.25);border-radius:8px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap">' +
+          '<div style="flex:1;min-width:280px">' +
+            '<div style="font-size:11px;color:rgba(180,200,220,.55);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">📄 Đang xử lý</div>' +
+            '<div id="v63CurrentFile" style="font-family:monospace;font-size:13px;color:#ffc107;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Đang chuẩn bị...</div>' +
+          '</div>' +
+          '<div style="text-align:right">' +
+            '<div style="font-size:11px;color:rgba(180,200,220,.55);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">⏱ Còn lại</div>' +
+            '<div id="v63Eta" style="font-size:20px;font-weight:800;color:#ffc107;font-variant-numeric:tabular-nums">--</div>' +
+            '<div id="v63Speed" style="font-size:10px;color:rgba(180,200,220,.55);margin-top:2px">--</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    
+    document.body.appendChild(div);
+    document.body.style.paddingTop = '320px';
+    
+    // Wire nút DỪNG
+    document.getElementById('v63StopBtn').onclick = function() {
+      if (typeof window._bbtnBulkCancelConfirm === 'function') {
+        window._bbtnBulkCancelConfirm();
+      } else {
+        if (confirm('⏹ DỪNG OCR HÀNG LOẠT?')) {
+          window._bbtnBulkCancel = true;
+        }
+      }
+    };
+    
+    return div;
+  }
+  
+  function _updateBigUIV63(stats) {
+    const bar = document.getElementById('v63Bar');
+    if (!bar) return;
+    
+    const pct = stats.total > 0 ? (stats.done / stats.total) * 100 : 0;
+    bar.style.width = pct + '%';
+    
+    const barText = document.getElementById('v63BarText');
+    if (barText) barText.textContent = pct.toFixed(1) + '%';
+    
+    const set = function(id, val) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    };
+    
+    set('v63Total', stats.done + ' / ' + stats.total);
+    set('v63Success', stats.success || 0);
+    set('v63Failed', (stats.failed || 0) + (stats.skipped || 0));
+    set('v63Devices', stats.devicesCount || 0);
+    
+    const currentEl = document.getElementById('v63CurrentFile');
+    if (currentEl) {
+      if (stats.currentFile) {
+        const name = stats.currentFile;
+        currentEl.textContent = name.length > 70 ? name.substring(0, 67) + '...' : name;
+      } else if (stats.done === stats.total) {
+        currentEl.innerHTML = '<span style="color:#00e676">✓ HOÀN TẤT</span>';
+      }
+    }
+    
+    if (stats.startTime && stats.done > 0) {
+      const elapsed = (Date.now() - stats.startTime) / 1000;
+      const remainingSec = Math.round((stats.total - stats.done) * (elapsed / stats.done));
+      const speedPerMin = (stats.done / (elapsed / 60)).toFixed(1);
+      
+      let etaText;
+      if (remainingSec > 3600) etaText = '~' + (Math.round(remainingSec/3600*10)/10) + ' giờ';
+      else if (remainingSec > 60) etaText = '~' + Math.round(remainingSec/60) + ' phút';
+      else if (remainingSec > 5) etaText = '~' + remainingSec + ' giây';
+      else if (stats.done < stats.total) etaText = 'Sắp xong...';
+      else etaText = 'Hoàn tất!';
+      
+      set('v63Eta', etaText);
+      set('v63Speed', speedPerMin + ' file/phút');
+    }
+  }
+  
+  // Cleanup khi xong
+  function _cleanupV63() {
+    const el = document.getElementById('bbtnBulkProgressV63');
+    if (el) el.remove();
+    document.body.style.paddingTop = '';
+  }
+  
+  // MutationObserver: detect khi UI cũ xuất hiện → tạo UI v63 + ẨN UI cũ
+  let v63Active = false;
+  let updateInterval = null;
+  
+  const observer = new MutationObserver(function() {
+    // Tìm element progress UI cũ
+    const oldUI = document.getElementById('bbtnBulkProgressV61') 
+               || document.getElementById('bbtnBulkProgress');
+    
+    if (oldUI && !v63Active) {
+      // UI cũ vừa xuất hiện → kích hoạt UI v63
+      v63Active = true;
+      
+      // Ẩn UI cũ
+      oldUI.style.display = 'none';
+      
+      // Lấy folder path + total từ window._bbtnBulkStats
+      const stats = window._bbtnBulkStats || {};
+      const total = stats.total || 0;
+      
+      // Tìm folder path từ button hoặc localStorage
+      let folderPath = 'NAS';
+      try {
+        const breadcrumbItems = document.querySelectorAll('a[onclick*="_bbtnLoadPath"]');
+        if (breadcrumbItems.length > 0) {
+          const last = breadcrumbItems[breadcrumbItems.length - 1];
+          folderPath = (last.textContent || '').trim() || folderPath;
+        }
+      } catch (e) {}
+      
+      _createBigUIV63(total, folderPath);
+      
+      // Update mỗi 500ms từ window._bbtnBulkStats
+      if (updateInterval) clearInterval(updateInterval);
+      updateInterval = setInterval(function() {
+        const stats = window._bbtnBulkStats;
+        if (!stats) return;
+        
+        stats.startTime = window._bbtnBulkStartTime;
+        _updateBigUIV63(stats);
+        
+        // Check if done or cancelled
+        if (stats.done >= stats.total || window._bbtnBulkCancel) {
+          setTimeout(function() {
+            clearInterval(updateInterval);
+            _cleanupV63();
+            v63Active = false;
+          }, 2000);
+        }
+      }, 500);
+    }
+    
+    if (!oldUI && v63Active) {
+      // UI cũ biến mất → cleanup
+      _cleanupV63();
+      if (updateInterval) clearInterval(updateInterval);
+      v63Active = false;
+    }
+  });
+  
+  observer.observe(document.body, { childList: true, subtree: false });
+  
+  console.log('[V63] Big UI overlay loaded - waits for v58/v61 progress');
+})();
