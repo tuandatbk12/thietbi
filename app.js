@@ -16677,3 +16677,181 @@ async function _authedFetch(url, options) {
   
   console.log('[V64] Big UI overlay loaded - detects ALL old ID variants');
 })();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V66: BULK OCR FINAL - self-contained, verified working
+// Fix: od.items (not thiet_bi), field gốc (ten_thiet_bi...), file_url (not file_path)
+// Disable v62/v63/v64 overlay. UI sticky top tự tạo, không observer/override sub-fn.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function() {
+  if (window._bbtnV66) return;
+  window._bbtnV66 = true;
+  window._bbtnUiV63Installed = true;  // disable v63 overlay
+  window._bbtnUiV64Installed = true;  // disable v64 overlay
+
+  function _v66Cur(){
+    return (window._bbtnState && window._bbtnState.path)
+        || window._bbtnLastPath
+        || null;
+  }
+
+  window._bbtnBulkOcrFolder = async function(folderPath) {
+    if (!folderPath) folderPath = _v66Cur();
+    if (!folderPath) { alert('Không xác định được thư mục. Vui lòng vào 1 folder rồi thử lại.'); return; }
+
+    const token = await _authGetToken();
+    const SB = _AUTH_SB_URL.replace(/\/$/,'');
+
+    async function scan(path, depth) {
+      depth = depth||0; if(depth>6) return [];
+      const url = SB + '/functions/v1/bbtn-list?path=' + encodeURIComponent(path);
+      let items = [];
+      try {
+        const r = await _bbtnFetchEdge(url, token, {timeoutMs:30000, maxRetries:1});
+        const d = await r.json();
+        items = d.items || d || [];
+      } catch(e){ console.warn('[V66] scan skip', path, e.message); return []; }
+      const pdfs = [];
+      for (const it of items) {
+        if (it.isFolder) pdfs.push.apply(pdfs, await scan(path.replace(/\/$/,'')+'/'+it.name, depth+1));
+        else if (it.name && it.name.toLowerCase().endsWith('.pdf'))
+          pdfs.push({ path: it.relativePath || (path.replace(/\/$/,'')+'/'+it.name), name: it.name, size: it.size||0 });
+      }
+      return pdfs;
+    }
+
+    if (window.showChangeNotif) showChangeNotif('info','🔍 Đang quét file PDF...', folderPath);
+    const pdfs = await scan(folderPath);
+    if (!pdfs.length) { alert('Không tìm thấy file PDF nào trong thư mục này.'); return; }
+
+    const totalMB = pdfs.reduce((s,f)=>s+(f.size||0),0)/1024/1024;
+    const oversized = pdfs.filter(f=>(f.size||0)>50*1024*1024);
+    const estMin = Math.round(pdfs.length*25/60);
+    let msg;
+    if (pdfs.length > 100) {
+      msg = '⚠️⚠️⚠️ CẢNH BÁO ⚠️⚠️⚠️\n\n📊 '+pdfs.length+' file PDF\n📦 '+totalMB.toFixed(1)+' MB\n'+
+        (oversized.length?'⚠️ '+oversized.length+' file >50MB (skip)\n':'')+
+        '⏱️ ~'+estMin+' phút (~'+(Math.round(estMin/60*10)/10)+' giờ)\n\nTÁC VỤ DÀI! Tab phải mở liên tục.\nCó thể DỪNG bất cứ lúc nào.\n\nTIẾP TỤC?';
+    } else {
+      msg = '📊 '+pdfs.length+' file PDF\n📦 '+totalMB.toFixed(1)+' MB\n'+
+        (oversized.length?'⚠️ '+oversized.length+' file >50MB (skip)\n':'')+
+        '⏱️ ~'+estMin+' phút\n\nTiếp tục OCR tất cả?';
+    }
+    if (!confirm(msg)) return;
+
+    // UI sticky top
+    const old=document.getElementById('v66ProgressUI'); if(old) old.remove();
+    const div=document.createElement('div');
+    div.id='v66ProgressUI';
+    div.style.cssText='position:fixed;top:0;left:0;right:0;background:linear-gradient(135deg,#0d1117,#161b22);border-bottom:3px solid #ffc107;z-index:99999;padding:20px 30px;box-shadow:0 8px 32px rgba(0,0,0,.8);font-family:system-ui';
+    div.innerHTML='<div style="max-width:1400px;margin:0 auto">'+
+      '<div style="display:flex;align-items:center;gap:16px;margin-bottom:14px">'+
+      '<div style="font-size:40px">🤖</div>'+
+      '<div style="flex:1"><div style="font-size:20px;font-weight:800;color:#ffc107">⚡ ĐANG OCR HÀNG LOẠT</div>'+
+      '<div style="font-size:11px;color:#aaa">📁 '+folderPath+'</div></div>'+
+      '<button id="v66Stop" style="padding:14px 30px;background:linear-gradient(135deg,#ff5252,#d32f2f);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:800;cursor:pointer">⏹ DỪNG</button></div>'+
+      '<div style="background:rgba(255,255,255,.08);height:24px;border-radius:12px;overflow:hidden;margin-bottom:14px;position:relative">'+
+      '<div id="v66Bar" style="background:linear-gradient(90deg,#ffc107,#ff9800);height:100%;width:0%;transition:width .4s"></div>'+
+      '<div id="v66Pct" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff">0%</div></div>'+
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">'+
+      '<div style="background:rgba(255,255,255,.06);padding:12px;border-radius:8px;text-align:center"><div id="v66Total" style="font-size:26px;font-weight:800;color:#fff">0/'+pdfs.length+'</div><div style="font-size:10px;color:#aaa">ĐÃ XỬ LÝ</div></div>'+
+      '<div style="background:rgba(0,230,118,.1);padding:12px;border-radius:8px;text-align:center;border:1px solid rgba(0,230,118,.3)"><div id="v66Ok" style="font-size:26px;font-weight:800;color:#00e676">0</div><div style="font-size:10px;color:#aaa">THÀNH CÔNG</div></div>'+
+      '<div style="background:rgba(255,82,82,.1);padding:12px;border-radius:8px;text-align:center;border:1px solid rgba(255,82,82,.3)"><div id="v66Fail" style="font-size:26px;font-weight:800;color:#ff5252">0</div><div style="font-size:10px;color:#aaa">LỖI/TRỐNG</div></div>'+
+      '<div style="background:rgba(0,200,255,.1);padding:12px;border-radius:8px;text-align:center;border:1px solid rgba(0,200,255,.3)"><div id="v66Dev" style="font-size:26px;font-weight:800;color:#00c8ff">0</div><div style="font-size:10px;color:#aaa">THIẾT BỊ</div></div></div>'+
+      '<div style="font-size:12px;color:#ffc107"><span id="v66Cur">Đang chuẩn bị...</span> · <span id="v66Eta"></span></div></div>';
+    document.body.appendChild(div);
+    document.body.style.paddingTop='300px';
+
+    let cancel=false;
+    document.getElementById('v66Stop').onclick=function(){
+      if(confirm('⏹ DỪNG OCR?\n\nĐã xử lý: '+done+'/'+pdfs.length+'\nThiết bị đã lưu: '+dev+'\n\nDữ liệu đã OCR KHÔNG mất.')){
+        cancel=true;
+        const b=document.getElementById('v66Stop'); if(b){b.disabled=true;b.innerHTML='⏳ Đang dừng...';b.style.opacity='.6';}
+      }
+    };
+
+    let done=0,ok=0,fail=0,dev=0;
+    const start=Date.now();
+    const success=[],failed=[];
+
+    for (let i=0;i<pdfs.length;i++){
+      if(cancel) break;
+      const f=pdfs[i];
+      document.getElementById('v66Cur').textContent='📄 '+f.name;
+
+      if((f.size||0)>50*1024*1024){ fail++; done++; failed.push({name:f.name,error:'>50MB skip'}); }
+      else try {
+        const dl=SB+'/functions/v1/bbtn-download?path='+encodeURIComponent(f.path);
+        const fr=await _bbtnFetchEdge(dl, token, {timeoutMs:120000, maxRetries:1});
+        if(!fr.ok) throw new Error('Tải fail '+fr.status);
+        const blob=await fr.blob();
+        const b64=await new Promise((res,rej)=>{const rd=new FileReader();rd.onloadend=()=>res(rd.result.split(',')[1]);rd.onerror=rej;rd.readAsDataURL(blob);});
+        const or=await fetch(SB+'/functions/v1/bbtn-ocr-extract',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY},body:JSON.stringify({file_base64:b64,mime_type:'application/pdf',file_name:f.name})});
+        if(!or.ok) throw new Error('OCR fail '+or.status);
+        const od=await or.json();
+        const items=od.items||[];
+        if(!items.length){ failed.push({name:f.name,error:'Không có thiết bị'}); fail++; }
+        else {
+          const recs=items.map(it=>({
+            tram:it.tram||null, loai_thiet_bi:it.loai_thiet_bi||null, ten_thiet_bi:it.ten_thiet_bi||null,
+            kieu:it.kieu||null, so_che_tao:it.so_che_tao||null, hang_san_xuat:it.hang_san_xuat||null,
+            nuoc_san_xuat:it.nuoc_san_xuat||null, nam_san_xuat:it.nam_san_xuat||null, dien_ap:it.dien_ap||null,
+            dong_dien:it.dong_dien||null, ngay_kiem_dinh:it.ngay_kiem_dinh||null, dang_kiem_dinh:it.dang_kiem_dinh||null,
+            vi_tri_lap_dat:it.vi_tri_lap_dat||null, sfra:it.sfra, tiet_dien:it.tiet_dien||null,
+            file_url:f.path, file_name:f.name, file_source:'nas'
+          }));
+          const ir=await fetch(SB+'/rest/v1/bbtn_records',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY,'Prefer':'return=minimal'},body:JSON.stringify(recs)});
+          if(!ir.ok) throw new Error('Save fail: '+(await ir.text()).substring(0,120));
+          ok++; dev+=recs.length; success.push({name:f.name,count:recs.length});
+        }
+      } catch(e){ fail++; failed.push({name:f.name,error:e.message}); console.error('[V66] FAIL',f.name,e); }
+
+      done++;
+      const pct=(done/pdfs.length*100);
+      document.getElementById('v66Bar').style.width=pct+'%';
+      document.getElementById('v66Pct').textContent=pct.toFixed(0)+'%';
+      document.getElementById('v66Total').textContent=done+'/'+pdfs.length;
+      document.getElementById('v66Ok').textContent=ok;
+      document.getElementById('v66Fail').textContent=fail;
+      document.getElementById('v66Dev').textContent=dev;
+      const el=(Date.now()-start)/1000, rem=Math.round((pdfs.length-done)*(el/done));
+      document.getElementById('v66Eta').textContent = rem>3600?'~'+(Math.round(rem/3600*10)/10)+' giờ':rem>60?'~'+Math.round(rem/60)+' phút':'~'+rem+' giây';
+      await new Promise(r=>setTimeout(r,1000));
+    }
+
+    document.getElementById('v66Cur').textContent='✓ HOÀN TẤT';
+    console.log('[V66] DONE',{ok,fail,dev});
+
+    setTimeout(function(){
+      const el=document.getElementById('v66ProgressUI'); if(el) el.remove();
+      document.body.style.paddingTop='';
+      _v66Summary(success, failed, dev, cancel);
+    }, 1500);
+  };
+
+  function _v66Summary(success, failed, dev, cancelled){
+    const old=document.getElementById('v66Summary'); if(old) old.remove();
+    const title = cancelled ? '⏹ Đã dừng OCR' : '✅ Hoàn tất OCR';
+    const tc = cancelled ? '#ff9800' : '#00e676';
+    const okHtml = success.length ? '<div style="margin-bottom:12px"><div style="font-size:12px;color:#00e676;font-weight:600;margin-bottom:6px">✓ Thành công ('+success.length+'):</div><div style="max-height:180px;overflow:auto;border:1px solid rgba(0,230,118,.2);border-radius:6px;padding:8px;background:rgba(0,230,118,.05)">'+success.map(f=>'<div style="font-size:11px;color:#ddd;padding:2px 0;display:flex;justify-content:space-between"><span>✓ '+f.name+'</span><span style="color:#888">'+f.count+' TB</span></div>').join('')+'</div></div>' : '';
+    const failHtml = failed.length ? '<div style="margin-bottom:12px"><div style="font-size:12px;color:#ff5252;font-weight:600;margin-bottom:6px">✗ Lỗi/Trống ('+failed.length+'):</div><div style="max-height:180px;overflow:auto;border:1px solid rgba(255,82,82,.2);border-radius:6px;padding:8px;background:rgba(255,82,82,.05)">'+failed.map(f=>'<div style="font-size:11px;color:#ddd;padding:3px 0"><div>'+f.name+'</div><div style="color:#ff8a80;font-size:10px">'+f.error+'</div></div>').join('')+'</div></div>' : '';
+    const html='<div id="v66Summary" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:999999;display:flex;align-items:center;justify-content:center;padding:20px"><div style="background:#161b22;border:2px solid '+tc+';border-radius:12px;max-width:760px;width:100%;max-height:85vh;overflow:auto;padding:26px">'+
+      '<div style="font-weight:800;font-size:20px;color:'+tc+';margin-bottom:8px">'+title+'</div>'+
+      '<div style="font-size:13px;color:#bbb;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:12px"><span style="color:#00e676">✓ '+success.length+'</span> thành công · <span style="color:#ff5252">✗ '+failed.length+'</span> lỗi/trống · <span style="color:#00c8ff">📊 '+dev+'</span> thiết bị lưu DB</div>'+
+      '<div style="background:rgba(0,200,255,.08);border:1px solid rgba(0,200,255,.25);border-radius:8px;padding:12px;margin-bottom:14px;font-size:11px;color:#ddd">💾 Đã lưu vào <b style="color:#00c8ff">Quản lý BBTN OCR</b> (nguồn = NAS).</div>'+
+      failHtml + okHtml +
+      '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">'+
+      '<button onclick="document.getElementById(\'v66Summary\').remove()" style="padding:10px 20px;background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:7px;cursor:pointer">Đóng</button>'+
+      '<button onclick="document.getElementById(\'v66Summary\').remove();window._v66GoOcr&&window._v66GoOcr()" style="padding:11px 22px;background:linear-gradient(135deg,#00c8ff,#0099cc);color:#000;border:none;border-radius:7px;cursor:pointer;font-weight:700">📊 Xem Quản lý BBTN OCR →</button></div>'+
+      '</div></div>';
+    document.body.insertAdjacentHTML('beforeend', html);
+  }
+
+  window._v66GoOcr = function(){
+    const links=document.querySelectorAll('a,button,[onclick]');
+    for(const l of links){ if((l.textContent||'').includes('Quản lý BBTN OCR')){ l.click(); return; } }
+    if(window.showChangeNotif) showChangeNotif('info','Vào menu "Quản lý BBTN OCR" để xem','');
+  };
+
+  console.log('[V66] Bulk OCR FINAL loaded - verified mapping (items/ten_thiet_bi/file_url)');
+})();
