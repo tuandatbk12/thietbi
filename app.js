@@ -16720,8 +16720,20 @@ async function _authedFetch(url, options) {
       return pdfs;
     }
 
+    // Banner scan TO - hiện NGAY (trước scan) để user biết đang chạy
+    (function(){var o=document.getElementById('v66ScanBanner');if(o)o.remove();})();
+    var _scanB=document.createElement('div');
+    _scanB.id='v66ScanBanner';
+    _scanB.style.cssText='position:fixed;top:0;left:0;right:0;background:linear-gradient(135deg,#0d1117,#161b22);border-bottom:3px solid #00c8ff;z-index:99999;padding:24px 30px;text-align:center;font-family:system-ui;box-shadow:0 8px 32px rgba(0,0,0,.8)';
+    _scanB.innerHTML='<div style="font-size:19px;font-weight:800;color:#00c8ff">🔍 Đang quét thư mục tìm file PDF...</div>'+
+      '<div style="font-size:11px;color:#aaa;margin-top:6px">📁 '+folderPath+'</div>'+
+      '<div style="margin-top:12px"><div style="display:inline-block;width:26px;height:26px;border:3px solid rgba(0,200,255,.2);border-top-color:#00c8ff;border-radius:50%;animation:v66spin .8s linear infinite"></div></div>';
+    document.body.appendChild(_scanB);
+    document.body.style.paddingTop='130px';
+    if(!document.getElementById('v66spinStyle')){var _st=document.createElement('style');_st.id='v66spinStyle';_st.textContent='@keyframes v66spin{to{transform:rotate(360deg)}}';document.head.appendChild(_st);}
     if (window.showChangeNotif) showChangeNotif('info','🔍 Đang quét file PDF...', folderPath);
     const pdfs = await scan(folderPath);
+    (function(){var b=document.getElementById('v66ScanBanner');if(b)b.remove();document.body.style.paddingTop='';})();
     if (!pdfs.length) { alert('Không tìm thấy file PDF nào trong thư mục này.'); return; }
 
     const totalMB = pdfs.reduce((s,f)=>s+(f.size||0),0)/1024/1024;
@@ -16786,7 +16798,12 @@ async function _authedFetch(url, options) {
         if(!fr.ok) throw new Error('Tải fail '+fr.status);
         const blob=await fr.blob();
         const b64=await new Promise((res,rej)=>{const rd=new FileReader();rd.onloadend=()=>res(rd.result.split(',')[1]);rd.onerror=rej;rd.readAsDataURL(blob);});
-        const or=await fetch(SB+'/functions/v1/bbtn-ocr-extract',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY},body:JSON.stringify({file_base64:b64,mime_type:'application/pdf',file_name:f.name})});
+        let or=await fetch(SB+'/functions/v1/bbtn-ocr-extract',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY},body:JSON.stringify({file_base64:b64,mime_type:'application/pdf',file_name:f.name})});
+        if(!or.ok && (or.status===504||or.status===503||or.status===429||or.status===502)){
+          document.getElementById('v66Cur').textContent='⏳ Gemini bận, thử lại: '+f.name;
+          await new Promise(r=>setTimeout(r,8000));
+          or=await fetch(SB+'/functions/v1/bbtn-ocr-extract',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY},body:JSON.stringify({file_base64:b64,mime_type:'application/pdf',file_name:f.name})});
+        }
         if(!or.ok) throw new Error('OCR fail '+or.status);
         const od=await or.json();
         const items=od.items||[];
