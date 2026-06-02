@@ -1,0 +1,150 @@
+/* ━━━━ PMIS Compare Module CSS ━━━━ */
+
+.pmis-modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7); 
+  z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.pmis-modal-card {
+  background: #1e2530; 
+  border-radius: 10px;
+  width: 95%; max-width: 1400px; 
+  max-height: 92vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+}
+.pmis-modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 15px 20px; border-bottom: 1px solid #2c3744;
+}
+.pmis-modal-title {
+  color: #00c8ff; font-weight: 600; font-size: 17px;
+}
+.pmis-modal-close {
+  background: rgba(255,255,255,0.1); border: none;
+  color: #fff; width: 32px; height: 32px; border-radius: 50%;
+  cursor: pointer; font-size: 14px;
+}
+.pmis-modal-close:hover { background: rgba(255,82,82,0.3); }
+.pmis-modal-body {
+  flex: 1; overflow: auto; padding: 20px;
+}
+
+/* Upload zone */
+.pmis-upload-zone {
+  border: 2px dashed #2c3744; border-radius: 10px;
+  padding: 30px; cursor: pointer; transition: border-color 0.2s;
+}
+.pmis-upload-zone:hover { border-color: #00c8ff; }
+
+.pmis-btn-primary {
+  background: #00c8ff; color: #000; border: none;
+  padding: 10px 22px; border-radius: 5px; font-weight: 600;
+  cursor: pointer; font-size: 14px;
+}
+.pmis-btn-primary:hover { background: #00b3e6; }
+
+/* Progress */
+.pmis-progress-wrap {
+  padding: 40px; text-align: center;
+}
+.pmis-progress-bar {
+  width: 100%; height: 8px; background: rgba(255,255,255,0.1);
+  border-radius: 4px; overflow: hidden; margin-bottom: 15px;
+}
+.pmis-progress-fill {
+  height: 100%; background: linear-gradient(90deg, #00c8ff, #4caf50);
+  width: 100%;
+  animation: pmis-pulse 2s infinite;
+}
+@keyframes pmis-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+.pmis-progress-text { color: #aaa; font-size: 13px; }
+
+/* Tabs */
+.pmis-tabs {
+  display: flex; gap: 5px; border-bottom: 1px solid #2c3744;
+  margin-bottom: 20px; flex-wrap: wrap;
+}
+.pmis-tab {
+  background: transparent; border: none;
+  color: #aaa; padding: 10px 16px;
+  cursor: pointer; font-size: 12px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+.pmis-tab:hover { color: #fff; }
+.pmis-tab.active {
+  color: #00c8ff;
+  border-bottom-color: #00c8ff;
+  font-weight: 600;
+}
+
+/* KPI Cards */
+.pmis-kpi-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+}
+.pmis-kpi {
+  background: rgba(0,200,255,0.08); padding: 15px; border-radius: 8px;
+  border-left: 3px solid #00c8ff;
+}
+.pmis-kpi-label {
+  color: #aaa; font-size: 11px; text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.pmis-kpi-value {
+  color: #fff; font-size: 22px; font-weight: 700;
+}
+
+/* Groups */
+.pmis-group-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px; margin-top: 12px;
+}
+.pmis-group {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px;
+}
+.pmis-group-icon { font-size: 18px; }
+.pmis-group-label { flex: 1; color: #ddd; font-size: 12px; }
+.pmis-group-count { color: #fff; font-weight: 700; font-size: 15px; }
+
+/* Table */
+.pmis-table-wrap { max-height: 60vh; overflow: auto; border: 1px solid #2c3744; border-radius: 6px; }
+.pmis-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 12px; color: #ddd;
+}
+.pmis-table thead {
+  background: #243140; position: sticky; top: 0; z-index: 1;
+}
+.pmis-table th {
+  text-align: left; padding: 10px 12px;
+  color: #fff; font-weight: 600;
+  border-bottom: 2px solid #1a242f;
+}
+.pmis-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #2c3744;
+}
+.pmis-table tbody tr:hover { background: rgba(0,200,255,0.05); }
+
+/* Input */
+.pmis-input {
+  background: #fff !important;
+  color: #000 !important;
+  border: 1px solid #d0d7de;
+  padding: 8px 12px; border-radius: 4px;
+  width: 250px; font-size: 13px;
+}
+.pmis-input:focus { outline: 2px solid #00c8ff; }
+
+/* Menu sidebar */
+.pmis-menu:hover {
+  background: rgba(0,200,255,0.1) !important;
+}

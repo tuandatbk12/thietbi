@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>BBTN OCR v3.3 — Multi-device + Page numbers</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 1100px; margin: 24px auto; padding: 20px; background: #1a1f2e; color: #eef; }
+    h1 { color: #00c8ff; }
+    .card { background: #252b3a; border-radius: 10px; padding: 20px; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.08); }
+    label { display: block; font-size: 12px; font-weight: 700; color: #9ab; margin-bottom: 4px; text-transform: uppercase; }
+    input, textarea { width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: #eef; font-size: 13px; margin-bottom: 12px; box-sizing: border-box; }
+    button { background: linear-gradient(135deg, #00c8ff, #0088ff); color: #000; border: none; padding: 10px 24px; border-radius: 8px; font-size: 13px; font-weight: 800; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    pre { background: #0e1219; padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 11px; max-height: 500px; }
+    .device-card { background: rgba(0,200,255,0.05); border: 1px solid rgba(0,200,255,0.2); border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+    .device-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); flex-wrap: wrap; gap: 8px; }
+    .device-title { font-size: 16px; font-weight: 800; color: #00e676; }
+    .device-meta { display: flex; gap: 12px; font-size: 11px; color: #9ab; align-items: center; }
+    .page-badge { background: rgba(255,193,7,0.15); color: #ffc107; padding: 3px 10px; border-radius: 4px; font-weight: 700; font-size: 11px; }
+    .field-row { display: grid; grid-template-columns: 180px 1fr; gap: 12px; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .field-name { color: #9ab; font-size: 12px; }
+    .field-value { color: #eef; font-size: 13px; word-break: break-word; }
+    .field-empty { color: #555; font-style: italic; }
+    #status { font-size: 13px; padding: 8px 12px; border-radius: 6px; display: none; }
+    .ok { background: rgba(0, 230, 118, 0.15); color: #00e676; }
+    .err { background: rgba(255, 82, 82, 0.15); color: #ff5252; }
+    .warn { background: rgba(255, 215, 64, 0.15); color: #ffd740; }
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; background: #00c8ff; color: #000; }
+    #summary { font-size: 13px; color: #9ab; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <h1>🔬 BBTN OCR v3.3 — Multi-device + Page numbers</h1>
+
+  <div class="card">
+    <h3 style="margin-top:0">Cấu hình</h3>
+    <label>Supabase URL</label>
+    <input id="sbUrl" value="https://xqqmfmljwycpehfyknoy.supabase.co" />
+    <label>Anon Key</label>
+    <input id="sbKey" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxcW1mbWxqd3ljcGVoZnlrbm95Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODM4MDQsImR4cCI6MjA4Nzg1OTgwNH0.J_z0cFqq_Yet-n2X2L_VREdkcAqbkRFpYUp-ti3Fukc" />
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">Upload BBTN</h3>
+    <p style="font-size:12px;color:#9ab;margin-top:0">
+      Hỗ trợ 22 loại + Multi-device (1 PDF chứa nhiều BBTN) + Page numbers
+    </p>
+    <label>Chọn file ảnh hoặc PDF</label>
+    <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,application/pdf" />
+    <div id="fileInfo" style="font-size:12px;color:#9ab;margin-bottom:12px"></div>
+    <button id="testBtn" onclick="runTest()">🚀 Test OCR</button>
+    <div id="status" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card" id="resultCard" style="display:none">
+    <h3 style="margin-top:0">Kết quả</h3>
+    <div id="summary"></div>
+    <div id="devices"></div>
+    <details style="margin-top:16px">
+      <summary style="cursor:pointer;color:#9ab;font-size:12px">Raw JSON (debug)</summary>
+      <pre id="rawJson"></pre>
+    </details>
+  </div>
+
+  <script>
+    let selectedFile = null;
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+      selectedFile = e.target.files[0];
+      const info = document.getElementById('fileInfo');
+      info.textContent = selectedFile
+        ? `${selectedFile.name} — ${(selectedFile.size / 1024).toFixed(1)} KB — ${selectedFile.type}`
+        : '';
+    });
+
+    function setStatus(msg, type) {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = type;
+      el.style.display = 'block';
+    }
+
+    async function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result.split(',')[1]);
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+    }
+
+    const fieldDescriptions = {
+      loai_thiet_bi: '🏷️ Loại',
+      tram: 'Trạm',
+      ten_thiet_bi: '⭐ Tên thiết bị',
+      kieu: 'Kiểu/Model',
+      so_che_tao: 'Serial',
+      hang_san_xuat: 'Hãng SX',
+      nuoc_san_xuat: 'Nước SX',
+      nam_san_xuat: 'Năm SX',
+      dien_ap: 'Điện áp',
+      dong_dien: 'Dòng điện',
+      ngay_kiem_dinh: '📅 Ngày KĐ',
+      dang_kiem_dinh: 'Dạng KĐ',
+      vi_tri_lap_dat: 'Vị trí lắp đặt',
+    };
+
+    function formatPageRange(start, end) {
+      if (!start) return '';
+      if (start === end) return `Trang ${start}`;
+      return `Trang ${start}-${end}`;
+    }
+
+    function renderDevice(item, index, total) {
+      const filledCount = Object.keys(fieldDescriptions).filter(k =>
+        item[k] !== null && item[k] !== undefined && item[k] !== ''
+      ).length;
+      const confidence = (filledCount / 13 * 100).toFixed(0);
+      const pageRange = formatPageRange(item.page_start, item.page_end);
+
+      let html = `<div class="device-card">
+        <div class="device-header">
+          <div class="device-title">
+            <span class="badge">${item.loai_thiet_bi || '?'}</span>
+            ${item.ten_thiet_bi || '(chưa đọc được tên)'}
+          </div>
+          <div class="device-meta">
+            ${pageRange ? `<span class="page-badge">📄 ${pageRange}</span>` : ''}
+            <span>Thiết bị ${index + 1}/${total} • ${filledCount}/13 trường • ${confidence}%</span>
+          </div>
+        </div>`;
+      for (const [key, label] of Object.entries(fieldDescriptions)) {
+        const value = item[key];
+        const isEmpty = value === null || value === undefined || value === '';
+        html += `
+          <div class="field-row">
+            <div class="field-name">${label}</div>
+            <div class="field-value ${isEmpty ? 'field-empty' : ''}">${isEmpty ? '—' : value}</div>
+          </div>`;
+      }
+      html += '</div>';
+      return html;
+    }
+
+    async function runTest() {
+      if (!selectedFile) { setStatus('❌ Chưa chọn file', 'err'); return; }
+      const sbUrl = document.getElementById('sbUrl').value.trim();
+      const sbKey = document.getElementById('sbKey').value.trim();
+      if (!sbUrl || !sbKey) { setStatus('❌ Thiếu URL/Key', 'err'); return; }
+
+      const btn = document.getElementById('testBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Đang xử lý...';
+
+      try {
+        setStatus('📤 Đang đọc file...', 'warn');
+        const b64 = await fileToBase64(selectedFile);
+        setStatus(`🤖 Gọi Gemini (${(b64.length / 1024).toFixed(0)} KB)...`, 'warn');
+
+        const t0 = Date.now();
+        const res = await fetch(`${sbUrl}/functions/v1/bbtn-ocr-extract`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': sbKey },
+          body: JSON.stringify({
+            file_base64: b64,
+            mime_type: selectedFile.type,
+            file_name: selectedFile.name,
+          }),
+        });
+        const elapsed = Date.now() - t0;
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          setStatus(`❌ Lỗi ${res.status}: ${data.error || 'Unknown'}`, 'err');
+          document.getElementById('rawJson').textContent = JSON.stringify(data, null, 2);
+          document.getElementById('resultCard').style.display = 'block';
+          return;
+        }
+
+        const items = data.items || [];
+        const retryMsg = data.retries > 0 ? `, ${data.retries} retries` : '';
+        setStatus(`✅ OCR thành công trong ${elapsed}ms (${items.length} thiết bị${retryMsg})`, 'ok');
+
+        document.getElementById('summary').innerHTML = `
+          Tìm thấy <strong style="color:#00e676">${items.length} thiết bị</strong> trong file.
+          Confidence trung bình: ${(data.avg_confidence * 100).toFixed(0)}%
+        `;
+
+        const devicesEl = document.getElementById('devices');
+        devicesEl.innerHTML = items.map((item, i) => renderDevice(item, i, items.length)).join('');
+
+        document.getElementById('rawJson').textContent = JSON.stringify(data, null, 2);
+        document.getElementById('resultCard').style.display = 'block';
+
+      } catch (err) {
+        setStatus(`❌ Error: ${err.message}`, 'err');
+        console.error(err);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '🚀 Test OCR';
+      }
+    }
+  </script>
+</body>
+</html>
