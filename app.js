@@ -17166,6 +17166,8 @@ async function _authedFetch(url, options) {
       if (txt.includes('OCR tất cả PDF')) b.style.display='none';
       // Nút OCR per-file: onclick gọi _bbtnOcrFromNas
       if (oc.includes('_bbtnOcrFromNas')) b.style.display='none';
+      // Nút Xóa record BBTN OCR
+      if (oc.includes('_bbtnMgmtDeleteRecord')) b.style.display='none';
     });
   }
   // Chạy định kỳ vì nút bulk được inject động
