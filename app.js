@@ -13195,6 +13195,9 @@ async function _authedFetch(url, options) {
           <td style="padding:8px">${statusBadge(r.match_status)}</td>
           <td style="padding:8px;text-align:center">${fileBadge}</td>
           <td style="padding:8px;font-size:10px;color:rgba(180,200,220,.5)">${createdStr}</td>
+          <td style="padding:8px;text-align:center">
+            <button onclick="window._bbtnMgmtDeleteRecord(${r.id})" style="padding:4px 9px;border:1px solid rgba(255,82,82,.35);background:rgba(255,82,82,.12);color:#ff5252;border-radius:5px;cursor:pointer;font-size:11px" title="Xóa record #${r.id}"><i class="fas fa-trash"></i></button>
+          </td>
         </tr>
       `;
     }).join('');
@@ -13221,6 +13224,7 @@ async function _authedFetch(url, options) {
                 <th style="padding:10px 8px;text-align:left;font-size:11px;color:#00c8ff;border-bottom:1px solid rgba(0,200,255,.2)">Trạng thái</th>
                 <th style="padding:10px 8px;text-align:center;font-size:11px;color:#00c8ff;border-bottom:1px solid rgba(0,200,255,.2)">File</th>
                 <th style="padding:10px 8px;text-align:left;font-size:11px;color:#00c8ff;border-bottom:1px solid rgba(0,200,255,.2)">Upload</th>
+                <th style="padding:10px 8px;text-align:center;font-size:11px;color:#ff5252;border-bottom:1px solid rgba(255,82,82,.2)">Xóa</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -17084,4 +17088,33 @@ async function _authedFetch(url, options) {
   };
 
   console.log('[V68] Per-file OCR fix + OCR thư mục đã chọn loaded');
+})();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V70: Xóa record trong Quản lý BBTN OCR
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function() {
+  if (window._bbtnV70) return;
+  window._bbtnV70 = true;
+
+  window._bbtnMgmtDeleteRecord = async function(id) {
+    if (!id) return;
+    if (!confirm('🗑️ Xóa record #' + id + '?\n\nKhông thể hoàn tác.')) return;
+    try {
+      const token = await _authGetToken();
+      const SB = _AUTH_SB_URL.replace(/\/$/, '');
+      const r = await fetch(SB + '/rest/v1/bbtn_records?id=eq.' + id, {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + token, 'apikey': _AUTH_SB_KEY, 'Prefer': 'return=minimal' }
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      if (window.showChangeNotif) showChangeNotif('success', '✓ Đã xóa', 'Record #' + id);
+      if (window._fetchBbtnMgmtData) window._fetchBbtnMgmtData();
+    } catch(e) {
+      console.error('[V70 delete]', e);
+      alert('Xóa lỗi: ' + e.message);
+    }
+  };
+
+  console.log('[V70] Nút xóa record BBTN OCR loaded');
 })();
