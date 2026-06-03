@@ -17176,3 +17176,105 @@ async function _authedFetch(url, options) {
 
   console.log('[V71] Phân quyền OCR/Xóa admin-only loaded. isAdmin=' + _isAdmin());
 })();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V72: Đối chiếu BBTN OCR ↔ CongTacThiNghiem (chuyển pending → matched/not_in_db)
+// Dùng RPC check_bbtn_match() đã có sẵn trong DB
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function() {
+  if (window._bbtnV72) return;
+  window._bbtnV72 = true;
+
+  function _isAdminV72(){ try { return _authGetSession()?.role === 'admin'; } catch(e){ return false; } }
+
+  // Match 1 record (gọi từ row action nếu cần sau)
+  window._bbtnMgmtMatchOne = async function(id) {
+    if (!_isAdminV72()) { if(window.showChangeNotif) showChangeNotif('error','⛔ Không có quyền',''); return; }
+    if (!id) return;
+    try {
+      const token = await _authGetToken();
+      const SB = _AUTH_SB_URL.replace(/\/$/,'');
+      const r = await fetch(SB+'/rest/v1/rpc/check_bbtn_match', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY},
+        body: JSON.stringify({ p_bbtn_id: id })
+      });
+      if (!r.ok) throw new Error('HTTP '+r.status);
+      const result = (await r.text()).replace(/"/g,'');
+      return result;
+    } catch(e){ console.error('[V72 match one]',e); return 'error'; }
+  };
+
+  // Match tất cả pending
+  window._bbtnMgmtMatchAll = async function() {
+    if (!_isAdminV72()) { alert('⛔ Chỉ admin'); return; }
+    const token = await _authGetToken();
+    const SB = _AUTH_SB_URL.replace(/\/$/,'');
+
+    // Lấy tất cả pending
+    const pr = await fetch(SB+'/rest/v1/bbtn_records?match_status=eq.pending&select=id&order=id', {
+      headers:{'Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY}
+    });
+    if (!pr.ok) { alert('Lỗi tải danh sách'); return; }
+    const list = await pr.json();
+    if (!list.length) { alert('Không có record pending'); return; }
+    if (!confirm('🔗 Đối chiếu '+list.length+' record pending với CongTacThiNghiem?\n\nƯớc tính: '+Math.ceil(list.length*0.3)+' giây')) return;
+
+    // Banner progress
+    const old = document.getElementById('v72Progress'); if(old) old.remove();
+    const div = document.createElement('div');
+    div.id = 'v72Progress';
+    div.style.cssText = 'position:fixed;top:0;left:0;right:0;background:linear-gradient(135deg,#0d1117,#161b22);border-bottom:3px solid #00c8ff;z-index:99999;padding:20px 30px;text-align:center;font-family:system-ui;box-shadow:0 8px 32px rgba(0,0,0,.8)';
+    div.innerHTML = '<div style="font-size:18px;font-weight:800;color:#00c8ff">🔗 Đang đối chiếu <span id="v72Cur">0</span>/'+list.length+'</div>'+
+      '<div style="background:rgba(255,255,255,.08);height:18px;border-radius:9px;overflow:hidden;margin:12px auto 8px;max-width:600px;position:relative">'+
+      '<div id="v72Bar" style="background:linear-gradient(90deg,#00c8ff,#0099cc);height:100%;width:0%;transition:width .3s"></div></div>'+
+      '<div style="font-size:11px;color:#aaa">✅ <span id="v72Ok" style="color:#00e676">0</span> khớp · ⚠️ <span id="v72Notdb" style="color:#ff5252">0</span> chưa khớp · 📝 <span id="v72Rev" style="color:#ffc107">0</span> cần xem · ❌ <span id="v72Err" style="color:#999">0</span> lỗi</div>';
+    document.body.appendChild(div);
+    document.body.style.paddingTop = '120px';
+
+    let ok=0, notdb=0, rev=0, err=0;
+    for (let i=0; i<list.length; i++) {
+      try {
+        const res = await window._bbtnMgmtMatchOne(list[i].id);
+        if (res === 'matched') ok++;
+        else if (res === 'not_in_db') notdb++;
+        else if (res === 'manual_review') rev++;
+        else err++;
+      } catch(e){ err++; }
+      const pct = ((i+1)/list.length*100);
+      document.getElementById('v72Cur').textContent = (i+1);
+      document.getElementById('v72Bar').style.width = pct+'%';
+      document.getElementById('v72Ok').textContent = ok;
+      document.getElementById('v72Notdb').textContent = notdb;
+      document.getElementById('v72Rev').textContent = rev;
+      document.getElementById('v72Err').textContent = err;
+    }
+
+    setTimeout(()=>{
+      document.getElementById('v72Progress')?.remove();
+      document.body.style.paddingTop = '';
+      alert('🔗 Hoàn tất đối chiếu '+list.length+' records!\n\n'+
+        '✅ Khớp DB: '+ok+'\n⚠️ Chưa khớp: '+notdb+'\n📝 Cần xem: '+rev+'\n❌ Lỗi: '+err);
+      if (window._fetchBbtnMgmtData) window._fetchBbtnMgmtData();
+    }, 800);
+  };
+
+  // Inject nút "Đối chiếu tất cả" vào toolbar Quản lý BBTN OCR (cạnh Refresh)
+  function _injectMatchBtn() {
+    if (!_isAdminV72()) return;
+    if (document.getElementById('v72MatchAllBtn')) return;
+    // Tìm nút Refresh (onclick có _fetchBbtnMgmtData)
+    const refreshBtn = [...document.querySelectorAll('button')].find(b => (b.getAttribute('onclick')||'').includes('_fetchBbtnMgmtData'));
+    if (!refreshBtn) return;
+    const btn = document.createElement('button');
+    btn.id = 'v72MatchAllBtn';
+    btn.onclick = function(){ window._bbtnMgmtMatchAll(); };
+    btn.style.cssText = 'padding:7px 14px;border-radius:7px;border:1px solid rgba(0,200,255,.4);background:linear-gradient(135deg,rgba(0,200,255,.15),rgba(0,150,200,.15));color:#00c8ff;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px';
+    btn.innerHTML = '<i class="fas fa-link"></i> Đối chiếu DB';
+    btn.title = 'Đối chiếu tất cả records pending với CongTacThiNghiem';
+    refreshBtn.parentNode.insertBefore(btn, refreshBtn);
+  }
+  setInterval(_injectMatchBtn, 1500);
+
+  console.log('[V72] Đối chiếu match_status loaded (admin only)');
+})();
