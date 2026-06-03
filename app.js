@@ -9049,10 +9049,13 @@ function _bbtnFilterClear() {
 }
 
 /** Toggle chọn 1 thư mục Trạm */
-function _bbtnToggleSelect(folderName) {
+function _bbtnToggleSelect(folderName, checked) {
   if (!folderName) return;
-  if (window._bbtnSelected.has(folderName)) window._bbtnSelected.delete(folderName);
-  else window._bbtnSelected.add(folderName);
+  if (!window._bbtnSelected) window._bbtnSelected = new Set();
+  // checked undefined → toggle; có giá trị → set theo đúng giá trị checkbox
+  if (checked === undefined) checked = !window._bbtnSelected.has(folderName);
+  if (checked) window._bbtnSelected.add(folderName);
+  else window._bbtnSelected.delete(folderName);
   _bbtnUpdateZipBtn();
 }
 
@@ -9503,14 +9506,13 @@ function _bbtnRenderItems(items, path, rootPath, depth) {
       const newPath = path.replace(/\/$/,'') + '/' + f.name;
       const safeName = f.name.replace(/'/g,"\\'");
       const isSelected = window._bbtnSelected && window._bbtnSelected.has(f.name);
-      const checkboxHtml = isTramLevel
-        ? `<div onclick="event.stopPropagation();_bbtnToggleSelect('${safeName}');this.querySelector('input').checked=!this.querySelector('input').checked;this.parentElement.style.borderColor=this.querySelector('input').checked?'#00e676':'rgba(255,215,64,.18)'" style="display:flex;align-items:center;cursor:pointer">
-            <input type="checkbox" ${isSelected?'checked':''} style="width:16px;height:16px;cursor:pointer;accent-color:#00e676">
-          </div>`
-        : '';
+      // V69: checkbox MỌI cấp folder, onchange đọc this.checked trực tiếp (sync với Set)
+      const checkboxHtml = `<label onclick="event.stopPropagation()" style="display:flex;align-items:center;cursor:pointer;padding:2px 4px">
+            <input type="checkbox" ${isSelected?'checked':''} onchange="_bbtnToggleSelect('${safeName}', this.checked); var card=this.closest('[data-bbtn-fcard]'); if(card){card.style.borderColor=this.checked?'#00e676':'rgba(255,215,64,.18)'; card.style.background=this.checked?'rgba(0,230,118,.06)':'rgba(255,215,64,.04)';}" style="width:18px;height:18px;cursor:pointer;accent-color:#00e676">
+          </label>`;
       const borderCol = isSelected ? '#00e676' : 'rgba(255,215,64,.18)';
       const bgCol = isSelected ? 'rgba(0,230,118,.06)' : 'rgba(255,215,64,.04)';
-      html += `<div style="padding:14px 16px;border-radius:9px;border:1px solid ${borderCol};background:${bgCol};transition:all .15s;display:flex;align-items:center;gap:10px">
+      html += `<div data-bbtn-fcard style="padding:14px 16px;border-radius:9px;border:1px solid ${borderCol};background:${bgCol};transition:all .15s;display:flex;align-items:center;gap:10px">
         ${checkboxHtml}
         <div onclick="_bbtnLoadPath('${newPath.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:10px;flex:1;cursor:pointer;min-width:0"
           onmouseover="this.parentElement.style.borderColor='${isSelected?'#00e676':'rgba(255,215,64,.5)'}'"
