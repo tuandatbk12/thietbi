@@ -17118,3 +17118,59 @@ async function _authedFetch(url, options) {
 
   console.log('[V70] Nút xóa record BBTN OCR loaded');
 })();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V71: Phân quyền - OCR & Xóa CHỈ admin (guard + ẩn nút)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function() {
+  if (window._bbtnV71) return;
+  window._bbtnV71 = true;
+
+  function _isAdmin() {
+    try { return _authGetSession()?.role === 'admin'; } catch(e){ return false; }
+  }
+  function _denyMsg() {
+    if (window.showChangeNotif) showChangeNotif('error','⛔ Không có quyền','Chỉ admin được dùng chức năng này');
+    else alert('⛔ Chỉ admin được dùng chức năng này');
+  }
+
+  // Wrap mỗi hàm: giữ bản gốc, thêm guard admin
+  function _guard(fnName) {
+    const orig = window[fnName];
+    if (typeof orig !== 'function') return;
+    window[fnName] = function() {
+      if (!_isAdmin()) { _denyMsg(); return; }
+      return orig.apply(this, arguments);
+    };
+  }
+
+  // Guard tất cả hàm ghi/xóa
+  _guard('_bbtnOcrFromNas');           // OCR per-file
+  _guard('_bbtnBulkOcrFolder');        // OCR tất cả PDF
+  _guard('_bbtnOcrSelectedFolders');   // OCR đã chọn
+  _guard('_bbtnSaveNasOcrResultV68');  // Lưu OCR result
+  _guard('_bbtnMgmtDeleteRecord');     // Xóa record
+  _guard('_bbtnSaveNasOcrResult');     // Lưu (bản cũ nếu còn)
+
+  // Ẩn nút bulk OCR / OCR đã chọn nếu không admin (CSS)
+  function _hideButtonsForNonAdmin() {
+    if (_isAdmin()) return;
+    const css = document.getElementById('v71HideOcr') || document.createElement('style');
+    css.id = 'v71HideOcr';
+    css.textContent = '#_bbtnOcrSelBtn{display:none !important}';
+    if (!css.parentNode) document.head.appendChild(css);
+    // Ẩn nút "OCR tất cả PDF" (v60 inject) + nút OCR per-file — tìm theo text/icon
+    document.querySelectorAll('button').forEach(b=>{
+      const txt = (b.textContent||'').trim();
+      const oc = b.getAttribute('onclick')||'';
+      if (txt.includes('OCR tất cả PDF')) b.style.display='none';
+      // Nút OCR per-file: onclick gọi _bbtnOcrFromNas
+      if (oc.includes('_bbtnOcrFromNas')) b.style.display='none';
+    });
+  }
+  // Chạy định kỳ vì nút bulk được inject động
+  setInterval(_hideButtonsForNonAdmin, 1500);
+  _hideButtonsForNonAdmin();
+
+  console.log('[V71] Phân quyền OCR/Xóa admin-only loaded. isAdmin=' + _isAdmin());
+})();
