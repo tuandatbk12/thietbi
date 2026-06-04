@@ -17787,9 +17787,21 @@ async function _authedFetch(url, options) {
     if (widget) widget.title = detail ? text + ' — ' + detail : text + ' (click để check)';
   }
 
+  async function _waitSbReady(maxMs) {
+    const t0 = Date.now();
+    while (Date.now() - t0 < (maxMs || 15000)) {
+      if (window._AUTH_SB_URL && window._AUTH_SB_KEY) return true;
+      await new Promise(r => setTimeout(r, 300));
+    }
+    return false;
+  }
+
   async function checkNow() {
     setStatus('checking', 'NAS: Đang check...', '');
     try {
+      // V84b: đợi Supabase init (app load không đồng bộ)
+      const ready = await _waitSbReady(15000);
+      if (!ready) { setStatus('unknown', 'NAS: ?', 'Chưa init Supabase'); return; }
       const SB = (window._AUTH_SB_URL || '').replace(/\/$/, '');
       const sbKey = window._AUTH_SB_KEY || '';
       if (!SB || !sbKey) { setStatus('unknown', 'NAS: ?', 'Chưa init Supabase'); return; }
