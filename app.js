@@ -16760,6 +16760,26 @@ async function _authedFetch(url, options) {
     pdfs.length = 0; _v77filtered.forEach(f => pdfs.push(f));
     if (_v77skip > 0 && window.showChangeNotif) showChangeNotif("info","🔍 Lọc file","Giữ " + pdfs.length + " file -TN-, bỏ " + _v77skip + " file KD/GCNKD");
 
+    // V80b: lọc file đã OCR (tránh duplicate)
+    if (window._v80CheckDupeBulk) {
+      const _v80Paths = pdfs.map(f => f.path);
+      const _v80Existing = await window._v80CheckDupeBulk(_v80Paths);
+      const _v80NewOnly = pdfs.filter(f => !_v80Existing.has(f.path));
+      const _v80SkipDup = pdfs.length - _v80NewOnly.length;
+      if (_v80NewOnly.length === 0) {
+        alert("Tất cả " + pdfs.length + " file -TN- đã OCR trước đó. Không có file mới để OCR.");
+        return;
+      }
+      if (_v80SkipDup > 0) {
+        const _v80Ask = confirm("📊 " + pdfs.length + " file -TN- tìm thấy:\n   ✅ " + _v80NewOnly.length + " file MỚI (chưa OCR)\n   ⏭️ " + _v80SkipDup + " file ĐÃ OCR trước (SKIP)\n\nOK = OCR chỉ file mới (khuyến nghị)\nHủy = OCR TẤT CẢ (tạo duplicate)");
+        if (_v80Ask) {
+          pdfs.length = 0; _v80NewOnly.forEach(f => pdfs.push(f));
+          console.log("[V80b] Bulk: chỉ OCR " + pdfs.length + " file mới, skip " + _v80SkipDup);
+        } else {
+          console.log("[V80b] Bulk: user chọn OCR ALL " + pdfs.length + " file (kể cả " + _v80SkipDup + " đã có)");
+        }
+      }
+    }
     const totalMB = pdfs.reduce((s,f)=>s+(f.size||0),0)/1024/1024;
     const oversized = pdfs.filter(f=>(f.size||0)>50*1024*1024);
     const estMin = Math.round(pdfs.length*25/60);
