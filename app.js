@@ -17752,3 +17752,147 @@ async function _authedFetch(url, options) {
 
   console.log('[V83] Tìm trùng lặp loaded (admin only)');
 })();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V86: Widget cảnh báo BBTN chưa xử lý
+// - Banner gọn đầu dashboard (ẩn nếu count = 0)
+// - Group theo Trạm + Ngày KĐ trong modal chi tiết
+// - 3 status: not_in_db, manual_review, pending
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function() {
+  if (window._v86Alert) return;
+  window._v86Alert = true;
+
+  const STATUS_LABEL = {
+    not_in_db: { label: 'Chưa khớp', icon: '⚠️', color: '#ff9100' },
+    manual_review: { label: 'Cần xem', icon: '📝', color: '#ffc107' },
+    pending: { label: 'Pending', icon: '⏳', color: '#888' }
+  };
+
+  function _esc(s) { return String(s||'').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+
+  function createBanner() {
+    if (document.getElementById('v86Banner')) return;
+    const b = document.createElement('div');
+    b.id = 'v86Banner';
+    b.style.cssText = 'display:none;position:relative;margin:8px 14px 0;padding:10px 16px;background:linear-gradient(135deg,rgba(255,145,0,.15),rgba(255,193,7,.1));border:1px solid rgba(255,145,0,.4);border-radius:8px;color:#fff;font-family:system-ui;font-size:12px;cursor:pointer;display:none;align-items:center;gap:14px';
+    b.innerHTML = '<span style="font-size:18px">⚠️</span>' +
+      '<div style="flex:1"><div id="v86BannerTitle" style="font-weight:700;color:#ff9100">— BBTN cần xử lý</div>' +
+      '<div id="v86BannerDetail" style="font-size:11px;color:rgba(255,255,255,.7);margin-top:2px"></div></div>' +
+      '<span style="color:#ff9100;font-weight:700">Chi tiết →</span>';
+    b.onclick = openModal;
+    // Inject vào đầu body hoặc đầu main content
+    const main = document.querySelector('main, #app, .container') || document.body;
+    if (main.firstChild) main.insertBefore(b, main.firstChild);
+    else main.appendChild(b);
+  }
+
+  async function refresh() {
+    try {
+      const token = await _authGetToken();
+      const SB = _AUTH_SB_URL.replace(/\/$/, '');
+      // Query records có status cần xử lý
+      const r = await fetch(SB + '/rest/v1/bbtn_records?match_status=in.(not_in_db,manual_review,pending)&select=match_status&limit=10000', {
+        headers: { 'Authorization': 'Bearer ' + token, 'apikey': _AUTH_SB_KEY }
+      });
+      if (!r.ok) return;
+      const data = await r.json();
+      const counts = { not_in_db: 0, manual_review: 0, pending: 0 };
+      data.forEach(d => { if (counts[d.match_status] !== undefined) counts[d.match_status]++; });
+      const total = data.length;
+      const b = document.getElementById('v86Banner');
+      if (!b) return;
+      if (total === 0) {
+        b.style.display = 'none';
+        return;
+      }
+      b.style.display = 'flex';
+      document.getElementById('v86BannerTitle').textContent = total + ' BBTN cần xử lý';
+      const parts = [];
+      if (counts.not_in_db) parts.push('⚠️ ' + counts.not_in_db + ' chưa khớp');
+      if (counts.manual_review) parts.push('📝 ' + counts.manual_review + ' cần xem');
+      if (counts.pending) parts.push('⏳ ' + counts.pending + ' pending');
+      document.getElementById('v86BannerDetail').textContent = parts.join(' · ');
+    } catch(e) { console.warn('[V86 refresh]', e); }
+  }
+
+  async function openModal() {
+    const token = await _authGetToken();
+    const SB = _AUTH_SB_URL.replace(/\/$/, '');
+    const r = await fetch(SB + '/rest/v1/bbtn_records?match_status=in.(not_in_db,manual_review,pending)&select=id,tram,ten_thiet_bi,kieu,so_che_tao,ngay_kiem_dinh,match_status,file_url,file_name&order=tram.asc,ngay_kiem_dinh.desc&limit=10000', {
+      headers: { 'Authorization': 'Bearer ' + token, 'apikey': _AUTH_SB_KEY }
+    });
+    if (!r.ok) { alert('Lỗi tải data'); return; }
+    const data = await r.json();
+    if (!data.length) { alert('✓ Không có BBTN nào cần xử lý'); return; }
+
+    // Group theo Tram + Ngày
+    const groups = new Map();
+    for (const rec of data) {
+      const dateStr = rec.ngay_kiem_dinh ? new Date(rec.ngay_kiem_dinh).toLocaleDateString('vi-VN') : '(chưa rõ ngày)';
+      const key = (rec.tram || '(không trạm)') + ' — ' + dateStr;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(rec);
+    }
+
+    // Render
+    document.getElementById('v86Modal')?.remove();
+    const groupsHtml = [...groups.entries()].map(([key, recs]) => {
+      const rows = recs.map(rec => {
+        const s = STATUS_LABEL[rec.match_status] || STATUS_LABEL.pending;
+        const fname = rec.file_name || (rec.file_url||'').split('/').pop() || '';
+        return '<tr style="border-bottom:1px solid rgba(255,255,255,.04)">' +
+          '<td style="padding:6px 10px;font-size:11px;color:#00e676;font-weight:600">' + _esc(rec.ten_thiet_bi || '-') + '</td>' +
+          '<td style="padding:6px 10px;font-size:11px;color:#ccd">' + _esc(rec.kieu || '-') + '</td>' +
+          '<td style="padding:6px 10px;font-size:10px;color:#999;font-family:monospace">' + _esc(rec.so_che_tao || '-') + '</td>' +
+          '<td style="padding:6px 10px;text-align:center"><span style="background:' + s.color + '22;color:' + s.color + ';padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700">' + s.icon + ' ' + s.label + '</span></td>' +
+          '<td style="padding:6px 10px;text-align:center">' +
+            (rec.file_url ? '<a href="javascript:void(0)" onclick="window._bbtnMgmtOpenFile&&window._bbtnMgmtOpenFile(\'' + _esc(rec.file_url) + '\')" title="Xem file" style="color:#00c8ff;text-decoration:none">📄</a>' : '<span style="opacity:.3">—</span>') +
+          '</td>' +
+          '</tr>';
+      }).join('');
+      return '<div style="margin-bottom:14px">' +
+        '<div style="padding:8px 14px;background:rgba(0,200,255,.1);border-left:3px solid #00c8ff;font-weight:700;color:#00c8ff;font-size:12px">📍 ' + _esc(key) + ' <span style="opacity:.6;font-weight:400">(' + recs.length + ' BBTN)</span></div>' +
+        '<table style="width:100%;border-collapse:collapse;font-size:11px;background:rgba(255,255,255,.02)"><tbody>' + rows + '</tbody></table>' +
+        '</div>';
+    }).join('');
+
+    const html = '<div id="v86Modal" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px">' +
+      '<div style="background:#161b22;border:1px solid rgba(255,255,255,.1);border-radius:10px;max-width:1100px;width:100%;max-height:90vh;overflow:auto;padding:24px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:12px">' +
+      '<div><div style="font-weight:700;font-size:16px;color:#fff">⚠️ BBTN CẦN XỬ LÝ <span style="color:#ff9100">(' + data.length + ' records, ' + groups.size + ' nhóm Trạm-Ngày)</span></div>' +
+      '<div style="font-size:11px;color:#999;margin-top:4px">Group theo Trạm + Ngày KĐ — phát hiện sai lệch tập trung tại đâu</div></div>' +
+      '<button onclick="document.getElementById(\'v86Modal\').remove()" style="padding:6px 14px;background:transparent;color:#999;border:1px solid #444;border-radius:6px;cursor:pointer">✕ Đóng</button>' +
+      '</div>' +
+      '<div style="max-height:65vh;overflow:auto">' + groupsHtml + '</div>' +
+      '<div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end">' +
+      '<button onclick="document.getElementById(\'v86Modal\').remove();if(window._showBbtnMgmt)window._showBbtnMgmt()" style="padding:9px 18px;background:linear-gradient(135deg,#00c8ff,#0080cc);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700">Mở Quản lý BBTN OCR →</button>' +
+      '</div></div></div>';
+    document.body.insertAdjacentHTML('beforeend', html);
+  }
+
+  // Đợi Supabase init xong rồi setup
+  async function init() {
+    const t0 = Date.now();
+    while (Date.now() - t0 < 15000) {
+      if (window._AUTH_SB_URL && window._AUTH_SB_KEY) break;
+      await new Promise(r => setTimeout(r, 300));
+    }
+    if (!window._AUTH_SB_URL) { console.warn('[V86] Supabase chưa init'); return; }
+    createBanner();
+    refresh();
+    setInterval(refresh, 60000); // refresh mỗi phút
+  }
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  // Expose để gọi từ ngoài
+  window._v86Refresh = refresh;
+  window._v86OpenModal = openModal;
+
+  console.log('[V86] BBTN Alert widget loaded');
+})();
