@@ -1,8 +1,8 @@
--- 
+-- ════════════════════════════════════════════════════════════════
 -- V79: Auto-match trigger
 -- Tự động gọi check_bbtn_match() sau khi insert record mới
---  Không cần bấm "Đối chiếu DB" thủ công
--- 
+-- → Không cần bấm "Đối chiếu DB" thủ công
+-- ════════════════════════════════════════════════════════════════
 
 CREATE OR REPLACE FUNCTION public.tr_auto_check_bbtn_match()
 RETURNS trigger
@@ -11,7 +11,7 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 BEGIN
-  -- Gọi check_bbtn_match. Nếu lỗi  log warning nhưng không fail insert
+  -- Gọi check_bbtn_match. Nếu lỗi → log warning nhưng không fail insert
   BEGIN
     PERFORM public.check_bbtn_match(NEW.id);
   EXCEPTION WHEN OTHERS THEN
