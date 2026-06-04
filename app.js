@@ -17627,3 +17627,128 @@ async function _authedFetch(url, options) {
 
   console.log('[V82] Bulk Delete loaded (admin only)');
 })();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V83: Tìm trùng lặp - phát hiện duplicate trong DB, cho user xóa
+// Group theo: (file_url + so_che_tao + ten_thiet_bi)
+// Trong nhóm: giữ id thấp nhất (cũ nhất), xóa các id cao hơn
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function() {
+  if (window._bbtnV83) return;
+  window._bbtnV83 = true;
+
+  function _isAdmin(){ try { return _authGetSession()?.role === 'admin'; } catch(e){ return false; } }
+
+  // Tìm + show modal duplicate
+  window._v83FindDuplicates = async function() {
+    if (!_isAdmin()) { alert('⛔ Chỉ admin'); return; }
+    const token = await _authGetToken();
+    const SB = _AUTH_SB_URL.replace(/\/$/, '');
+
+    if (window.showChangeNotif) showChangeNotif('info', '🔍 Đang quét duplicate...', '');
+
+    // Lấy tất cả records (chỉ field cần thiết)
+    const r = await fetch(SB + '/rest/v1/bbtn_records?select=id,file_url,so_che_tao,ten_thiet_bi,tram,ngay_kiem_dinh,created_at&order=id.asc&limit=10000', {
+      headers: { 'Authorization': 'Bearer ' + token, 'apikey': _AUTH_SB_KEY }
+    });
+    if (!r.ok) { alert('Lỗi tải records'); return; }
+    const all = await r.json();
+
+    // Group: key = file_url|so_che_tao|ten_thiet_bi
+    const groups = new Map();
+    for (const rec of all) {
+      const key = (rec.file_url || '') + '|' + (rec.so_che_tao || 'NULL') + '|' + (rec.ten_thiet_bi || '');
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(rec);
+    }
+
+    // Lọc nhóm có ≥2 records
+    const dupes = [...groups.entries()].filter(([k, v]) => v.length > 1);
+    if (!dupes.length) {
+      alert('✓ Không tìm thấy duplicate nào trong DB!');
+      return;
+    }
+
+    const totalDupRecords = dupes.reduce((s, [, v]) => s + (v.length - 1), 0);
+    window._v83Dupes = dupes;
+
+    // Render modal
+    document.getElementById('v83Modal')?.remove();
+    const rows = dupes.map(([key, recs], gi) => {
+      const keepId = recs[0].id; // giữ id thấp nhất
+      const delIds = recs.slice(1).map(r => r.id);
+      const fileName = (recs[0].file_url || '').split('/').pop() || '(no file)';
+      return '<tr style="border-bottom:1px solid rgba(255,255,255,.05)">' +
+        '<td style="padding:8px;color:#999;font-size:11px">' + (gi + 1) + '</td>' +
+        '<td style="padding:8px;font-size:11px;color:#eef">' + (recs[0].ten_thiet_bi || '-') + '</td>' +
+        '<td style="padding:8px;font-size:11px;color:#ccd">' + (recs[0].tram || '-') + '</td>' +
+        '<td style="padding:8px;font-family:monospace;font-size:10px;color:#aaa">' + (recs[0].so_che_tao || '<null>') + '</td>' +
+        '<td style="padding:8px;font-size:10px;color:#888">' + fileName + '</td>' +
+        '<td style="padding:8px;text-align:center;font-weight:700;color:#ff5252">' + recs.length + '</td>' +
+        '<td style="padding:8px;font-size:10px"><span style="color:#00e676">Giữ #' + keepId + '</span> · <span style="color:#ff5252">Xóa #' + delIds.join(',#') + '</span></td>' +
+        '</tr>';
+    }).join('');
+
+    const html = '<div id="v83Modal" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px">' +
+      '<div style="background:#161b22;border:1px solid rgba(255,255,255,.1);border-radius:10px;max-width:1200px;width:100%;max-height:90vh;overflow:auto;padding:24px">' +
+      '<div style="display:flex;justify-content:space-between;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:12px">' +
+      '<div><div style="font-weight:700;font-size:15px;color:#fff"><span style="background:rgba(255,82,82,.2);color:#ff5252;padding:3px 8px;border-radius:4px;font-size:11px">🔍 TRÙNG LẶP</span> Phát hiện ' + dupes.length + ' nhóm</div>' +
+      '<div style="font-size:11px;color:#999;margin-top:4px">' + totalDupRecords + ' records dư cần xóa · ' + all.length + ' records tổng</div></div>' +
+      '<button onclick="document.getElementById(\'v83Modal\').remove()" style="padding:6px 12px;background:transparent;color:#999;border:1px solid #444;border-radius:6px;cursor:pointer">✕ Đóng</button></div>' +
+      '<div style="background:rgba(255,193,7,.08);border:1px solid rgba(255,193,7,.2);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:11px;color:#ffc107">⚠️ Mỗi nhóm: GIỮ record có id NHỎ NHẤT (cũ nhất), XÓA các records còn lại. Nếu sai (vd CSV 3 pha thật) hãy đóng modal.</div>' +
+      '<div style="max-height:55vh;overflow:auto;border:1px solid rgba(255,255,255,.06);border-radius:6px;margin-bottom:14px"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:rgba(255,255,255,.06);position:sticky;top:0">' +
+      '<th style="padding:8px;text-align:left">#</th><th style="padding:8px;text-align:left">Tên TB</th><th style="padding:8px;text-align:left">Trạm</th><th style="padding:8px;text-align:left">Serial</th><th style="padding:8px;text-align:left">File</th><th style="padding:8px;text-align:center">Số bản</th><th style="padding:8px;text-align:left">Hành động</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div style="display:flex;gap:10px;justify-content:flex-end">' +
+      '<button onclick="document.getElementById(\'v83Modal\').remove()" style="padding:9px 18px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;cursor:pointer">Hủy</button>' +
+      '<button onclick="window._v83DeleteDuplicates()" style="padding:9px 18px;background:linear-gradient(135deg,#ff5252,#d32f2f);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700">🗑️ Xóa ' + totalDupRecords + ' records dư</button>' +
+      '</div></div></div>';
+    document.body.insertAdjacentHTML('beforeend', html);
+  };
+
+  // Xóa duplicates
+  window._v83DeleteDuplicates = async function() {
+    if (!_isAdmin()) return;
+    const dupes = window._v83Dupes;
+    if (!dupes) return;
+    const toDelete = [];
+    for (const [, recs] of dupes) {
+      // Giữ recs[0] (id nhỏ nhất), xóa các bản khác
+      for (let i = 1; i < recs.length; i++) toDelete.push(recs[i].id);
+    }
+    if (!confirm('🗑️ XÓA ' + toDelete.length + ' records duplicate?\n\nKhông thể hoàn tác. Đảm bảo bạn đã review danh sách.')) return;
+
+    const token = await _authGetToken();
+    const SB = _AUTH_SB_URL.replace(/\/$/, '');
+    let ok = 0, fail = 0;
+    for (const id of toDelete) {
+      try {
+        const r = await fetch(SB + '/rest/v1/bbtn_records?id=eq.' + id, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + token, 'apikey': _AUTH_SB_KEY, 'Prefer': 'return=minimal' }
+        });
+        if (r.ok) ok++; else fail++;
+      } catch(e) { fail++; }
+    }
+    document.getElementById('v83Modal')?.remove();
+    delete window._v83Dupes;
+    alert('✓ Đã xóa ' + ok + ' / ' + toDelete.length + ' records duplicate' + (fail ? ' (' + fail + ' lỗi)' : ''));
+    if (window._fetchBbtnMgmtData) window._fetchBbtnMgmtData();
+  };
+
+  // Inject nút "Tìm trùng lặp" vào toolbar (cạnh Đối chiếu DB)
+  function _injectFindDupBtn() {
+    if (!_isAdmin()) return;
+    if (document.getElementById('v83FindBtn')) return;
+    const refreshBtn = [...document.querySelectorAll('button')].find(b => (b.getAttribute('onclick')||'').includes('_fetchBbtnMgmtData'));
+    if (!refreshBtn) return;
+    const btn = document.createElement('button');
+    btn.id = 'v83FindBtn';
+    btn.onclick = function() { window._v83FindDuplicates(); };
+    btn.style.cssText = 'padding:7px 14px;border-radius:7px;border:1px solid rgba(255,145,0,.4);background:linear-gradient(135deg,rgba(255,145,0,.15),rgba(200,120,0,.15));color:#ff9100;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px';
+    btn.innerHTML = '<i class="fas fa-search"></i> Tìm trùng lặp';
+    refreshBtn.parentNode.insertBefore(btn, refreshBtn);
+  }
+  setInterval(_injectFindDupBtn, 1500);
+
+  console.log('[V83] Tìm trùng lặp loaded (admin only)');
+})();
