@@ -12962,6 +12962,8 @@ async function _authedFetch(url, options) {
       ngay_to: '',
       match_status: '',
       search: '',
+      nam_sx: '',
+      hang_sx: '',
     },
     data: [],
     total: 0,
@@ -12995,9 +12997,11 @@ async function _authedFetch(url, options) {
     if (f.ngay_from) params.push(`ngay_kiem_dinh=gte.${f.ngay_from}`);
     if (f.ngay_to) params.push(`ngay_kiem_dinh=lte.${f.ngay_to}`);
     if (f.match_status) params.push(`match_status=eq.${f.match_status}`);
+    if (f.nam_sx) params.push(`nam_san_xuat=eq.${encodeURIComponent(f.nam_sx)}`);
+    if (f.hang_sx) params.push(`hang_san_xuat=eq.${encodeURIComponent(f.hang_sx)}`);
     if (f.search) {
       const s = encodeURIComponent(f.search);
-      params.push(`or=(ten_thiet_bi.ilike.*${s}*,so_che_tao.ilike.*${s}*,kieu.ilike.*${s}*)`);
+      params.push(`or=(ten_thiet_bi.ilike.*${s}*,so_che_tao.ilike.*${s}*,kieu.ilike.*${s}*,file_name.ilike.*${s}*,hang_san_xuat.ilike.*${s}*)`);
     }
     return `${SB_URL}/rest/v1/bbtn_records?${params.join('&')}`;
   }
@@ -17887,4 +17891,93 @@ async function _authedFetch(url, options) {
   window._v86OpenModal = openModal;
 
   console.log('[V86] BBTN Alert widget loaded');
+})();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V87: Search Advanced - thêm filter Năm SX + Hãng SX dropdown
+// Auto-populate options từ DB distinct values, cache 5 phút
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function() {
+  if (window._v87Search) return;
+  window._v87Search = true;
+
+  let _cache = { years: null, hangs: null, ts: 0 };
+  const CACHE_MS = 5 * 60 * 1000;
+
+  async function loadDistinct() {
+    if (_cache.years && (Date.now() - _cache.ts) < CACHE_MS) return _cache;
+    try {
+      const token = await _authGetToken();
+      const SB = _AUTH_SB_URL.replace(/\/$/, '');
+      const r = await fetch(SB + '/rest/v1/bbtn_records?select=nam_san_xuat,hang_san_xuat&limit=10000', {
+        headers: { 'Authorization': 'Bearer ' + token, 'apikey': _AUTH_SB_KEY }
+      });
+      if (!r.ok) return _cache;
+      const data = await r.json();
+      const years = new Set();
+      const hangs = new Set();
+      data.forEach(d => {
+        if (d.nam_san_xuat) years.add(String(d.nam_san_xuat).trim());
+        if (d.hang_san_xuat) hangs.add(String(d.hang_san_xuat).trim());
+      });
+      _cache = {
+        years: [...years].sort((a,b) => parseInt(b) - parseInt(a)),
+        hangs: [...hangs].sort((a,b) => a.localeCompare(b)),
+        ts: Date.now()
+      };
+    } catch(e) { console.warn('[V87 distinct]', e); }
+    return _cache;
+  }
+
+  function injectDropdowns() {
+    const statusEl = document.getElementById('bbtnFilterStatus');
+    if (!statusEl) return;
+    const filterRow = statusEl.closest('div').parentElement;
+    if (!filterRow) return;
+    if (filterRow.querySelector('#bbtnFilterNamSx')) return; // đã có
+
+    const f = (window._bbtnMgmtState && window._bbtnMgmtState.filters) || {};
+
+    // Render skeleton trước, sau đó load options async
+    const namBox = document.createElement('div');
+    namBox.innerHTML = '<label style="display:block;font-size:10px;color:rgba(180,200,220,.6);text-transform:uppercase;margin-bottom:3px">Năm SX</label>' +
+      '<select id="bbtnFilterNamSx" onchange="_bbtnMgmtSetFilter && _bbtnMgmtSetFilter(\'nam_sx\', this.value)" style="width:100%;padding:6px 10px;border-radius:5px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#eef;font-size:12px;box-sizing:border-box"><option value="">— Tất cả —</option></select>';
+    const hangBox = document.createElement('div');
+    hangBox.innerHTML = '<label style="display:block;font-size:10px;color:rgba(180,200,220,.6);text-transform:uppercase;margin-bottom:3px">Hãng SX</label>' +
+      '<select id="bbtnFilterHangSx" onchange="_bbtnMgmtSetFilter && _bbtnMgmtSetFilter(\'hang_sx\', this.value)" style="width:100%;padding:6px 10px;border-radius:5px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#eef;font-size:12px;box-sizing:border-box"><option value="">— Tất cả —</option></select>';
+
+    // Chèn sau dropdown Status
+    filterRow.insertBefore(namBox, statusEl.closest('div').nextSibling);
+    filterRow.insertBefore(hangBox, namBox.nextSibling);
+
+    // Populate options async
+    loadDistinct().then(cache => {
+      const namSel = document.getElementById('bbtnFilterNamSx');
+      const hangSel = document.getElementById('bbtnFilterHangSx');
+      if (namSel && cache.years) {
+        for (const y of cache.years) {
+          const o = document.createElement('option');
+          o.value = y;
+          o.textContent = y;
+          if (f.nam_sx === y) o.selected = true;
+          namSel.appendChild(o);
+        }
+      }
+      if (hangSel && cache.hangs) {
+        for (const h of cache.hangs) {
+          const o = document.createElement('option');
+          o.value = h;
+          o.textContent = h.length > 25 ? h.substring(0,25)+'…' : h;
+          o.title = h;
+          if (f.hang_sx === h) o.selected = true;
+          hangSel.appendChild(o);
+        }
+      }
+    });
+  }
+
+  // Re-inject mỗi 2s phòng UI re-render
+  setInterval(injectDropdowns, 2000);
+
+  console.log('[V87] Search advanced (Năm SX + Hãng SX) loaded');
 })();
