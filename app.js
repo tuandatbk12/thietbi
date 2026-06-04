@@ -3974,6 +3974,10 @@ function _lytShowDetailPanel(title, color, totalLine, items, mbaSection) {
     </div>
     <div id="hm-detail-body" style="overflow-y:auto;flex:1;min-height:0;overscroll-behavior:contain">${bodyHtml}</div>`;
 
+  // V81: Lưu state cho Export Excel
+  window._lytPanelLastItems = items;
+  window._lytPanelLastMba = mbaSection;
+  window._lytPanelLastTitle = title;
   p.classList.add('open');
   _hmOpenPanel(p);
 }
