@@ -3964,7 +3964,7 @@ function _lytShowDetailPanel(title, color, totalLine, items, mbaSection) {
     <div class="hm-resize-grip" id="hm-resize-grip"></div>
     <div class="hm-detail-hd" style="border-left:3px solid ${color||'var(--accent)'}">
       <span style="color:rgba(255,255,255,.97)">${title}</span>
-      <button onclick="event.stopPropagation();window._exportLytPanelExcel&&window._exportLytPanelExcel(${JSON.stringify(title)}, window._lytPanelLastItems||[], window._lytPanelLastMba||null)" title="Xuất Excel" style="margin-right:8px;padding:4px 10px;border-radius:5px;border:1px solid rgba(0,230,118,.4);background:rgba(0,230,118,.1);color:#00e676;font-size:11px;font-weight:700;cursor:pointer">📊 Excel</button>
+      <button onclick="event.stopPropagation();window._exportLytPanelExcel&&window._exportLytPanelExcel()" title="Xuất Excel" style="margin-right:8px;padding:4px 10px;border-radius:5px;border:1px solid rgba(0,230,118,.4);background:rgba(0,230,118,.1);color:#00e676;font-size:11px;font-weight:700;cursor:pointer">📊 Excel</button>
       <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span>
     </div>
     <div style="padding:6px 16px 6px;font-size:9px;color:rgba(180,210,230,.7);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">${totalLine||''}</div>
