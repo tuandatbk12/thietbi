@@ -17293,3 +17293,47 @@ async function _authedFetch(url, options) {
 
   console.log('[V72] Đối chiếu match_status loaded (admin only)');
 })();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V78: Override _bbtnMgmtOpenFile - hỗ trợ XEM cả file NAS (path) và Storage (URL)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function() {
+  if (window._bbtnV78) return;
+  window._bbtnV78 = true;
+
+  window._bbtnMgmtOpenFile = async function(filePath) {
+    if (!filePath) { alert('Không có file'); return; }
+    if (filePath.startsWith('pending://')) { alert('File chưa upload xong'); return; }
+    try {
+      // CASE 1: Supabase Storage URL - mở thẳng
+      if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+        window.open(filePath, '_blank');
+        return;
+      }
+      // CASE 2: Path NAS - tải qua Edge Function → blob URL
+      const token = await _authGetToken();
+      const SB = _AUTH_SB_URL.replace(/\/$/, '');
+      const fileName = filePath.split('/').pop();
+      if (window.showChangeNotif) showChangeNotif('info', '📥 Đang tải file...', fileName);
+      const r = await fetch(SB + '/functions/v1/bbtn-download?path=' + encodeURIComponent(filePath), {
+        headers: { 'Authorization': 'Bearer ' + token, 'apikey': _AUTH_SB_KEY }
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, '_blank');
+      if (!win) {
+        alert('⛔ Trình duyệt chặn popup.\nCho phép popup cho site này rồi thử lại.');
+        URL.revokeObjectURL(url);
+        return;
+      }
+      setTimeout(function() { URL.revokeObjectURL(url); }, 300000);
+      if (window.showChangeNotif) showChangeNotif('success', '✓ Đã mở', fileName);
+    } catch(e) {
+      console.error('[V78 OpenFile]', e);
+      alert('Lỗi mở file: ' + e.message);
+    }
+  };
+
+  console.log('[V78] _bbtnMgmtOpenFile override (NAS + Storage)');
+})();
