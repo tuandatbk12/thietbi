@@ -17772,20 +17772,23 @@ async function _authedFetch(url, options) {
   function _esc(s) { return String(s||'').replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
 
   function createBanner() {
-    if (document.getElementById('v86Banner')) return;
-    const b = document.createElement('div');
-    b.id = 'v86Banner';
-    b.style.cssText = 'display:none;position:relative;margin:8px 14px 0;padding:10px 16px;background:linear-gradient(135deg,rgba(255,145,0,.15),rgba(255,193,7,.1));border:1px solid rgba(255,145,0,.4);border-radius:8px;color:#fff;font-family:system-ui;font-size:12px;cursor:pointer;display:none;align-items:center;gap:14px';
-    b.innerHTML = '<span style="font-size:18px">⚠️</span>' +
-      '<div style="flex:1"><div id="v86BannerTitle" style="font-weight:700;color:#ff9100">— BBTN cần xử lý</div>' +
-      '<div id="v86BannerDetail" style="font-size:11px;color:rgba(255,255,255,.7);margin-top:2px"></div></div>' +
-      '<span style="color:#ff9100;font-weight:700">Chi tiết →</span>';
-    b.onclick = openModal;
-    // Inject vào đầu body hoặc đầu main content
-    const main = document.querySelector('main, #app, .container') || document.body;
-    if (main.firstChild) main.insertBefore(b, main.firstChild);
-    else main.appendChild(b);
+    // V86b: KHÔNG tạo banner riêng nữa. Gắn click vào menu #bbtnAlertsMenu sẵn có.
+    const menu = document.getElementById('bbtnAlertsMenu');
+    if (!menu) return;
+    if (menu.dataset.v86Attached) return;
+    menu.dataset.v86Attached = '1';
+    // Bọc onclick gốc + thêm openModal
+    const origOnclick = menu.onclick;
+    menu.onclick = function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      openModal();
+      return false;
+    };
+    console.log('[V86b] Attached click handler vào #bbtnAlertsMenu');
   }
+  // Re-attach mỗi 2s phòng SPA re-render menu
+  setInterval(createBanner, 2000);
 
   async function refresh() {
     try {
@@ -17800,19 +17803,8 @@ async function _authedFetch(url, options) {
       const counts = { not_in_db: 0, manual_review: 0, pending: 0 };
       data.forEach(d => { if (counts[d.match_status] !== undefined) counts[d.match_status]++; });
       const total = data.length;
-      const b = document.getElementById('v86Banner');
-      if (!b) return;
-      if (total === 0) {
-        b.style.display = 'none';
-        return;
-      }
-      b.style.display = 'flex';
-      document.getElementById('v86BannerTitle').textContent = total + ' BBTN cần xử lý';
-      const parts = [];
-      if (counts.not_in_db) parts.push('⚠️ ' + counts.not_in_db + ' chưa khớp');
-      if (counts.manual_review) parts.push('📝 ' + counts.manual_review + ' cần xem');
-      if (counts.pending) parts.push('⏳ ' + counts.pending + ' pending');
-      document.getElementById('v86BannerDetail').textContent = parts.join(' · ');
+      // V86b: không cập nhật banner cũ, chỉ lưu counts cho modal/log
+      window._v86LastCounts = { total: total, ...counts };
     } catch(e) { console.warn('[V86 refresh]', e); }
   }
 
