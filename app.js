@@ -16749,6 +16749,16 @@ async function _authedFetch(url, options) {
     const pdfs = await scan(folderPath);
     (function(){var b=document.getElementById('v66ScanBanner');if(b)b.remove();document.body.style.paddingTop='';})();
     if (!pdfs.length) { alert('Không tìm thấy file PDF nào trong thư mục này.'); return; }
+    // V77d: lọc chỉ Biên bản Thí nghiệm (-TN-), skip KD/GCNKD
+    const _v77orig = pdfs.length;
+    const _v77filtered = pdfs.filter(f => (f.name||'').split('-')[1] === 'TN');
+    const _v77skip = _v77orig - _v77filtered.length;
+    if (_v77filtered.length === 0) {
+      alert('Không có file Biên bản Thí nghiệm (-TN-) nào.\nĐã skip ' + _v77skip + ' file KD/GCNKD trong tổng ' + _v77orig + ' PDF.');
+      return;
+    }
+    pdfs.length = 0; _v77filtered.forEach(f => pdfs.push(f));
+    if (_v77skip > 0 && window.showChangeNotif) showChangeNotif("info","🔍 Lọc file","Giữ " + pdfs.length + " file -TN-, bỏ " + _v77skip + " file KD/GCNKD");
 
     const totalMB = pdfs.reduce((s,f)=>s+(f.size||0),0)/1024/1024;
     const oversized = pdfs.filter(f=>(f.size||0)>50*1024*1024);
