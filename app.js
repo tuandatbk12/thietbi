@@ -17029,7 +17029,12 @@ async function _authedFetch(url, options) {
     sb.remove(); document.body.style.paddingTop='';
 
     if (!allPdfs.length) { alert('Không tìm thấy PDF trong các thư mục đã chọn'); return; }
-    if (!confirm('📊 '+allPdfs.length+' file PDF trong '+sel.length+' thư mục\n⏱️ ~'+Math.round(allPdfs.length*25/60)+' phút\n\nOCR tất cả?')) return;
+    // V77: filter -TN-
+    const _v77orig2 = allPdfs.length;
+    allPdfs = allPdfs.filter(function(f){ return (f.name||'').split('-')[1] === 'TN'; });
+    const _v77skip2 = _v77orig2 - allPdfs.length;
+    if (!allPdfs.length) { alert('Không có file Biên bản Thí nghiệm (-TN-) nào.\nĐã skip '+_v77skip2+' file KD/GCNKD trong tổng '+_v77orig2+' PDF.'); return; }
+    if (!confirm('📊 Tổng '+_v77orig2+' PDF trong '+sel.length+' thư mục, đã lọc:\n   ✅ '+allPdfs.length+' file Thí nghiệm (-TN-)\n'+(_v77skip2?'   ⏭️  '+_v77skip2+' file KD/GCNKD bỏ qua\n':'')+'⏱️ ~'+Math.round(allPdfs.length*25/60)+' phút\n\nOCR '+allPdfs.length+' file -TN-?')) return;
 
     // UI progress (giống v66)
     const old=document.getElementById('v66ProgressUI'); if(old) old.remove();
