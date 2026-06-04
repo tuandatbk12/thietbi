@@ -1,4 +1,4 @@
-# EVN Hà Nội Dashboard — CONTEXT (cập nhật v77d)
+# EVN Hà Nội Dashboard — CONTEXT (cập nhật v78)
 
 ## Hệ thống
 - Dashboard: https://thietbi.vercel.app/ (Vercel auto-deploy)
@@ -18,6 +18,7 @@
 3. OCR thư mục đã chọn (_bbtnOcrSelectedFolders V68) - FILTER -TN-
 4. Xóa record (_bbtnMgmtDeleteRecord V70)
 5. Đối chiếu DB (RPC check_bbtn_match, V72)
+6. Xem file BBTN (V78: hỗ trợ cả URL Storage và path NAS qua bbtn-download blob URL)
 - V71 phân quyền: guard hàm + ẩn nút nếu role !== 'admin'
 
 ## File naming convention (V77d filter)
@@ -49,7 +50,7 @@ created_email, updated_at, loai_thiet_bi, sfra, tiet_dien, file_source
 ## Git commits chính (v66→v77d)
 64e7ed3(v66)→7a9d51e(v67)→c065d26(v68)→7f2fa70(sw.js)→5af3c3c(v69)→
 59b40d0(v70)→da788ff(v71)→c164953(v71c)→9a92985(CONTEXT)→2ed2af0(v72)→
-4278db1(v77 v68 filter)→e9f174d(v77b)→31ea250(v77c)→73aa196(v77d V66 filter) — HEAD
+4278db1(v77 v68 filter)→e9f174d(v77b)→31ea250(v77c)→73aa196(v77d V66 filter)→e595df4(CONTEXT)→f8c802c(v78 view NAS file) — HEAD
 Edge: V73/V75/V76 deployed (không git)
 
 ## Bài học session
@@ -60,6 +61,8 @@ Edge: V73/V75/V76 deployed (không git)
    VD: "TUYỆT ĐỐI KHÔNG đọc số từ bảng đo", "TRỐNG → null, KHÔNG bịa".
 4. CSV (Chống sét van) prompt: phải nói rõ "CHỈ 3 records khi có 3 serial khác nhau".
 5. File name convention làm filter mạnh hơn so với content filter.
+6. Override function ở scope window được. Hàm cũ check URL pattern Supabase Storage → reject NAS path. 
+   Fix: override window._bbtnMgmtOpenFile xử lý cả 2 case (HTTP URL + NAS path qua Edge Function blob URL).
 
 ## TODO
 - (Future) Audit data cũ có thể có serial bịa từ bảng đo
