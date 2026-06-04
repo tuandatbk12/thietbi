@@ -17064,6 +17064,26 @@ async function _authedFetch(url, options) {
     allPdfs = allPdfs.filter(function(f){ return (f.name||'').split('-')[1] === 'TN'; });
     const _v77skip2 = _v77orig2 - allPdfs.length;
     if (!allPdfs.length) { alert('Không có file Biên bản Thí nghiệm (-TN-) nào.\nĐã skip '+_v77skip2+' file KD/GCNKD trong tổng '+_v77orig2+' PDF.'); return; }
+    // V80c: filter file đã OCR (tránh duplicate trong "OCR đã chọn")
+    if (window._v80CheckDupeBulk) {
+      const _v80cPaths = allPdfs.map(f => f.path);
+      const _v80cExisting = await window._v80CheckDupeBulk(_v80cPaths);
+      const _v80cNew = allPdfs.filter(f => !_v80cExisting.has(f.path));
+      const _v80cSkip = allPdfs.length - _v80cNew.length;
+      if (_v80cNew.length === 0) {
+        alert("Tất cả " + allPdfs.length + " file -TN- trong thư mục đã chọn đều ĐÃ OCR trước. Không có file mới.");
+        return;
+      }
+      if (_v80cSkip > 0) {
+        const _v80cAsk = confirm("📊 " + allPdfs.length + " file -TN- trong " + sel.length + " thư mục:\n   ✅ " + _v80cNew.length + " file MỚI (chưa OCR)\n   ⏭️ " + _v80cSkip + " file ĐÃ OCR trước (SKIP)\n\nOK = OCR chỉ file mới (khuyến nghị)\nHủy = OCR TẤT CẢ (tạo duplicate)");
+        if (_v80cAsk) {
+          allPdfs.length = 0; _v80cNew.forEach(f => allPdfs.push(f));
+          console.log("[V80c] Selected: chỉ OCR " + allPdfs.length + " file mới, skip " + _v80cSkip);
+        } else {
+          console.log("[V80c] Selected: user chọn OCR ALL " + allPdfs.length + " (kể cả " + _v80cSkip + " đã có)");
+        }
+      }
+    }
     if (!confirm('📊 Tổng '+_v77orig2+' PDF trong '+sel.length+' thư mục, đã lọc:\n   ✅ '+allPdfs.length+' file Thí nghiệm (-TN-)\n'+(_v77skip2?'   ⏭️  '+_v77skip2+' file KD/GCNKD bỏ qua\n':'')+'⏱️ ~'+Math.round(allPdfs.length*25/60)+' phút\n\nOCR '+allPdfs.length+' file -TN-?')) return;
 
     // UI progress (giống v66)
