@@ -13071,6 +13071,10 @@ async function _authedFetch(url, options) {
                     style="padding:7px 14px;border-radius:7px;border:1px solid rgba(0,230,118,.4);background:linear-gradient(135deg,rgba(0,230,118,.15),rgba(0,200,100,.15));color:#00e676;font-size:11px;font-weight:700;cursor:pointer">
               <i class="fas fa-file-excel"></i> Export Excel
             </button>
+            <button id="v82BulkDeleteBtn" onclick="window._v82BulkDelete&&window._v82BulkDelete()"
+                    style="display:none;padding:7px 14px;border-radius:7px;border:1px solid rgba(255,82,82,.4);background:linear-gradient(135deg,rgba(255,82,82,.15),rgba(200,50,50,.15));color:#ff5252;font-size:11px;font-weight:700;cursor:pointer">
+              <i class="fas fa-trash"></i> Xóa <span id="v82SelCount">0</span> đã chọn
+            </button>
             <button onclick="_bbtnMgmtClearFilters()"
                     style="padding:7px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:var(--text-primary);font-size:11px;cursor:pointer">
               <i class="fas fa-times"></i> Xoá lọc
@@ -13187,7 +13191,8 @@ async function _authedFetch(url, options) {
         : '<span style="opacity:.4">—</span>';
 
       return `
-        <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+        <tr style="border-bottom:1px solid rgba(255,255,255,.04)" data-bbtn-id="${r.id}">
+          <td style="padding:8px;text-align:center"><input type="checkbox" class="v82-row-cb" data-id="${r.id}" onchange="window._v82ToggleRow&&window._v82ToggleRow(${r.id}, this.checked)" style="cursor:pointer;width:14px;height:14px;accent-color:#ff9100"></td>
           <td style="padding:8px;font-size:11px;color:rgba(180,200,220,.5)">${page * PAGE_SIZE + i + 1}</td>
           <td style="padding:8px"><span style="background:#00c8ff;color:#000;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700">${_esc(r.loai_thiet_bi || '?')}</span></td>
           <td style="padding:8px;font-size:12px;font-weight:600;color:#eef">${_esc(r.tram || '')}</td>
@@ -13217,6 +13222,7 @@ async function _authedFetch(url, options) {
           <table style="width:100%;border-collapse:collapse;font-size:12px">
             <thead style="background:rgba(0,200,255,.08);position:sticky;top:0;z-index:5">
               <tr>
+                <th style="padding:10px 8px;text-align:center;font-size:11px;color:#ff9100;border-bottom:1px solid rgba(255,145,0,.2);width:36px"><input type="checkbox" id="v82SelectAll" onchange="window._v82ToggleAll&&window._v82ToggleAll(this.checked)" style="cursor:pointer;width:14px;height:14px;accent-color:#ff9100" title="Chọn tất cả trang hiện tại"></th>
                 <th style="padding:10px 8px;text-align:left;font-size:11px;color:#00c8ff;border-bottom:1px solid rgba(0,200,255,.2)">#</th>
                 <th style="padding:10px 8px;text-align:left;font-size:11px;color:#00c8ff;border-bottom:1px solid rgba(0,200,255,.2)">Loại</th>
                 <th style="padding:10px 8px;text-align:left;font-size:11px;color:#00c8ff;border-bottom:1px solid rgba(0,200,255,.2)">Trạm</th>
@@ -17531,4 +17537,93 @@ async function _authedFetch(url, options) {
   };
 
   console.log('[V81] Export panel detail Excel loaded');
+})();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V82: Bulk Delete trong Quản lý BBTN OCR (admin only)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function() {
+  if (window._bbtnV82) return;
+  window._bbtnV82 = true;
+
+  function _isAdminV82(){ try { return _authGetSession()?.role === 'admin'; } catch(e){ return false; } }
+  window._v82Selected = new Set();
+
+  function _updateUI() {
+    const btn = document.getElementById('v82BulkDeleteBtn');
+    const cnt = document.getElementById('v82SelCount');
+    const n = window._v82Selected.size;
+    if (cnt) cnt.textContent = n;
+    if (btn) btn.style.display = (n > 0 && _isAdminV82()) ? 'inline-flex' : 'none';
+  }
+
+  window._v82ToggleRow = function(id, checked) {
+    if (!_isAdminV82()) return;
+    if (checked) window._v82Selected.add(id);
+    else window._v82Selected.delete(id);
+    _updateUI();
+  };
+
+  window._v82ToggleAll = function(checked) {
+    if (!_isAdminV82()) return;
+    document.querySelectorAll('.v82-row-cb').forEach(cb => {
+      cb.checked = checked;
+      const id = parseInt(cb.dataset.id);
+      if (id) {
+        if (checked) window._v82Selected.add(id);
+        else window._v82Selected.delete(id);
+      }
+    });
+    _updateUI();
+  };
+
+  window._v82BulkDelete = async function() {
+    if (!_isAdminV82()) { alert('⛔ Chỉ admin'); return; }
+    const ids = Array.from(window._v82Selected);
+    if (!ids.length) { alert('Chưa chọn record nào'); return; }
+    if (!confirm('🗑️ Xóa ' + ids.length + ' records đã chọn?\n\nKhông thể hoàn tác.')) return;
+
+    const token = await _authGetToken();
+    const SB = _AUTH_SB_URL.replace(/\/$/, '');
+    let ok = 0, fail = 0;
+    for (const id of ids) {
+      try {
+        const r = await fetch(SB + '/rest/v1/bbtn_records?id=eq.' + id, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + token, 'apikey': _AUTH_SB_KEY, 'Prefer': 'return=minimal' }
+        });
+        if (r.ok) ok++; else fail++;
+      } catch(e) { fail++; console.error('[V82]', id, e); }
+    }
+    window._v82Selected.clear();
+    _updateUI();
+    if (window.showChangeNotif) showChangeNotif('success', '✓ Đã xóa ' + ok + ' records', fail ? (fail + ' lỗi') : '');
+    else alert('Đã xóa ' + ok + ' records' + (fail ? ' (' + fail + ' lỗi)' : ''));
+    if (window._fetchBbtnMgmtData) window._fetchBbtnMgmtData();
+  };
+
+  // Ẩn checkbox + select-all cho non-admin
+  function _hideForNonAdmin() {
+    if (_isAdminV82()) return;
+    const css = document.getElementById('v82HideCss') || document.createElement('style');
+    css.id = 'v82HideCss';
+    css.textContent = '#v82SelectAll, .v82-row-cb, #v82BulkDeleteBtn { display: none !important; }';
+    if (!css.parentNode) document.head.appendChild(css);
+  }
+  setInterval(_hideForNonAdmin, 2000);
+  _hideForNonAdmin();
+
+  // Reset selected khi reload page (vì id mới)
+  const _origFetch = window._fetchBbtnMgmtData;
+  if (typeof _origFetch === 'function') {
+    window._fetchBbtnMgmtData = function() {
+      window._v82Selected.clear();
+      const sa = document.getElementById('v82SelectAll');
+      if (sa) sa.checked = false;
+      _updateUI();
+      return _origFetch.apply(this, arguments);
+    };
+  }
+
+  console.log('[V82] Bulk Delete loaded (admin only)');
 })();
