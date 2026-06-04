@@ -17752,3 +17752,79 @@ async function _authedFetch(url, options) {
 
   console.log('[V83] Tìm trùng lặp loaded (admin only)');
 })();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V84: NAS Health Check Widget - floating top-right
+// Tự động check mỗi 30s, click để check ngay
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function() {
+  if (window._v84Health) return;
+  window._v84Health = true;
+
+  function createWidget() {
+    if (document.getElementById('v84HealthWidget')) return;
+    const w = document.createElement('div');
+    w.id = 'v84HealthWidget';
+    w.style.cssText = 'position:fixed;top:14px;right:14px;background:rgba(20,28,40,.95);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 14px;z-index:9999;font-family:system-ui;font-size:11px;color:#fff;cursor:pointer;backdrop-filter:blur(8px);box-shadow:0 4px 16px rgba(0,0,0,.5);display:flex;align-items:center;gap:8px;min-width:120px;transition:all .2s';
+    w.innerHTML = '<span id="v84Dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#999;transition:all .3s"></span><span id="v84Text" style="font-weight:600">NAS: Đang check...</span>';
+    w.onclick = checkNow;
+    w.title = 'Click để check NAS ngay';
+    document.body.appendChild(w);
+  }
+
+  function setStatus(state, text, detail) {
+    const dot = document.getElementById('v84Dot');
+    const txt = document.getElementById('v84Text');
+    const widget = document.getElementById('v84HealthWidget');
+    if (!dot || !txt) return;
+    const colors = { online: '#00e676', offline: '#ff5252', checking: '#ffc107', unknown: '#999' };
+    const c = colors[state] || '#999';
+    dot.style.background = c;
+    if (state === 'online') dot.style.boxShadow = '0 0 8px ' + c;
+    else if (state === 'offline') dot.style.boxShadow = '0 0 8px ' + c;
+    else dot.style.boxShadow = 'none';
+    txt.textContent = text;
+    if (widget) widget.title = detail ? text + ' — ' + detail : text + ' (click để check)';
+  }
+
+  async function checkNow() {
+    setStatus('checking', 'NAS: Đang check...', '');
+    try {
+      const SB = (window._AUTH_SB_URL || '').replace(/\/$/, '');
+      const sbKey = window._AUTH_SB_KEY || '';
+      if (!SB || !sbKey) { setStatus('unknown', 'NAS: ?', 'Chưa init Supabase'); return; }
+      const start = Date.now();
+      const r = await fetch(SB + '/functions/v1/nas-health-check', { 
+        headers: { 'apikey': sbKey }
+      });
+      const ms = Date.now() - start;
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      if (data.ok && data.nasReachable) {
+        setStatus('online', 'NAS Online · ' + (data.latencyMs || ms) + 'ms', 
+          'BBTN: ' + (data.bbtnAccessible ? '✓' : '✗') + ' | Asset: ' + (data.assetAccessible ? '✓' : '✗'));
+      } else {
+        setStatus('offline', 'NAS Offline', data.detail || data.status || 'Unknown');
+        if (!window._v84WarnedThisSession && window.showChangeNotif) {
+          showChangeNotif('error', '⚠️ NAS Offline', data.detail || 'Liên hệ admin kiểm tra');
+          window._v84WarnedThisSession = true;
+          setTimeout(() => { window._v84WarnedThisSession = false; }, 600000);
+        }
+      }
+    } catch(e) {
+      setStatus('offline', 'NAS Offline', e.message);
+      console.warn('[V84]', e);
+    }
+  }
+
+  // Wait DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => { createWidget(); checkNow(); });
+  } else {
+    createWidget();
+    checkNow();
+  }
+  setInterval(checkNow, 30000);
+
+  console.log('[V84] NAS Health Check widget loaded');
+})();
