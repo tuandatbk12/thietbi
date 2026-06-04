@@ -17765,26 +17765,30 @@ async function _authedFetch(url, options) {
     if (document.getElementById('v84HealthWidget')) return;
     const w = document.createElement('div');
     w.id = 'v84HealthWidget';
-    w.style.cssText = 'position:fixed;top:14px;right:14px;background:rgba(20,28,40,.95);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 14px;z-index:9999;font-family:system-ui;font-size:11px;color:#fff;cursor:pointer;backdrop-filter:blur(8px);box-shadow:0 4px 16px rgba(0,0,0,.5);display:flex;align-items:center;gap:8px;min-width:120px;transition:all .2s';
-    w.innerHTML = '<span id="v84Dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#999;transition:all .3s"></span><span id="v84Text" style="font-weight:600">NAS: Đang check...</span>';
+    w.style.cssText = 'position:fixed;bottom:14px;left:14px;width:18px;height:18px;border-radius:50%;background:rgba(20,28,40,.85);border:1px solid rgba(255,255,255,.15);z-index:9999;cursor:pointer;backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;transition:all .2s';
+    w.innerHTML = '<span id="v84Dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#999;transition:background .3s, box-shadow .3s"></span><span id="v84Text" style="display:none"></span>';
     w.onclick = checkNow;
     w.title = 'Click để check NAS ngay';
+    w.onmouseenter = function() { w.style.transform = 'scale(1.4)'; };
+    w.onmouseleave = function() { w.style.transform = 'scale(1)'; };
     document.body.appendChild(w);
   }
 
   function setStatus(state, text, detail) {
     const dot = document.getElementById('v84Dot');
-    const txt = document.getElementById('v84Text');
     const widget = document.getElementById('v84HealthWidget');
-    if (!dot || !txt) return;
-    const colors = { online: '#00e676', offline: '#ff5252', checking: '#ffc107', unknown: '#999' };
-    const c = colors[state] || '#999';
-    dot.style.background = c;
-    if (state === 'online') dot.style.boxShadow = '0 0 8px ' + c;
-    else if (state === 'offline') dot.style.boxShadow = '0 0 8px ' + c;
+    if (!dot) return;
+    // V84c: KHÔNG đổi màu sang vàng khi đang check (giữ màu cũ - tránh nhấp nháy)
+    if (state === 'checking') {
+      if (widget) widget.title = '🔄 Đang check NAS... (click để check ngay)';
+      return;
+    }
+    const colors = { online: '#00e676', offline: '#ff5252', unknown: '#999' };
+    const col = colors[state] || '#999';
+    dot.style.background = col;
+    if (state === 'online' || state === 'offline') dot.style.boxShadow = '0 0 8px ' + col;
     else dot.style.boxShadow = 'none';
-    txt.textContent = text;
-    if (widget) widget.title = detail ? text + ' — ' + detail : text + ' (click để check)';
+    if (widget) widget.title = (state === 'online' ? '🟢 ' : state === 'offline' ? '🔴 ' : '⚪ ') + text + (detail ? ' — ' + detail : '') + ' (click để check)';
   }
 
   async function _waitSbReady(maxMs) {
