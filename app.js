@@ -3964,6 +3964,7 @@ function _lytShowDetailPanel(title, color, totalLine, items, mbaSection) {
     <div class="hm-resize-grip" id="hm-resize-grip"></div>
     <div class="hm-detail-hd" style="border-left:3px solid ${color||'var(--accent)'}">
       <span style="color:rgba(255,255,255,.97)">${title}</span>
+      <button onclick="event.stopPropagation();window._exportLytPanelExcel&&window._exportLytPanelExcel(${JSON.stringify(title)}, window._lytPanelLastItems||[], window._lytPanelLastMba||null)" title="Xuất Excel" style="margin-right:8px;padding:4px 10px;border-radius:5px;border:1px solid rgba(0,230,118,.4);background:rgba(0,230,118,.1);color:#00e676;font-size:11px;font-weight:700;cursor:pointer">📊 Excel</button>
       <span class="hm-detail-close" onclick="this.closest('.hm-detail-panel').classList.remove('open');let bd=document.getElementById('hm-detail-backdrop');if(bd)bd.style.display='none'">✕</span>
     </div>
     <div style="padding:6px 16px 6px;font-size:9px;color:rgba(180,210,230,.7);font-family:var(--font-mono);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">${totalLine||''}</div>
@@ -17454,4 +17455,76 @@ async function _authedFetch(url, options) {
   }
 
   console.log('[V80] Duplicate prevention loaded (per-file confirm dialog)');
+})();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V81: Export panel detail ra Excel
+// Áp dụng cho mọi panel dùng _lytShowDetailPanel (Thiết bị theo năm, theo trạm, ...)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function() {
+  if (window._lytV81) return;
+  window._lytV81 = true;
+
+  async function _ensureXLSX() {
+    if (window.XLSX) return window.XLSX;
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+    return window.XLSX;
+  }
+
+  window._exportLytPanelExcel = async function(title, items, mbaSection) {
+    items = items || window._lytPanelLastItems || [];
+    mbaSection = mbaSection || window._lytPanelLastMba || null;
+    title = title || window._lytPanelLastTitle || 'Panel';
+    if (!items.length) { alert('Không có dữ liệu để xuất'); return; }
+
+    try {
+      const XLSX = await _ensureXLSX();
+      const rows = [];
+      rows.push(['Mục', 'Số liệu', 'Chi tiết']);
+
+      function flatten(item, depth = 0) {
+        const indent = '   '.repeat(depth);
+        if (item.isGroup) {
+          rows.push([indent + '── ' + (item.text||'') + ' ──', '', '']);
+          return;
+        }
+        rows.push([indent + (item.text || ''), item.badge || item.sub || '', '']);
+        if (Array.isArray(item.children)) {
+          for (const ch of item.children) flatten(ch, depth + 1);
+        }
+        if (Array.isArray(item.detail)) {
+          for (const leaf of item.detail) {
+            rows.push([indent + '   ▸ ' + leaf, '', '']);
+          }
+        }
+      }
+
+      for (const it of items) flatten(it);
+      if (mbaSection && mbaSection.length) {
+        rows.push([]);
+        rows.push(['── MBA ──', '', '']);
+        for (const m of mbaSection) flatten(m);
+      }
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols'] = [{wch:55}, {wch:25}, {wch:60}];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Panel');
+      const safeTitle = String(title).replace(/[^\p{L}\p{N}_\-]+/gu, '_').substring(0, 50);
+      const fname = safeTitle + '_' + new Date().toISOString().slice(0,10) + '.xlsx';
+      XLSX.writeFile(wb, fname);
+      if (window.showChangeNotif) showChangeNotif('success', '✓ Đã xuất Excel', fname);
+    } catch(e) {
+      console.error('[V81 export]', e);
+      alert('Lỗi xuất Excel: ' + e.message);
+    }
+  };
+
+  console.log('[V81] Export panel detail Excel loaded');
 })();
