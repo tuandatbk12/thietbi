@@ -1,69 +1,66 @@
-# EVN Hà Nội Dashboard — CONTEXT (cập nhật v71c)
+# EVN Hà Nội Dashboard — CONTEXT (cập nhật v77d)
 
 ## Hệ thống
-- Dashboard: https://thietbi.vercel.app/ (Vercel auto-deploy từ GitHub tuandatbk12/thietbi main)
-- Local repo: /c/Users/admin/Documents/thietbi (Windows + Git Bash)
-- Supabase ref: xqqmfmljwycpehfyknoy (Free tier, Edge Function timeout 60s)
+- Dashboard: https://thietbi.vercel.app/ (Vercel auto-deploy)
+- Local: /c/Users/admin/Documents/thietbi
+- Supabase ref: xqqmfmljwycpehfyknoy
 - Admin: admin@example.com / EvnAdmin@2026
-- Gemini model: gemini-2.5-flash (GEMINI_API_KEY trong Supabase secrets)
+- Gemini: gemini-2.5-flash
 
-## NAS / Cloudflare (QUAN TRỌNG)
-- NAS Synology qua Cloudflare Tunnel "evn-nas-webdav-v2"
-- Public hostname: nas.dulieuvanhanh.pro.vn
-- WebDAV port: 5005 (HTTP)
-- cloudflared = Docker container "cloudflared-nas" trên NAS (HOST network mode)
-- ⭐ Tunnel Service URL = http://localhost:5005 (KHÔNG dùng IP — vì localhost = chính NAS,
-  IP đổi bao nhiêu lần cũng không ảnh hưởng. ĐÃ FIX vĩnh viễn lỗi 502 do đổi IP)
-- NAS IP hiện tại: 192.168.1.7 (DHCP) — KHÔNG còn quan trọng vì tunnel dùng localhost
+## NAS / Cloudflare
+- Tunnel `evn-nas-webdav-v2` → nas.dulieuvanhanh.pro.vn
+- cloudflared Docker container "cloudflared-nas" trên NAS (HOST network)
+- ⭐ Tunnel Service URL = http://localhost:5005 (MIỄN NHIỄM đổi IP NAS)
 
-## DB bbtn_records — COLUMN THẬT (verify)
+## Tính năng (v66-v77d, admin-only)
+1. OCR per-file PDF (_bbtnOcrFromNas → V68 preview/save)
+2. OCR tất cả PDF folder (_bbtnBulkOcrFolder V66, line 16712) - FILTER -TN-
+3. OCR thư mục đã chọn (_bbtnOcrSelectedFolders V68) - FILTER -TN-
+4. Xóa record (_bbtnMgmtDeleteRecord V70)
+5. Đối chiếu DB (RPC check_bbtn_match, V72)
+- V71 phân quyền: guard hàm + ẩn nút nếu role !== 'admin'
+
+## File naming convention (V77d filter)
+- `XX.XXXXX-TN-...pdf` = Biên bản Thí nghiệm ← OCR
+- `XX.XXXXX-KD-...pdf` = Kiểm định ← SKIP
+- `XX.XXXXX-GCNKD-...pdf` = Giấy chứng nhận KĐ ← SKIP
+- Filter: f.name.split('-')[1] === 'TN'
+
+## Edge Function (deployed)
+- bbtn-ocr-extract: prompt v73→v75→v76
+  - V73: CSV ten_thiet_bi theo vị trí ("CSV 4T2" thay vì "CSV [serial]")
+  - V75: cấm đọc serial từ bảng đo (MΩ/μA/kV)
+  - V76: CSV serial trống → CHỈ 1 record (không tách 3 pha)
+- Backup: index.ts.before-v73/v74/v75/v76.bak
+- Deploy: `supabase functions deploy bbtn-ocr-extract --project-ref xqqmfmljwycpehfyknoy --no-verify-jwt`
+
+## DB bbtn_records
 id, file_url, file_name, file_size, file_type, tram, ten_thiet_bi, kieu, so_che_tao,
 hang_san_xuat, nuoc_san_xuat, nam_san_xuat, dien_ap, dong_dien, dong_cat, ngay_kiem_dinh,
 dang_kiem_dinh, dieu_kien_mt, phuong_phap, don_vi_dat_lam, vi_tri_lap_dat, ocr_raw,
 ocr_confidence, ocr_provider, match_status, matched_tn_id, created_at, created_by,
 created_email, updated_at, loai_thiet_bi, sfra, tiet_dien, file_source
-- ⚠️ Column file_url (KHÔNG phải file_path). file_source = 'nas'|'storage'.
 
-## Edge Function bbtn-ocr-extract — I/O
-- INPUT: { file_base64, mime_type, file_name } (snake_case)
-- OUTPUT: { success, items:[...], item_count, fields, avg_confidence, ... }
-- ⚠️ Array là od.items (KHÔNG phải thiet_bi). Field item names = DB columns (no mapping).
-- Limit 50MB/file → 504 nếu Gemini quá tải (đã có retry 8s).
+## Edge Function I/O
+- INPUT: { file_base64, mime_type, file_name }
+- OUTPUT: { success, items:[...], item_count, fields, ... }
+- ⚠️ od.items (KHÔNG phải thiet_bi). Field item = DB column.
 
-## OCR-from-NAS — MAPPING ĐÚNG (bài học lớn session này)
-od.items → map nguyên field: tram, loai_thiet_bi, ten_thiet_bi, kieu, so_che_tao,
-hang_san_xuat, nuoc_san_xuat, nam_san_xuat, dien_ap, dong_dien, ngay_kiem_dinh,
-dang_kiem_dinh, vi_tri_lap_dat, sfra, tiet_dien + file_url (=NAS path), file_name, file_source:'nas'
+## Git commits chính (v66→v77d)
+64e7ed3(v66)→7a9d51e(v67)→c065d26(v68)→7f2fa70(sw.js)→5af3c3c(v69)→
+59b40d0(v70)→da788ff(v71)→c164953(v71c)→9a92985(CONTEXT)→2ed2af0(v72)→
+4278db1(v77 v68 filter)→e9f174d(v77b)→31ea250(v77c)→73aa196(v77d V66 filter) — HEAD
+Edge: V73/V75/V76 deployed (không git)
 
-## Tính năng OCR (v66-v71c) — TẤT CẢ admin-only
-1. OCR per-file: nút "OCR" trên mỗi file PDF (_bbtnOcrFromNas → _showNasOcrPreviewV68 → _bbtnSaveNasOcrResultV68)
-2. OCR tất cả PDF: nút "⚡ OCR tất cả PDF" (_bbtnBulkOcrFolder v66) — banner scan + progress + summary
-3. OCR thư mục đã chọn: tick checkbox folder → nút "⚡ OCR đã chọn" (_bbtnOcrSelectedFolders v68)
-4. Xóa record: nút 🗑️ trong Quản lý BBTN OCR (_bbtnMgmtDeleteRecord v70)
-- Phân quyền v71: _guard() chặn hàm + ẩn nút nếu _authGetSession()?.role !== 'admin'
+## Bài học session
+1. Có 3 phiên bản _bbtnBulkOcrFolder (V60/V61/V66). V66 thắng (override cuối).
+   → Patch phải nhắm V66 (line 16712+), không phải V60 cũ.
+2. Python heredoc + multiline string trên Windows có thể fail match → dùng readlines() + line-based insert.
+3. AI hallucination: prompt cần CẤM rõ ràng, không chỉ "khuyến nghị". 
+   VD: "TUYỆT ĐỐI KHÔNG đọc số từ bảng đo", "TRỐNG → null, KHÔNG bịa".
+4. CSV (Chống sét van) prompt: phải nói rõ "CHỈ 3 records khi có 3 serial khác nhau".
+5. File name convention làm filter mạnh hơn so với content filter.
 
-## CACHE BUMP — DÙNG PYTHON (KHÔNG dùng sed greedy!)
-python3 -c "import re; c=open('sw.js',encoding='utf-8').read(); c=re.sub(r\"'evn-v[0-9]+[^']*'\",\"'evn-vXX-name'\",c); open('sw.js','w',encoding='utf-8').write(c)"
-- ⚠️ sed pattern 'evn-v[0-9.]*-[^']*' KHÔNG quote → greedy → PHÁ HỦY sw.js (đã từng hỏng,
-  phải restore từ git). LUÔN node --check sw.js sau bump.
-
-## Git commits session (v66→v71c)
-64e7ed3(v66 bulk final) → 7a9d51e(v67 banner+retry) → c065d26(v68 perfile+selected) →
-7f2fa70(restore sw.js) → 5af3c3c(v69 checkbox) → 59b40d0(v70 delete) →
-da788ff(v71 permission) → c164953(v71c hide delete) — HEAD
-
-## Backup files (local)
-app.js.before-v66/v67/v68/v69/v70/v71/v71c.bak
-
-## Bài học kỹ thuật session này
-1. Override JS function KHÔNG ảnh hưởng closure đã capture → dùng self-contained replacement.
-2. HTTP 530 = Cloudflare/tunnel down; 502 = tunnel OK nhưng backend (WebDAV/IP) sai.
-   → Dùng localhost trong tunnel route (cloudflared cùng host) = miễn nhiễm đổi IP.
-3. Verify Edge Function output + DB column TRƯỚC khi viết insert (od.items, file_url).
-4. sed greedy phá file → dùng Python regex cho sửa cache.
-5. Test logic trên Console TRƯỚC khi commit (đỡ phải push thử nhiều lần).
-6. Supabase insert Prefer:return=minimal → DevTools báo "Fetch failed loading" nhưng ok=true.
-
-## TODO còn lại
-- (Optional) Sửa prompt Gemini đặt ten_thiet_bi đẹp hơn cho file Chống Sét Van (CSV)
-- (Optional) Tính năng đối chiếu OCR ↔ DB gốc để chuyển match_status pending→matched
+## TODO
+- (Future) Audit data cũ có thể có serial bịa từ bảng đo
+- (Future) Tính năng phòng duplicate (check file_url trước khi OCR)
