@@ -9,6 +9,8 @@
 // ════════════════════════════════════════════════════════════════
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// V89: import helpers fetch NAS (stream qua server, tránh browser load file lớn)
+import { getNasConfig, nasUrl, nasAuthHeader, nasFetch, safeJoinPath, normalizeClientPath } from '../_shared/nas.ts';
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
 const GEMINI_MODEL = "gemini-2.5-flash";
@@ -107,10 +109,22 @@ MBATD = Máy biến áp tự dùng / Trung thế (Distribution transformer):
    - "Từ Tủ C42 đến Tủ TU C42-TBA E1.20" → "Cáp C42-TU C42"
    - DTĐ → "TĐ <số>" (bỏ chữ D)
    - TIchânsứ, TĐ1pha KHÔNG có dấu cách
+   - CSV (Chống sét van): LẤY TỪ vị trí, KHÔNG dùng serial. VD "4T2- TBA E1.1 Đông Anh" → "CSV 4T2"; "TU C44- TBA E1.9" → "CSV C44".
+   - ⚠️ QUY TẮC SỐ RECORDS CHO CSV:
+     • Nếu trường "Số chế tạo (Serial number):" ở đầu BBTN TRỐNG → CHỈ TẠO 1 RECORD DUY NHẤT (so_che_tao=null). KHÔNG tách 3 pha. KHÔNG bịa số.
+     • Nếu trường serial ghi 1 số DUY NHẤT → CHỈ 1 record với serial đó.
+     • CHỈ tạo 3 records (cho 3 pha) khi BBTN ghi RÕ RÀNG 3 serial KHÁC NHAU cho 3 pha riêng biệt (vd "Pha A: SN001, Pha B: SN002, Pha C: SN003" hoặc bảng có cột Pha với 3 serial khác nhau).
+     • TUYỆT ĐỐI KHÔNG lấy số từ bảng đo (MΩ, μA, kV) làm serial pha.
 
 4. **kieu** (text): Kiểu/model. NULL cho THM/HTTĐ/RL/Dầu.
 
-5. **so_che_tao** (text): Serial. Giữ nguyên số 0 đầu.
+5. **so_che_tao** (text): Serial number CỦA THIẾT BỊ. ⚠️⚠️⚠️ QUAN TRỌNG:
+    - CHỈ đọc từ trường "Số chế tạo (Serial number):" trong PHẦN THÔNG TIN THIẾT BỊ ở ĐẦU BBTN (cùng phần với Hãng SX, Năm SX, Kiểu).
+    - TUYỆT ĐỐI KHÔNG đọc số từ các BẢNG ĐO (vd "Đo điện trở cách điện", "Đo dòng rò", "Điện áp tham chiếu"...).
+    - Trong các bảng đo, cột tiêu đề có thể ghi "Số chế tạo" nhưng các Ô bên dưới là GIÁ TRỊ ĐO (MΩ, μA, kV...), KHÔNG phải serial.
+    - Nếu trường "Số chế tạo" ở phần thông tin TRỐNG → trả NULL. KHÔNG bịa, KHÔNG đoán, KHÔNG lấy giá trị từ bảng đo.
+    - VD: Bảng "Điện trở cách điện" cột "Trước Irò 31000" → 31000 là MΩ, KHÔNG phải serial.
+    - Giữ nguyên số 0 đầu nếu có serial thật.
 
 6. **hang_san_xuat** (text): Hãng (EEMC, HANAKA, ABB, SIEMENS...). NULL cho THM/HTTĐ/RL/Dầu.
 
@@ -274,8 +288,48 @@ serve(async (req: Request) => {
   let body: any;
   try { body = await req.json(); } catch { return jsonResponse({ error: "Invalid JSON body" }, 400); }
 
-  const { file_base64, mime_type, file_name } = body;
-  if (!file_base64 || !mime_type) return jsonResponse({ error: "Missing fields" }, 400);
+  // V89: hỗ trợ INPUT mới {nas_path} - server fetch file từ NAS, tránh browser load file lớn
+  let { file_base64, mime_type, file_name } = body;
+  const nas_path = body.nas_path;
+  
+  if (nas_path && !file_base64) {
+    // Stream-from-NAS mode
+    console.log(`[OCR-V89] Stream from NAS: ${nas_path}`);
+    try {
+      const cfg = getNasConfig();
+      // Normalize path để tránh path traversal
+      const safePath = normalizeClientPath(nas_path, cfg.bbtnRoot);
+      const remoteUrl = nasUrl(cfg, safePath);
+      const t0 = Date.now();
+      const upstream = await nasFetch(remoteUrl, {
+        headers: nasAuthHeader(cfg),
+        timeoutMs: 90000, // 90s cho file lớn
+      });
+      if (!upstream.ok) {
+        console.error(`[OCR-V89] NAS fetch ${upstream.status}: ${nas_path}`);
+        return jsonResponse({ error: `NAS fetch failed: HTTP ${upstream.status}`, nas_path }, 502);
+      }
+      const bytes = new Uint8Array(await upstream.arrayBuffer());
+      const fetchMs = Date.now() - t0;
+      console.log(`[OCR-V89] Fetched ${(bytes.length/1024/1024).toFixed(2)}MB in ${fetchMs}ms`);
+      
+      // Encode base64 (chunked để tránh stack overflow với file lớn)
+      const CHUNK = 0x8000; // 32KB chunks
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += CHUNK) {
+        bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + CHUNK)));
+      }
+      file_base64 = btoa(bin);
+      mime_type = mime_type || 'application/pdf';
+      file_name = file_name || nas_path.split('/').pop() || 'bbtn.pdf';
+      console.log(`[OCR-V89] Encoded base64 ${(file_base64.length/1024/1024).toFixed(2)}MB`);
+    } catch (e) {
+      console.error('[OCR-V89] Stream error:', e);
+      return jsonResponse({ error: `NAS stream failed: ${(e as Error).message}`, nas_path }, 502);
+    }
+  }
+  
+  if (!file_base64 || !mime_type) return jsonResponse({ error: "Missing fields (need file_base64 OR nas_path)" }, 400);
 
   const ALLOWED_MIMES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
   if (!ALLOWED_MIMES.includes(mime_type)) return jsonResponse({ error: `Unsupported MIME: ${mime_type}` }, 400);

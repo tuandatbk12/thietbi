@@ -16948,10 +16948,10 @@ async function _authedFetch(url, options) {
     const blob = await fr.blob();
     if(blob.size > 50*1024*1024) throw new Error('>50MB skip');
     const b64 = await _b64(blob);
-    let or = await fetch(SB+'/functions/v1/bbtn-ocr-extract',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY},body:JSON.stringify({file_base64:b64,mime_type:'application/pdf',file_name:fileName})});
+    let or = await fetch(SB+'/functions/v1/bbtn-ocr-extract',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY},body:JSON.stringify({nas_path:nasPath,mime_type:'application/pdf',file_name:fileName})});
     if(!or.ok && (or.status===504||or.status===503||or.status===429||or.status===502)){
       await new Promise(r=>setTimeout(r,8000));
-      or = await fetch(SB+'/functions/v1/bbtn-ocr-extract',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY},body:JSON.stringify({file_base64:b64,mime_type:'application/pdf',file_name:fileName})});
+      or = await fetch(SB+'/functions/v1/bbtn-ocr-extract',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY},body:JSON.stringify({nas_path:nasPath,mime_type:'application/pdf',file_name:fileName})});
     }
     if(!or.ok) throw new Error('OCR fail '+or.status);
     return await or.json();
