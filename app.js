@@ -16852,16 +16852,12 @@ async function _authedFetch(url, options) {
 
       if((f.size||0)>50*1024*1024){ fail++; done++; failed.push({name:f.name,error:'>50MB skip'}); }
       else try {
-        const dl=SB+'/functions/v1/bbtn-download?path='+encodeURIComponent(f.path);
-        const fr=await _bbtnFetchEdge(dl, token, {timeoutMs:120000, maxRetries:1});
-        if(!fr.ok) throw new Error('Tải fail '+fr.status);
-        const blob=await fr.blob();
-        const b64=await new Promise((res,rej)=>{const rd=new FileReader();rd.onloadend=()=>res(rd.result.split(',')[1]);rd.onerror=rej;rd.readAsDataURL(blob);});
-        let or=await fetch(SB+'/functions/v1/bbtn-ocr-extract',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY},body:JSON.stringify({file_base64:b64,mime_type:'application/pdf',file_name:f.name})});
+        // V89b: stream qua server - không download file vào browser
+        let or=await fetch(SB+'/functions/v1/bbtn-ocr-extract',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY},body:JSON.stringify({nas_path:f.path,mime_type:'application/pdf',file_name:f.name})});
         if(!or.ok && (or.status===504||or.status===503||or.status===429||or.status===502)){
           document.getElementById('v66Cur').textContent='⏳ Gemini bận, thử lại: '+f.name;
           await new Promise(r=>setTimeout(r,8000));
-          or=await fetch(SB+'/functions/v1/bbtn-ocr-extract',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY},body:JSON.stringify({file_base64:b64,mime_type:'application/pdf',file_name:f.name})});
+          or=await fetch(SB+'/functions/v1/bbtn-ocr-extract',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY},body:JSON.stringify({nas_path:f.path,mime_type:'application/pdf',file_name:f.name})});
         }
         if(!or.ok) throw new Error('OCR fail '+or.status);
         const od=await or.json();
