@@ -1,0 +1,54 @@
+name: Auto Backup Database
+
+on:
+  schedule:
+    # Chủ nhật 2h sáng VN = 19:00 UTC Thứ 7
+    - cron: '0 19 * * 6'
+  workflow_dispatch: # Cho phép chạy thủ công từ Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Backup tables
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          python3 .github/scripts/backup_db.py
+
+      - name: Commit backups
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backups/
+          if git diff --staged --quiet; then
+            echo "Không có thay đổi để commit"
+          else
+            git commit -m "chore(backup): DB snapshot $(date -u +'%Y-%m-%d')"
+            git push
+          fi
+
+      - name: Cleanup old backups (giữ 12 mới nhất)
+        run: |
+          cd backups
+          ls -1 | sort -r | tail -n +13 | xargs -r rm -rf
+          cd ..
+          if git diff --quiet; then
+            echo "Không có cleanup"
+          else
+            git add backups/
+            git commit -m "chore(backup): cleanup old snapshots"
+            git push
+          fi
