@@ -17862,15 +17862,30 @@ async function _authedFetch(url, options) {
 
   // Đợi Supabase init xong rồi setup
   async function init() {
+    // V93: đợi Supabase init lâu hơn (60s) thay vì 15s, retry nếu cần
+    const MAX_WAIT = 60000;
     const t0 = Date.now();
-    while (Date.now() - t0 < 15000) {
+    while (Date.now() - t0 < MAX_WAIT) {
       if (window._AUTH_SB_URL && window._AUTH_SB_KEY) break;
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 500));
     }
-    if (!window._AUTH_SB_URL) { console.warn('[V86] Supabase chưa init'); return; }
+    if (!window._AUTH_SB_URL) {
+      console.warn('[V86] Supabase chưa init sau ' + (MAX_WAIT/1000) + 's, retry ngầm');
+      // Retry mỗi 30s nếu vẫn chưa init
+      const retryId = setInterval(() => {
+        if (window._AUTH_SB_URL && window._AUTH_SB_KEY) {
+          clearInterval(retryId);
+          console.log('[V86] Supabase init xong, khởi động widget');
+          createBanner();
+          refresh();
+          setInterval(refresh, 60000);
+        }
+      }, 30000);
+      return;
+    }
     createBanner();
     refresh();
-    setInterval(refresh, 60000); // refresh mỗi phút
+    setInterval(refresh, 60000);
   }
   
   if (document.readyState === 'loading') {
@@ -18052,19 +18067,57 @@ async function _authedFetch(url, options) {
     return { type:'unknown', label:'❌ Lỗi', detail: msg };
   };
 
-  // Toast độc lập (không phụ thuộc #changeNotifArea)
+  // V93: Toast độc lập với stack, nút Close, thời gian hợp lý
+  // Khởi tạo stack container
+  function _v90GetStack() {
+    let stack = document.getElementById('v90ToastStack');
+    if (!stack) {
+      stack = document.createElement('div');
+      stack.id = 'v90ToastStack';
+      stack.style.cssText = 'position:fixed;top:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:10px;max-width:420px;pointer-events:none';
+      document.body.appendChild(stack);
+    }
+    return stack;
+  }
+
+  // Lưu lịch sử toast (giữ 50 cái gần nhất)
+  window._v90ToastHistory = window._v90ToastHistory || [];
+
   window._v90Toast = function(type, title, detail) {
     const colors = { error:'#ff5252', warn:'#ff9100', success:'#00e676', info:'#00c8ff' };
+    const col = colors[type] || '#888';
+    
+    // Lưu history
+    window._v90ToastHistory.push({ type, title, detail, time: new Date().toISOString() });
+    if (window._v90ToastHistory.length > 50) window._v90ToastHistory.shift();
+    
+    const stack = _v90GetStack();
     const div = document.createElement('div');
-    div.style.cssText = 'position:fixed;top:20px;right:20px;background:rgba(20,28,40,.95);border-left:4px solid ' + (colors[type]||'#888') + ';padding:14px 18px;border-radius:6px;color:#fff;font-family:system-ui;font-size:13px;z-index:99999;min-width:260px;max-width:400px;box-shadow:0 6px 24px rgba(0,0,0,.6);backdrop-filter:blur(8px)';
-    div.innerHTML = '<div style="font-weight:700;color:' + (colors[type]||'#fff') + '">' + title + '</div>' +
-      (detail ? '<div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:4px;word-break:break-word">' + detail + '</div>' : '');
-    document.body.appendChild(div);
-    setTimeout(() => {
-      div.style.opacity = '0';
-      div.style.transition = 'opacity .5s';
-      setTimeout(() => div.remove(), 600);
-    }, type === 'error' ? 8000 : 4000);
+    div.style.cssText = 'pointer-events:auto;background:rgba(20,28,40,.96);border-left:4px solid '+col+';padding:14px 38px 14px 18px;border-radius:6px;color:#fff;font-family:system-ui;font-size:13px;min-width:280px;max-width:420px;box-shadow:0 6px 24px rgba(0,0,0,.6);backdrop-filter:blur(8px);position:relative;transition:opacity .4s,transform .4s;transform:translateX(10px);opacity:0';
+    div.innerHTML = '<div style="font-weight:700;color:'+col+';padding-right:10px">'+title+'</div>' +
+      (detail ? '<div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:4px;word-break:break-word">'+detail+'</div>' : '') +
+      '<button onclick="this.parentNode.style.opacity=0;setTimeout(()=>this.parentNode.remove(),400)" style="position:absolute;top:8px;right:8px;background:transparent;border:none;color:rgba(255,255,255,.6);cursor:pointer;font-size:16px;padding:2px 6px;line-height:1;border-radius:4px" onmouseover="this.style.background=\'rgba(255,255,255,.1)\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'rgba(255,255,255,.6)\'">✕</button>';
+    stack.appendChild(div);
+    // Animate in
+    requestAnimationFrame(() => { div.style.transform='translateX(0)'; div.style.opacity='1'; });
+    
+    // Auto dismiss: error 15s, warn/info 8s, success 5s
+    const dismissMs = type === 'error' ? 15000 : (type === 'success' ? 5000 : 8000);
+    const tid = setTimeout(() => {
+      if (div.parentNode) {
+        div.style.opacity = '0';
+        div.style.transform = 'translateX(20px)';
+        setTimeout(() => div.remove(), 500);
+      }
+    }, dismissMs);
+    // Hover stops timer (user đang đọc)
+    div.onmouseenter = () => { clearTimeout(tid); };
+  };
+
+  // Helper xem lịch sử toast trong Console
+  window._v90ShowHistory = function() {
+    console.table(window._v90ToastHistory || []);
+    console.log('Có ' + (window._v90ToastHistory||[]).length + ' toast trong lịch sử');
   };
 
   console.log('[V90] OCR helpers loaded (timeout + classify + toast)');
