@@ -1,4 +1,4 @@
-# EVN Hà Nội Dashboard — CONTEXT (cập nhật v85)
+# EVN Hà Nội Dashboard — CONTEXT (cập nhật v100)
 
 ## Hệ thống
 - Dashboard: https://thietbi.vercel.app/ (Vercel auto-deploy)
@@ -148,3 +148,96 @@ created_email, updated_at, loai_thiet_bi, sfra, tiet_dien, file_source
 **Misc:**
 - Cleanup V60/V61 dead code (~600-900 dòng, rủi ro cao)
 - Consider DB UNIQUE constraint (cẩn thận CSV 3 pha)
+
+
+═══════════════════════════════════════════════════════════
+## CẬP NHẬT v86 → v100 (Sprint OCR Refactor + Visibility)
+═══════════════════════════════════════════════════════════
+
+### Tính năng mới (v86-v88)
+- v86: Widget cảnh báo BBTN chưa khớp DB (gắn vào menu #bbtnAlertsMenu)
+- v87: Search advanced - dropdown Năm SX + Hãng SX, search rộng file_name+hang_san_xuat
+- v88: Auto-backup DB GitHub Actions (CN 2h sáng VN, cron '0 19 * * 6')
+  - .github/workflows/backup-db.yml + .github/scripts/backup_db.py
+  - Backup 5 bảng: bbtn_records, bbtn_alerts, CongTacThiNghiem, TongHopThietBi, nas_health_log
+  - ⚠️ PENDING: setup GitHub Secrets SUPABASE_URL + SUPABASE_ANON_KEY
+
+### Sprint OCR Pipeline Refactor (v89-v100) - QUAN TRỌNG
+Vấn đề gốc: file lớn crash browser, timeout, OOM, Gemini 503, Chrome chặn confirm.
+
+**v89 - Stream qua Edge Function**
+- Browser KHÔNG load file vào RAM. Gửi {nas_path} → Edge Function tự fetch NAS + xử lý
+- Edge Function: input {nas_path?, file_base64?, mime_type, file_name, file_size_bytes?, fileSizeBytes?}
+- Backup: index.ts.before-v89.bak
+
+**v90-92 - Helper architecture (window scope)**
+- _v90OcrFetch(nasPath, fileName, sizeBytes): ALL-IN-ONE - timeout động + retry + classify + trả JSON
+- _v90Toast(type, title, detail): toast độc lập, KHÔNG phụ thuộc #changeNotifArea
+- _v90ToastHistory + _v90ShowHistory(): lịch sử 50 toast
+- _ocrOne mỏng: chỉ delegate _v90OcrFetch (bỏ download blob/base64 dead code)
+- Payload có file_size_bytes (snake) + fileSizeBytes (camel)
+
+**v93 - Toast persistent**
+- Stack dọc #v90ToastStack, auto-dismiss error 15s/info 8s/success 5s
+- Hover dừng timer, nút ✕ đóng ngay
+- V86 retry init Supabase mỗi 30s nếu chưa init (max 60s)
+
+**v94-95 - Token + Heartbeat**
+- Timeout động: <15MB→150s, 15-30MB→180s, >30MB→240s
+- Retry timeout+network (2 lần), r=null trong catch (classify đúng lỗi cuối)
+- Fresh token (let freshToken) TRƯỚC mỗi insert DB (JWT 1h expire khi bulk lâu)
+- Heartbeat đếm giây SAU check >200MB (tránh leak), clear trong finally (_v95hb)
+- Skip >200MB: KHÔNG done++ (V66), KHÔNG continue (V68) - tránh double count
+
+**v96 - Per-file heartbeat**
+- _v96StartPerFileProgress/_v96StopPerFileProgress: toast đếm giây cho per-file OCR
+
+**v97 - Fix OOM HTTP 546 (Edge Function)**
+- File >10MB: upload bytes THẲNG lên Gemini File API (KHÔNG encode base64)
+- uploadBytesToGeminiFileAPI(bytes) thay uploadToGeminiFileAPI(base64)
+- RAM giảm từ ~292MB (3 copy) xuống ~80MB. Backup: index.ts.before-v97.bak
+
+**v98 - Fix constraint 23514**
+- _v98NormDangKD(): normalize dang_kiem_dinh về 5 giá trị hợp lệ
+- "CBM", "Kiểm tra chất lượng", lạ → "Khác". Constraint bbtn_dang_check: Lần đầu|Định kỳ|Đột xuất|Sửa chữa|Khác|NULL
+
+**v99 - Fix HTTP 546 do Gemini 503 (Edge Function)**
+- MAX_RETRIES 6→3, backoff nhẹ 2/3/4s (trước 2/4/6/8/10/12=42s vượt 60s → shutdown)
+- Hết retry vẫn 503/429 → trả JSON lỗi rõ ràng (HTTP 503) thay vì để shutdown→546
+- Backup: index.ts.before-v99.bak
+
+**v100 - Fix Chrome chặn confirm()**
+- _v100Confirm(message, title): modal HTML Promise-based, Chrome KHÔNG chặn được
+- Thay 4 confirm START: V66 bulk, V68 selected, V80 _v80Ask, V80c _v80cAsk
+- Lý do: confirm() native bị Chrome chặn khi tab inactive → trả false → bulk không chạy
+
+### Helper Functions mới (window scope)
+- _v90OcrFetch, _v90Toast, _v90ToastHistory, _v90ShowHistory (v90/93)
+- _v96StartPerFileProgress, _v96StopPerFileProgress (v96)
+- _v98NormDangKD (v98)
+- _v100Confirm (v100)
+
+### Edge Function bbtn-ocr-extract (post-v99)
+- INLINE_RAW_LIMIT 10MB: <10MB inline base64, >10MB upload bytes thẳng (FILE_API)
+- MAX_RETRIES=3, backoff 2/3/4s, trả 503 rõ ràng
+- Log phases: [OCR-V97] Fetched/INLINE/LARGE, [File API] Uploading, [Gemini] 503/429 retry
+
+### Tech Lessons mới
+- Chrome chặn confirm()/alert() khi tab inactive → dùng modal HTML
+- Gemini free tier hay 503 + rate limit 15 RPM → retry phải ngắn (free tier 60s wall-clock)
+- OOM 546 do encode base64 (×1.33) + giữ nhiều copy → upload bytes thẳng
+- Edge Function 60s timeout: retry backoff dài (42s) → shutdown. Phải giới hạn tổng wait
+- Constraint CHECK: OCR data tự do (CBM...) cần normalize trước insert
+- Line-based patch an toàn hơn string match khi có dòng trống/CRLF/Unicode
+
+### Commit log v86-v100
+- a7a455e v87, 1ed4a83 v88, ef73877 v89, aa47a3e v89b
+- 4216a1f v90, a59b0bc v91, 12c8d0b v92, 1397fbf v93
+- 831a482 v94, b55ac96 v95, afe21fe v96, ee98433 v97
+- 2d51ddf v98, 3e0a476 v99, dfade32 v100
+- (v86: add4151 + c20a64c)
+
+### PENDING
+- Setup GitHub Secrets v88 (SUPABASE_URL, SUPABASE_ANON_KEY)
+- Throttle bulk nếu OCR folder rất lớn (50-100+ file) gặp nhiều 503
+- Mobile responsive (Việc K - chưa làm)
