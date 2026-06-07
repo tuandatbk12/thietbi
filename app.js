@@ -16855,8 +16855,8 @@ async function _authedFetch(url, options) {
       if((f.size||0)>200*1024*1024){ fail++; done++; failed.push({name:f.name,error:'>200MB skip'}); if(window._v90Toast)_v90Toast('warn','⚠️ Bỏ qua file '+fSizeMB+'MB',f.name); }
       else try {
         // V91: _v90OcrFetch all-in-one (đã có retry + classify nội bộ)
-        const or = await window._v90OcrFetch(f.path, f.name, f.size);
-        const od=await or.json();
+        // V92: _v90OcrFetch trả JSON luôn
+        const od = await window._v90OcrFetch(f.path, f.name, f.size);
         const items=od.items||[];
         if(!items.length){ failed.push({name:f.name,error:'Không có thiết bị'}); fail++; }
         else {
@@ -16937,22 +16937,11 @@ async function _authedFetch(url, options) {
   if (window._bbtnV68) return;
   window._bbtnV68 = true;
 
-  function _b64(blob){ return new Promise((res,rej)=>{const rd=new FileReader();rd.onloadend=()=>res(rd.result.split(',')[1]);rd.onerror=rej;rd.readAsDataURL(blob);}); }
-
+  // V92: _ocrOne mỏng - delegate _v90OcrFetch (đã trả JSON, retry, classify)
   async function _ocrOne(token, SB, nasPath, fileName, sizeBytes){
-    // V90: stream qua server, timeout động theo size, bỏ dead code download+base64
     const sizeMB = (sizeBytes||0)/1024/1024;
-    if (sizeBytes && sizeBytes > 200*1024*1024) throw new Error('>200MB skip ('+sizeMB.toFixed(1)+'MB)');
-    let or = await window._v90OcrFetch(nasPath, fileName, sizeBytes);
-    if(!or.ok && (or.status===504||or.status===503||or.status===429||or.status===502)){
-      await new Promise(r=>setTimeout(r,8000));
-      or = await window._v90OcrFetch(nasPath, fileName, sizeBytes);
-    }
-    if(!or.ok){
-      const cls = window._v90ClassifyError(null, or);
-      throw new Error(cls.label+' '+cls.detail);
-    }
-    return await or.json();
+    if (sizeBytes && sizeBytes > 200*1024*1024) throw new Error('📦 >200MB skip ('+sizeMB.toFixed(1)+'MB)');
+    return await window._v90OcrFetch(nasPath, fileName, sizeBytes);
   }
 
   function _mapRec(it, nasPath, fileName){
@@ -17996,6 +17985,7 @@ async function _authedFetch(url, options) {
 
   // V91: Fetch OCR all-in-one - timeout động + retry + classify trong helper
   window._v90OcrFetch = async function(nasPath, fileName, sizeBytes) {
+    // V92: All-in-one - timeout động + retry + classify + trả JSON
     const SB = _AUTH_SB_URL.replace(/\/$/, '');
     const token = await _authGetToken();
     const sizeMB = (sizeBytes || 0) / 1024 / 1024;
@@ -18008,26 +17998,27 @@ async function _authedFetch(url, options) {
         const r = await fetch(SB + '/functions/v1/bbtn-ocr-extract', {
           method:'POST',
           headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY},
-          body: JSON.stringify({nas_path:nasPath, mime_type:'application/pdf', file_name:fileName}),
+          body: JSON.stringify({
+            nas_path: nasPath,
+            mime_type: 'application/pdf',
+            file_name: fileName,
+            file_size_bytes: sizeBytes || 0,
+            fileSizeBytes: sizeBytes || 0
+          }),
           signal: ctrl.signal
         });
         clearTimeout(tid);
         return r;
-      } catch(e) {
-        clearTimeout(tid);
-        throw e;
-      }
+      } catch(e) { clearTimeout(tid); throw e; }
     }
     function _mkErr(label, type) { const e = new Error(label); e._v90Type = type; return e; }
 
-    // Attempt 1
     let r;
     try { r = await _attempt(); }
     catch(e) {
       if (e.name === 'AbortError') throw _mkErr('⏱️ Timeout '+Math.round(timeoutMs/1000)+'s ('+sizeMB.toFixed(1)+'MB)', 'timeout');
       throw _mkErr('🔌 Lỗi mạng: '+(e.message||'fetch failed'), 'network');
     }
-    // Retry 1 lần với 504/503/429/502
     if (!r.ok && [504,503,429,502].indexOf(r.status) !== -1) {
       await new Promise(rs => setTimeout(rs, 8000));
       try { r = await _attempt(); }
@@ -18036,7 +18027,6 @@ async function _authedFetch(url, options) {
         throw _mkErr('🔌 Lỗi mạng: '+(e.message||'fetch failed'), 'network');
       }
     }
-    // Classify HTTP error
     if (!r.ok) {
       if (r.status === 413) throw _mkErr('📦 File quá lớn (HTTP 413)', 'too_large');
       if (r.status === 504 || r.status === 502) throw _mkErr('🚪 Gateway timeout (HTTP '+r.status+')', 'gateway');
@@ -18044,7 +18034,8 @@ async function _authedFetch(url, options) {
       if (r.status >= 500) throw _mkErr('💥 Server lỗi (HTTP '+r.status+')', 'server');
       throw _mkErr('❌ HTTP '+r.status, 'http');
     }
-    return r;
+    // V92: trả JSON luôn, không trả Response
+    return await r.json();
   };
 
   // Phân loại lỗi
