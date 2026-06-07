@@ -9563,7 +9563,7 @@ function _bbtnRenderItems(items, path, rootPath, depth) {
         <td style="padding:7px 12px;text-align:right;font-family:var(--font-mono);color:rgba(180,200,220,.65);font-size:10px">${fmtDate(f.modified)}</td>
         <td style="padding:7px 12px;text-align:center;white-space:nowrap">
           <button onclick="_bbtnViewFile('${safeRelPath}',false)" style="padding:3px 9px;border-radius:5px;border:1px solid rgba(0,200,255,.3);background:rgba(0,200,255,.08);color:var(--accent);font-size:9.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;margin-right:4px"><i class="fas fa-eye"></i> Xem</button>
-          <button onclick="_bbtnViewFile('${safeRelPath}',true)" style="padding:3px 9px;border-radius:5px;border:1px solid rgba(0,230,118,.3);background:rgba(0,230,118,.08);color:#00e676;font-size:9.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;margin-right:4px"><i class="fas fa-download"></i> Tải</button>${ext === 'pdf' ? `<button onclick="_bbtnOcrFromNas('${safeRelPath}', '${f.name.replace(/'/g,"\\'")}')" style="padding:3px 9px;border-radius:5px;border:1px solid rgba(255,193,7,.3);background:rgba(255,193,7,.1);color:#ffc107;font-size:9.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px" title="OCR file này bằng Gemini AI"><i class="fas fa-eye-low-vision"></i> OCR</button>` : ''}
+          <button onclick="_bbtnViewFile('${safeRelPath}',true)" style="padding:3px 9px;border-radius:5px;border:1px solid rgba(0,230,118,.3);background:rgba(0,230,118,.08);color:#00e676;font-size:9.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;margin-right:4px"><i class="fas fa-download"></i> Tải</button>${ext === 'pdf' ? `<button onclick="_bbtnOcrFromNas('${safeRelPath}', '${f.name.replace(/'/g,"\\'")}', ${f.size||0})" style="padding:3px 9px;border-radius:5px;border:1px solid rgba(255,193,7,.3);background:rgba(255,193,7,.1);color:#ffc107;font-size:9.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px" title="OCR file này bằng Gemini AI"><i class="fas fa-eye-low-vision"></i> OCR</button>` : ''}
         </td>
       </tr>`;
     });
@@ -16854,18 +16854,8 @@ async function _authedFetch(url, options) {
       document.getElementById('v66Cur').textContent='📄 '+f.name+' ('+fSizeMB+'MB)';
       if((f.size||0)>200*1024*1024){ fail++; done++; failed.push({name:f.name,error:'>200MB skip'}); if(window._v90Toast)_v90Toast('warn','⚠️ Bỏ qua file '+fSizeMB+'MB',f.name); }
       else try {
-        // V90: dùng _v90OcrFetch (timeout động + classify error)
-        let or = await window._v90OcrFetch(f.path, f.name, f.size);
-        if(!or.ok && (or.status===504||or.status===503||or.status===429||or.status===502)){
-          document.getElementById('v66Cur').textContent='⏳ Gemini bận, thử lại: '+f.name;
-          await new Promise(r=>setTimeout(r,8000));
-          or = await window._v90OcrFetch(f.path, f.name, f.size);
-        }
-        if(!or.ok){
-          const cls = window._v90ClassifyError(null, or);
-          if(window._v90Toast) _v90Toast('error', cls.label+' — '+f.name, cls.detail);
-          throw new Error(cls.label+' '+cls.detail);
-        }
+        // V91: _v90OcrFetch all-in-one (đã có retry + classify nội bộ)
+        const or = await window._v90OcrFetch(f.path, f.name, f.size);
         const od=await or.json();
         const items=od.items||[];
         if(!items.length){ failed.push({name:f.name,error:'Không có thiết bị'}); fail++; }
@@ -17136,9 +17126,11 @@ async function _authedFetch(url, options) {
     for (let i=0;i<allPdfs.length;i++){
       if(cancel) break;
       const f=allPdfs[i];
-      document.getElementById('v68Cur').textContent='📄 '+f.name;
+      const fSizeMB = ((f.size||0)/1024/1024).toFixed(1);
+      document.getElementById('v68Cur').textContent='📄 '+f.name+' ('+fSizeMB+'MB)';
       try {
-        const od = await _ocrOne(token, SB, f.path, f.name);
+        if ((f.size||0) > 200*1024*1024) throw new Error('📦 >200MB skip ('+fSizeMB+'MB)');
+        const od = await _ocrOne(token, SB, f.path, f.name, f.size);
         const items = od.items||[];
         if(!items.length){ failed.push({name:f.name,error:'Không có thiết bị'}); fail++; }
         else {
@@ -18002,35 +17994,57 @@ async function _authedFetch(url, options) {
   if (window._v90Helpers) return;
   window._v90Helpers = true;
 
-  // Fetch OCR với timeout động theo size
+  // V91: Fetch OCR all-in-one - timeout động + retry + classify trong helper
   window._v90OcrFetch = async function(nasPath, fileName, sizeBytes) {
     const SB = _AUTH_SB_URL.replace(/\/$/, '');
     const token = await _authGetToken();
     const sizeMB = (sizeBytes || 0) / 1024 / 1024;
-    let timeoutMs;
-    if (sizeMB > 30) timeoutMs = 180000;
-    else if (sizeMB > 15) timeoutMs = 120000;
-    else timeoutMs = 90000;
-    const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), timeoutMs);
-    try {
-      const r = await fetch(SB + '/functions/v1/bbtn-ocr-extract', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token,
-          'apikey': _AUTH_SB_KEY
-        },
-        body: JSON.stringify({ nas_path: nasPath, mime_type: 'application/pdf', file_name: fileName }),
-        signal: ctrl.signal
-      });
-      clearTimeout(tid);
-      return r;
-    } catch (e) {
-      clearTimeout(tid);
-      if (e.name === 'AbortError') throw new Error('TIMEOUT_' + Math.round(timeoutMs/1000) + 's_' + sizeMB.toFixed(1) + 'MB');
-      throw new Error('NETWORK_' + (e.message || 'Failed to fetch'));
+    const timeoutMs = sizeMB > 30 ? 180000 : sizeMB > 15 ? 120000 : 90000;
+
+    async function _attempt() {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        const r = await fetch(SB + '/functions/v1/bbtn-ocr-extract', {
+          method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY},
+          body: JSON.stringify({nas_path:nasPath, mime_type:'application/pdf', file_name:fileName}),
+          signal: ctrl.signal
+        });
+        clearTimeout(tid);
+        return r;
+      } catch(e) {
+        clearTimeout(tid);
+        throw e;
+      }
     }
+    function _mkErr(label, type) { const e = new Error(label); e._v90Type = type; return e; }
+
+    // Attempt 1
+    let r;
+    try { r = await _attempt(); }
+    catch(e) {
+      if (e.name === 'AbortError') throw _mkErr('⏱️ Timeout '+Math.round(timeoutMs/1000)+'s ('+sizeMB.toFixed(1)+'MB)', 'timeout');
+      throw _mkErr('🔌 Lỗi mạng: '+(e.message||'fetch failed'), 'network');
+    }
+    // Retry 1 lần với 504/503/429/502
+    if (!r.ok && [504,503,429,502].indexOf(r.status) !== -1) {
+      await new Promise(rs => setTimeout(rs, 8000));
+      try { r = await _attempt(); }
+      catch(e) {
+        if (e.name === 'AbortError') throw _mkErr('⏱️ Timeout '+Math.round(timeoutMs/1000)+'s ('+sizeMB.toFixed(1)+'MB)', 'timeout');
+        throw _mkErr('🔌 Lỗi mạng: '+(e.message||'fetch failed'), 'network');
+      }
+    }
+    // Classify HTTP error
+    if (!r.ok) {
+      if (r.status === 413) throw _mkErr('📦 File quá lớn (HTTP 413)', 'too_large');
+      if (r.status === 504 || r.status === 502) throw _mkErr('🚪 Gateway timeout (HTTP '+r.status+')', 'gateway');
+      if (r.status === 503 || r.status === 429) throw _mkErr('🚦 Server bận (HTTP '+r.status+')', 'busy');
+      if (r.status >= 500) throw _mkErr('💥 Server lỗi (HTTP '+r.status+')', 'server');
+      throw _mkErr('❌ HTTP '+r.status, 'http');
+    }
+    return r;
   };
 
   // Phân loại lỗi
