@@ -264,8 +264,9 @@ async function callGeminiOcr(parts: any[]): Promise<{ text: string; elapsed: num
     if (geminiRes.status === 429) {
       const errText = await geminiRes.clone().text();
       const m = errText.match(/retry in (\d+(?:\.\d+)?)s/i);
-      if (m) waitMs = Math.min((Math.ceil(parseFloat(m[1])) + 1) * 1000, 10000); // cap 10s
-      else waitMs = 8000;
+      // V102: 429 = het quota, retry it va nhanh (cap 5s) vi retry lau cung vo ich khi quota can
+      if (m) waitMs = Math.min((Math.ceil(parseFloat(m[1])) + 1) * 1000, 5000); // cap 5s
+      else waitMs = 4000;
       console.log(`[Gemini] 429 quota, wait ${waitMs/1000}s (retry ${retryCount}/${MAX_RETRIES})`);
     } else {
       console.log(`[Gemini] 503, wait ${waitMs/1000}s (retry ${retryCount}/${MAX_RETRIES})`);
@@ -281,7 +282,11 @@ async function callGeminiOcr(parts: any[]): Promise<{ text: string; elapsed: num
   const elapsed = Date.now() - startTime;
   if (!geminiRes.ok) throw new Error(`Gemini ${geminiRes.status}: ${(await geminiRes.text()).slice(0, 500)}`);
   const geminiData = await geminiRes.json();
-  const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  // V102: dam bao text luon la string (Gemini doi khi tra parts khong chuan -> .slice loi)
+  let text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (typeof text !== "string") {
+    text = text == null ? "" : (typeof text === "object" ? JSON.stringify(text) : String(text));
+  }
   if (!text) throw new Error("Gemini empty response");
   return { text, elapsed, retries: retryCount };
 }
@@ -381,7 +386,7 @@ serve(async (req: Request) => {
       const cleanText = text.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
       parsed = JSON.parse(cleanText);
     } catch {
-      return jsonResponse({ error: "Gemini returned non-JSON", raw_text: text.slice(0, 1000) }, 502);
+      return jsonResponse({ error: "Gemini returned non-JSON", raw_text: String(text).slice(0, 1000) }, 502);
     }
 
     let items: any[];
