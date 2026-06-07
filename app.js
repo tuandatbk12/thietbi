@@ -16874,10 +16874,14 @@ async function _authedFetch(url, options) {
         }
       } catch(e){
         fail++;
-        const cls = window._v90ClassifyError ? window._v90ClassifyError(e, null) : { label:'❌ Lỗi', detail:e.message };
-        failed.push({name:f.name,error:cls.label+': '+cls.detail});
-        if(window._v90Toast) _v90Toast('error', cls.label+' — '+f.name, cls.detail);
+        // V94: dùng message của error trực tiếp (đã được _v90OcrFetch classify)
+        const label = e._v90Type ? e.message : ('❌ Lỗi: '+e.message);
+        failed.push({name:f.name,error:label});
+        if(window._v90Toast) _v90Toast('error', label, f.name);
         console.error('[V66] FAIL',f.name,e);
+      } finally {
+        // V94: clear heartbeat
+        if (typeof _v94hb !== 'undefined') clearInterval(_v94hb);
       }
 
       done++;
@@ -18004,7 +18008,8 @@ async function _authedFetch(url, options) {
     const SB = _AUTH_SB_URL.replace(/\/$/, '');
     const token = await _authGetToken();
     const sizeMB = (sizeBytes || 0) / 1024 / 1024;
-    const timeoutMs = sizeMB > 30 ? 180000 : sizeMB > 15 ? 120000 : 90000;
+    // V94: nâng timeout - Gemini có thể chậm khi bị throttle, không chỉ do size
+    const timeoutMs = sizeMB > 30 ? 240000 : sizeMB > 15 ? 180000 : 150000;
 
     async function _attempt() {
       const ctrl = new AbortController();
@@ -18028,19 +18033,29 @@ async function _authedFetch(url, options) {
     }
     function _mkErr(label, type) { const e = new Error(label); e._v90Type = type; return e; }
 
+    // V94: retry cho cả AbortError/Network (Gemini đôi khi treo, request 2 nhanh hơn)
     let r;
-    try { r = await _attempt(); }
-    catch(e) {
-      if (e.name === 'AbortError') throw _mkErr('⏱️ Timeout '+Math.round(timeoutMs/1000)+'s ('+sizeMB.toFixed(1)+'MB)', 'timeout');
-      throw _mkErr('🔌 Lỗi mạng: '+(e.message||'fetch failed'), 'network');
-    }
-    if (!r.ok && [504,503,429,502].indexOf(r.status) !== -1) {
-      await new Promise(rs => setTimeout(rs, 8000));
-      try { r = await _attempt(); }
-      catch(e) {
-        if (e.name === 'AbortError') throw _mkErr('⏱️ Timeout '+Math.round(timeoutMs/1000)+'s ('+sizeMB.toFixed(1)+'MB)', 'timeout');
-        throw _mkErr('🔌 Lỗi mạng: '+(e.message||'fetch failed'), 'network');
+    let lastErr = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        r = await _attempt();
+        if (r.ok || [504,503,429,502].indexOf(r.status) === -1) break; // OK hoặc lỗi non-retryable
+        // Retry HTTP
+        if (attempt < 2) {
+          console.warn('[V94] HTTP '+r.status+' on attempt '+attempt+', retry 8s...');
+          await new Promise(rs => setTimeout(rs, 8000));
+        }
+      } catch(e) {
+        lastErr = e;
+        if (attempt < 2) {
+          console.warn('[V94] '+e.name+' on attempt '+attempt+', retry 5s...');
+          await new Promise(rs => setTimeout(rs, 5000));
+        }
       }
+    }
+    if (!r) {
+      if (lastErr && lastErr.name === 'AbortError') throw _mkErr('⏱️ Timeout '+Math.round(timeoutMs/1000)+'s ('+sizeMB.toFixed(1)+'MB)', 'timeout');
+      throw _mkErr('🔌 Lỗi mạng: '+(lastErr && lastErr.message || 'fetch failed'), 'network');
     }
     if (!r.ok) {
       if (r.status === 413) throw _mkErr('📦 File quá lớn (HTTP 413)', 'too_large');
