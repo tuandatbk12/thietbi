@@ -249,7 +249,8 @@ async function callGeminiOcr(parts: any[]): Promise<{ text: string; elapsed: num
   const startTime = Date.now();
   let geminiRes: Response;
   let retryCount = 0;
-  const MAX_RETRIES = 6;
+  // V99: gioi han retry de KHONG vuot 60s wall-clock free tier (tranh shutdown -> HTTP 546)
+  const MAX_RETRIES = 3;
   while (true) {
     geminiRes = await fetch(`${GEMINI_GENERATE_URL}?key=${GEMINI_API_KEY}`, {
       method: "POST",
@@ -258,17 +259,24 @@ async function callGeminiOcr(parts: any[]): Promise<{ text: string; elapsed: num
     });
     if ((geminiRes.status !== 503 && geminiRes.status !== 429) || retryCount >= MAX_RETRIES) break;
     retryCount++;
-    let waitMs = 2000 * retryCount;
+    // V99: 503 backoff nhe (2/3/4s) thay vi 2/4/6...; 429 quota van doc retry-in nhung cap 10s
+    let waitMs = 1000 * (retryCount + 1); // 2s, 3s, 4s
     if (geminiRes.status === 429) {
       const errText = await geminiRes.clone().text();
       const m = errText.match(/retry in (\d+(?:\.\d+)?)s/i);
-      if (m) waitMs = (Math.ceil(parseFloat(m[1])) + 1) * 1000;
-      else waitMs = 30000;
+      if (m) waitMs = Math.min((Math.ceil(parseFloat(m[1])) + 1) * 1000, 10000); // cap 10s
+      else waitMs = 8000;
       console.log(`[Gemini] 429 quota, wait ${waitMs/1000}s (retry ${retryCount}/${MAX_RETRIES})`);
     } else {
       console.log(`[Gemini] 503, wait ${waitMs/1000}s (retry ${retryCount}/${MAX_RETRIES})`);
     }
     await new Promise(r => setTimeout(r, waitMs));
+  }
+  // V99: het retry van 503/429 -> tra loi ro rang, KHONG de Edge Function chay tiep roi shutdown
+  if (geminiRes.status === 503 || geminiRes.status === 429) {
+    const busyMsg = geminiRes.status === 429 ? 'Gemini het quota (429)' : 'Gemini qua tai (503)';
+    console.error(`[Gemini] Het ${MAX_RETRIES} retry, van ${geminiRes.status} -> tra loi`);
+    return jsonResponse({ error: `${busyMsg} sau ${MAX_RETRIES} lan thu. Thu lai sau vai phut.`, gemini_status: geminiRes.status }, 503);
   }
   const elapsed = Date.now() - startTime;
   if (!geminiRes.ok) throw new Error(`Gemini ${geminiRes.status}: ${(await geminiRes.text()).slice(0, 500)}`);
