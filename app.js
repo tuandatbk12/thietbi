@@ -12560,7 +12560,7 @@ async function _authedFetch(url, options) {
           dien_ap: it.dien_ap,
           dong_dien: it.dong_dien,
           ngay_kiem_dinh: it.ngay_kiem_dinh,
-          dang_kiem_dinh: it.dang_kiem_dinh,
+          dang_kiem_dinh: (window._v98NormDangKD ? _v98NormDangKD(it.dang_kiem_dinh) : it.dang_kiem_dinh),
           vi_tri_lap_dat: it.vi_tri_lap_dat,
           sfra: it.sfra,
           tiet_dien: it.tiet_dien,
@@ -16871,7 +16871,7 @@ async function _authedFetch(url, options) {
               tram:it.tram||null, loai_thiet_bi:it.loai_thiet_bi||null, ten_thiet_bi:it.ten_thiet_bi||null,
               kieu:it.kieu||null, so_che_tao:it.so_che_tao||null, hang_san_xuat:it.hang_san_xuat||null,
               nuoc_san_xuat:it.nuoc_san_xuat||null, nam_san_xuat:it.nam_san_xuat||null, dien_ap:it.dien_ap||null,
-              dong_dien:it.dong_dien||null, ngay_kiem_dinh:it.ngay_kiem_dinh||null, dang_kiem_dinh:it.dang_kiem_dinh||null,
+              dong_dien:it.dong_dien||null, ngay_kiem_dinh:it.ngay_kiem_dinh||null, dang_kiem_dinh:(window._v98NormDangKD?_v98NormDangKD(it.dang_kiem_dinh):it.dang_kiem_dinh||null),
               vi_tri_lap_dat:it.vi_tri_lap_dat||null, sfra:it.sfra, tiet_dien:it.tiet_dien||null,
               file_url:f.path, file_name:f.name, file_source:'nas'
             }));
@@ -16966,7 +16966,7 @@ async function _authedFetch(url, options) {
       tram:it.tram||null, loai_thiet_bi:it.loai_thiet_bi||null, ten_thiet_bi:it.ten_thiet_bi||null,
       kieu:it.kieu||null, so_che_tao:it.so_che_tao||null, hang_san_xuat:it.hang_san_xuat||null,
       nuoc_san_xuat:it.nuoc_san_xuat||null, nam_san_xuat:it.nam_san_xuat||null, dien_ap:it.dien_ap||null,
-      dong_dien:it.dong_dien||null, ngay_kiem_dinh:it.ngay_kiem_dinh||null, dang_kiem_dinh:it.dang_kiem_dinh||null,
+      dong_dien:it.dong_dien||null, ngay_kiem_dinh:it.ngay_kiem_dinh||null, dang_kiem_dinh:(window._v98NormDangKD?_v98NormDangKD(it.dang_kiem_dinh):it.dang_kiem_dinh||null),
       vi_tri_lap_dat:it.vi_tri_lap_dat||null, sfra:it.sfra, tiet_dien:it.tiet_dien||null,
       file_url:nasPath, file_name:fileName, file_source:'nas'
     };
@@ -18199,6 +18199,17 @@ async function _authedFetch(url, options) {
   window._v96StopPerFileProgress = function(h) {
     if (h && h.hbId) clearInterval(h.hbId);
     if (h && h.div && h.div.parentNode) h.div.remove();
+  };
+
+  // V98: normalize dang_kiem_dinh ve 5 gia tri hop le (constraint bbtn_dang_check)
+  window._v98NormDangKD = function(val) {
+    if (!val) return null;
+    const v = String(val).toLowerCase().trim();
+    if (v.includes('lần đầu') || v.includes('lan dau') || v.includes('ban đầu') || v.includes('ban dau')) return 'Lần đầu';
+    if (v.includes('định kỳ') || v.includes('dinh ky')) return 'Định kỳ';
+    if (v.includes('đột xuất') || v.includes('dot xuat')) return 'Đột xuất';
+    if (v.includes('sửa chữa') || v.includes('sua chua')) return 'Sửa chữa';
+    return 'Khác'; // CBM, Kiem tra chat luong, gia tri la -> Khac
   };
 
   console.log('[V90] OCR helpers loaded (timeout + classify + toast)');
