@@ -16796,16 +16796,16 @@ async function _authedFetch(url, options) {
       }
     }
     const totalMB = pdfs.reduce((s,f)=>s+(f.size||0),0)/1024/1024;
-    const oversized = pdfs.filter(f=>(f.size||0)>50*1024*1024);
+    const oversized = pdfs.filter(f=>(f.size||0)>200*1024*1024);
     const estMin = Math.round(pdfs.length*25/60);
     let msg;
     if (pdfs.length > 100) {
       msg = '⚠️⚠️⚠️ CẢNH BÁO ⚠️⚠️⚠️\n\n📊 '+pdfs.length+' file PDF\n📦 '+totalMB.toFixed(1)+' MB\n'+
-        (oversized.length?'⚠️ '+oversized.length+' file >50MB (skip)\n':'')+
+        (oversized.length?'⚠️ '+oversized.length+' file >200MB (skip)\n':'')+
         '⏱️ ~'+estMin+' phút (~'+(Math.round(estMin/60*10)/10)+' giờ)\n\nTÁC VỤ DÀI! Tab phải mở liên tục.\nCó thể DỪNG bất cứ lúc nào.\n\nTIẾP TỤC?';
     } else {
       msg = '📊 '+pdfs.length+' file PDF\n📦 '+totalMB.toFixed(1)+' MB\n'+
-        (oversized.length?'⚠️ '+oversized.length+' file >50MB (skip)\n':'')+
+        (oversized.length?'⚠️ '+oversized.length+' file >200MB (skip)\n':'')+
         '⏱️ ~'+estMin+' phút\n\nTiếp tục OCR tất cả?';
     }
     if (!confirm(msg)) return;
@@ -16850,16 +16850,22 @@ async function _authedFetch(url, options) {
       const f=pdfs[i];
       document.getElementById('v66Cur').textContent='📄 '+f.name;
 
-      if((f.size||0)>50*1024*1024){ fail++; done++; failed.push({name:f.name,error:'>50MB skip'}); }
+      const fSizeMB = ((f.size||0)/1024/1024).toFixed(1);
+      document.getElementById('v66Cur').textContent='📄 '+f.name+' ('+fSizeMB+'MB)';
+      if((f.size||0)>200*1024*1024){ fail++; done++; failed.push({name:f.name,error:'>200MB skip'}); if(window._v90Toast)_v90Toast('warn','⚠️ Bỏ qua file '+fSizeMB+'MB',f.name); }
       else try {
-        // V89b: stream qua server - không download file vào browser
-        let or=await fetch(SB+'/functions/v1/bbtn-ocr-extract',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY},body:JSON.stringify({nas_path:f.path,mime_type:'application/pdf',file_name:f.name})});
+        // V90: dùng _v90OcrFetch (timeout động + classify error)
+        let or = await window._v90OcrFetch(f.path, f.name, f.size);
         if(!or.ok && (or.status===504||or.status===503||or.status===429||or.status===502)){
           document.getElementById('v66Cur').textContent='⏳ Gemini bận, thử lại: '+f.name;
           await new Promise(r=>setTimeout(r,8000));
-          or=await fetch(SB+'/functions/v1/bbtn-ocr-extract',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY},body:JSON.stringify({nas_path:f.path,mime_type:'application/pdf',file_name:f.name})});
+          or = await window._v90OcrFetch(f.path, f.name, f.size);
         }
-        if(!or.ok) throw new Error('OCR fail '+or.status);
+        if(!or.ok){
+          const cls = window._v90ClassifyError(null, or);
+          if(window._v90Toast) _v90Toast('error', cls.label+' — '+f.name, cls.detail);
+          throw new Error(cls.label+' '+cls.detail);
+        }
         const od=await or.json();
         const items=od.items||[];
         if(!items.length){ failed.push({name:f.name,error:'Không có thiết bị'}); fail++; }
@@ -16876,7 +16882,13 @@ async function _authedFetch(url, options) {
           if(!ir.ok) throw new Error('Save fail: '+(await ir.text()).substring(0,120));
           ok++; dev+=recs.length; success.push({name:f.name,count:recs.length});
         }
-      } catch(e){ fail++; failed.push({name:f.name,error:e.message}); console.error('[V66] FAIL',f.name,e); }
+      } catch(e){
+        fail++;
+        const cls = window._v90ClassifyError ? window._v90ClassifyError(e, null) : { label:'❌ Lỗi', detail:e.message };
+        failed.push({name:f.name,error:cls.label+': '+cls.detail});
+        if(window._v90Toast) _v90Toast('error', cls.label+' — '+f.name, cls.detail);
+        console.error('[V66] FAIL',f.name,e);
+      }
 
       done++;
       const pct=(done/pdfs.length*100);
@@ -16937,19 +16949,19 @@ async function _authedFetch(url, options) {
 
   function _b64(blob){ return new Promise((res,rej)=>{const rd=new FileReader();rd.onloadend=()=>res(rd.result.split(',')[1]);rd.onerror=rej;rd.readAsDataURL(blob);}); }
 
-  async function _ocrOne(token, SB, nasPath, fileName){
-    const dl = SB+'/functions/v1/bbtn-download?path='+encodeURIComponent(nasPath);
-    const fr = await _bbtnFetchEdge(dl, token, {timeoutMs:120000, maxRetries:1});
-    if(!fr.ok) throw new Error('Tải fail '+fr.status);
-    const blob = await fr.blob();
-    if(blob.size > 50*1024*1024) throw new Error('>50MB skip');
-    const b64 = await _b64(blob);
-    let or = await fetch(SB+'/functions/v1/bbtn-ocr-extract',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY},body:JSON.stringify({nas_path:nasPath,mime_type:'application/pdf',file_name:fileName})});
+  async function _ocrOne(token, SB, nasPath, fileName, sizeBytes){
+    // V90: stream qua server, timeout động theo size, bỏ dead code download+base64
+    const sizeMB = (sizeBytes||0)/1024/1024;
+    if (sizeBytes && sizeBytes > 200*1024*1024) throw new Error('>200MB skip ('+sizeMB.toFixed(1)+'MB)');
+    let or = await window._v90OcrFetch(nasPath, fileName, sizeBytes);
     if(!or.ok && (or.status===504||or.status===503||or.status===429||or.status===502)){
       await new Promise(r=>setTimeout(r,8000));
-      or = await fetch(SB+'/functions/v1/bbtn-ocr-extract',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY},body:JSON.stringify({nas_path:nasPath,mime_type:'application/pdf',file_name:fileName})});
+      or = await window._v90OcrFetch(nasPath, fileName, sizeBytes);
     }
-    if(!or.ok) throw new Error('OCR fail '+or.status);
+    if(!or.ok){
+      const cls = window._v90ClassifyError(null, or);
+      throw new Error(cls.label+' '+cls.detail);
+    }
     return await or.json();
   }
 
@@ -16965,19 +16977,23 @@ async function _authedFetch(url, options) {
   }
 
   // ── FIX PER-FILE OCR (override v57) ──
-  window._bbtnOcrFromNas = async function(nasPath, fileName) {
+  window._bbtnOcrFromNas = async function(nasPath, fileName, sizeBytes) {
     if (!nasPath) { (window._friendlyAlert||alert)('Không có đường dẫn file'); return; }
-    if (window.showChangeNotif) showChangeNotif('info','🔍 Đang OCR file...', fileName);
+    const sizeMB = sizeBytes ? ((sizeBytes/1024/1024).toFixed(1)+'MB') : '';
+    if (window._v90Toast) _v90Toast('info', '🔍 Đang OCR...', fileName + (sizeMB?' ('+sizeMB+')':''));
+    else if (window.showChangeNotif) showChangeNotif('info','🔍 Đang OCR file...', fileName);
     try {
       const token = await _authGetToken();
       if (!token) throw new Error('Chưa đăng nhập');
       const SB = _AUTH_SB_URL.replace(/\/$/, '');
-      if (window.showChangeNotif) showChangeNotif('info','⏳ Đang OCR với Gemini AI...', fileName);
-      const od = await _ocrOne(token, SB, nasPath, fileName);
+      const od = await _ocrOne(token, SB, nasPath, fileName, sizeBytes);
       _showNasOcrPreviewV68(od, { nasPath, fileName });
+      if (window._v90Toast) _v90Toast('success', '✓ OCR xong', fileName);
     } catch(e) {
       console.error('[V68 OCR-NAS]', e);
-      if (window.showChangeNotif) showChangeNotif('error','❌ Lỗi OCR', e.message);
+      const cls = window._v90ClassifyError ? window._v90ClassifyError(e, null) : { label:'❌ Lỗi OCR', detail:e.message };
+      if (window._v90Toast) _v90Toast('error', cls.label, fileName + ' — ' + cls.detail);
+      else if (window.showChangeNotif) showChangeNotif('error','❌ Lỗi OCR', e.message);
       else alert('Lỗi OCR: '+e.message);
     }
   };
@@ -17976,4 +17992,75 @@ async function _authedFetch(url, options) {
   setInterval(injectDropdowns, 2000);
 
   console.log('[V87] Search advanced (Năm SX + Hãng SX) loaded');
+})();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// V90: OCR Helpers - timeout động + phân loại lỗi + toast độc lập
+// CHỈ ĐỊNH NGHĨA HELPERS, KHÔNG WRAP FUNCTION (tránh đè V80/V71)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(function() {
+  if (window._v90Helpers) return;
+  window._v90Helpers = true;
+
+  // Fetch OCR với timeout động theo size
+  window._v90OcrFetch = async function(nasPath, fileName, sizeBytes) {
+    const SB = _AUTH_SB_URL.replace(/\/$/, '');
+    const token = await _authGetToken();
+    const sizeMB = (sizeBytes || 0) / 1024 / 1024;
+    let timeoutMs;
+    if (sizeMB > 30) timeoutMs = 180000;
+    else if (sizeMB > 15) timeoutMs = 120000;
+    else timeoutMs = 90000;
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const r = await fetch(SB + '/functions/v1/bbtn-ocr-extract', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token,
+          'apikey': _AUTH_SB_KEY
+        },
+        body: JSON.stringify({ nas_path: nasPath, mime_type: 'application/pdf', file_name: fileName }),
+        signal: ctrl.signal
+      });
+      clearTimeout(tid);
+      return r;
+    } catch (e) {
+      clearTimeout(tid);
+      if (e.name === 'AbortError') throw new Error('TIMEOUT_' + Math.round(timeoutMs/1000) + 's_' + sizeMB.toFixed(1) + 'MB');
+      throw new Error('NETWORK_' + (e.message || 'Failed to fetch'));
+    }
+  };
+
+  // Phân loại lỗi
+  window._v90ClassifyError = function(err, resp) {
+    const msg = String(err && err.message || err || '');
+    if (msg.indexOf('TIMEOUT_') === 0) return { type:'timeout', label:'⏱️ Timeout', detail:msg };
+    if (msg.indexOf('NETWORK_') === 0) return { type:'network', label:'🔌 Mạng', detail:msg };
+    if (resp) {
+      if (resp.status === 413) return { type:'too_large', label:'📦 File quá lớn', detail:'HTTP 413 — file vượt giới hạn Gemini' };
+      if (resp.status === 504 || resp.status === 502) return { type:'gateway', label:'🚪 Gateway timeout', detail:'HTTP '+resp.status };
+      if (resp.status === 503 || resp.status === 429) return { type:'busy', label:'🚦 Server bận', detail:'HTTP '+resp.status };
+      if (resp.status >= 500) return { type:'server', label:'💥 Server lỗi', detail:'HTTP '+resp.status };
+    }
+    return { type:'unknown', label:'❌ Lỗi', detail: msg };
+  };
+
+  // Toast độc lập (không phụ thuộc #changeNotifArea)
+  window._v90Toast = function(type, title, detail) {
+    const colors = { error:'#ff5252', warn:'#ff9100', success:'#00e676', info:'#00c8ff' };
+    const div = document.createElement('div');
+    div.style.cssText = 'position:fixed;top:20px;right:20px;background:rgba(20,28,40,.95);border-left:4px solid ' + (colors[type]||'#888') + ';padding:14px 18px;border-radius:6px;color:#fff;font-family:system-ui;font-size:13px;z-index:99999;min-width:260px;max-width:400px;box-shadow:0 6px 24px rgba(0,0,0,.6);backdrop-filter:blur(8px)';
+    div.innerHTML = '<div style="font-weight:700;color:' + (colors[type]||'#fff') + '">' + title + '</div>' +
+      (detail ? '<div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:4px;word-break:break-word">' + detail + '</div>' : '');
+    document.body.appendChild(div);
+    setTimeout(() => {
+      div.style.opacity = '0';
+      div.style.transition = 'opacity .5s';
+      setTimeout(() => div.remove(), 600);
+    }, type === 'error' ? 8000 : 4000);
+  };
+
+  console.log('[V90] OCR helpers loaded (timeout + classify + toast)');
 })();
