@@ -16976,16 +16976,18 @@ async function _authedFetch(url, options) {
   window._bbtnOcrFromNas = async function(nasPath, fileName, sizeBytes) {
     if (!nasPath) { (window._friendlyAlert||alert)('Không có đường dẫn file'); return; }
     const sizeMB = sizeBytes ? ((sizeBytes/1024/1024).toFixed(1)+'MB') : '';
-    if (window._v90Toast) _v90Toast('info', '🔍 Đang OCR...', fileName + (sizeMB?' ('+sizeMB+')':''));
-    else if (window.showChangeNotif) showChangeNotif('info','🔍 Đang OCR file...', fileName);
+    // V96: progress heartbeat đếm giây thay toast info 1 lần
+    const _v96p = window._v96StartPerFileProgress ? window._v96StartPerFileProgress(fileName, sizeMB) : null;
     try {
       const token = await _authGetToken();
       if (!token) throw new Error('Chưa đăng nhập');
       const SB = _AUTH_SB_URL.replace(/\/$/, '');
       const od = await _ocrOne(token, SB, nasPath, fileName, sizeBytes);
+      if (window._v96StopPerFileProgress) window._v96StopPerFileProgress(_v96p);
       _showNasOcrPreviewV68(od, { nasPath, fileName });
       if (window._v90Toast) _v90Toast('success', '✓ OCR xong', fileName);
     } catch(e) {
+      if (window._v96StopPerFileProgress) window._v96StopPerFileProgress(_v96p);
       console.error('[V68 OCR-NAS]', e);
       const cls = window._v90ClassifyError ? window._v90ClassifyError(e, null) : { label:'❌ Lỗi OCR', detail:e.message };
       if (window._v90Toast) _v90Toast('error', cls.label, fileName + ' — ' + cls.detail);
@@ -18174,6 +18176,29 @@ async function _authedFetch(url, options) {
   window._v90ShowHistory = function() {
     console.table(window._v90ToastHistory || []);
     console.log('Có ' + (window._v90ToastHistory||[]).length + ' toast trong lịch sử');
+  };
+
+  // V96: per-file OCR progress (heartbeat đếm giây)
+  window._v96StartPerFileProgress = function(fileName, sizeMB) {
+    let div = document.getElementById('v96PerFileProgress');
+    if (!div) {
+      div = document.createElement('div');
+      div.id = 'v96PerFileProgress';
+      div.style.cssText = 'position:fixed;top:20px;right:20px;z-index:99999;background:rgba(20,28,40,.96);border-left:4px solid #00c8ff;padding:14px 18px;border-radius:6px;color:#fff;font-family:system-ui;font-size:13px;min-width:280px;box-shadow:0 6px 24px rgba(0,0,0,.6);backdrop-filter:blur(8px)';
+      document.body.appendChild(div);
+    }
+    const t0 = Date.now();
+    const update = () => {
+      const el = Math.round((Date.now()-t0)/1000);
+      div.innerHTML = '<div style="font-weight:700;color:#00c8ff">🔍 Đang OCR... ⏱ '+el+'s</div>' +
+        '<div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:4px;word-break:break-word">'+fileName+(sizeMB?' ('+sizeMB+')':'')+'</div>';
+    };
+    update();
+    return { hbId: setInterval(update, 1000), div };
+  };
+  window._v96StopPerFileProgress = function(h) {
+    if (h && h.hbId) clearInterval(h.hbId);
+    if (h && h.div && h.div.parentNode) h.div.remove();
   };
 
   console.log('[V90] OCR helpers loaded (timeout + classify + toast)');
