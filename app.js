@@ -16907,7 +16907,8 @@ async function _authedFetch(url, options) {
       document.getElementById('v66Dev').textContent=dev;
       const el=(Date.now()-start)/1000, rem=Math.round((pdfs.length-done)*(el/done));
       document.getElementById('v66Eta').textContent = rem>3600?'~'+(Math.round(rem/3600*10)/10)+' giờ':rem>60?'~'+Math.round(rem/60)+' phút':'~'+rem+' giây';
-      await new Promise(r=>setTimeout(r,1000));
+      // V101: throttle 4s giua file (tranh Supabase Edge Function qua tai -> 502 hang loat)
+      await new Promise(r=>setTimeout(r,4000));
     }
 
     document.getElementById('v66Cur').textContent='✓ HOÀN TẤT';
@@ -17185,7 +17186,8 @@ async function _authedFetch(url, options) {
       document.getElementById('v68Dev').textContent=dev;
       const el=(Date.now()-start)/1000, rem=Math.round((allPdfs.length-done)*(el/done));
       document.getElementById('v68Eta').textContent=rem>60?'~'+Math.round(rem/60)+' phút':'~'+rem+' giây';
-      await new Promise(r=>setTimeout(r,1000));
+      // V101: throttle 4s giua file
+      await new Promise(r=>setTimeout(r,4000));
     }
     document.getElementById('v68Cur').textContent='✓ HOÀN TẤT';
     setTimeout(function(){
@@ -18075,30 +18077,35 @@ async function _authedFetch(url, options) {
     }
     function _mkErr(label, type) { const e = new Error(label); e._v90Type = type; return e; }
 
-    // V94: retry cho cả AbortError/Network (Gemini đôi khi treo, request 2 nhanh hơn)
+    // V101: retry 3 lần cho HTTP 5xx (502/503/504 cần gateway hồi phục); timeout/network 2 lần
     let r;
     let lastErr = null;
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    const MAX_ATTEMPT = 3;
+    for (let attempt = 1; attempt <= MAX_ATTEMPT; attempt++) {
       try {
         r = await _attempt();
         if (r.ok || [504,503,429,502].indexOf(r.status) === -1) break; // OK hoặc lỗi non-retryable
-        // Retry HTTP
-        if (attempt < 2) {
-          console.warn('[V94] HTTP '+r.status+' on attempt '+attempt+', retry 8s...');
-          await new Promise(rs => setTimeout(rs, 8000));
+        // Retry HTTP 5xx: backoff dài dần 8s, 15s
+        if (attempt < MAX_ATTEMPT) {
+          const waitMs = attempt === 1 ? 8000 : 15000;
+          console.warn('[V101] HTTP '+r.status+' on attempt '+attempt+'/'+MAX_ATTEMPT+', retry '+(waitMs/1000)+'s...');
+          await new Promise(rs => setTimeout(rs, waitMs));
         }
       } catch(e) {
         r = null;
         lastErr = e;
+        // timeout/network: chi retry 2 lan (lau), khong retry lan 3
         if (attempt < 2) {
-          console.warn('[V94] '+e.name+' on attempt '+attempt+', retry 5s...');
+          console.warn('[V101] '+e.name+' on attempt '+attempt+', retry 5s...');
           await new Promise(rs => setTimeout(rs, 5000));
+        } else {
+          break; // het retry timeout/network
         }
       }
     }
     if (!r) {
       if (lastErr && lastErr.name === 'AbortError') throw _mkErr('⏱️ Timeout '+Math.round(timeoutMs/1000)+'s sau 2 lan thu ('+sizeMB.toFixed(1)+'MB)', 'timeout');
-      throw _mkErr('🔌 Lỗi mạng: '+(lastErr && lastErr.message || 'fetch failed'), 'network');
+      throw _mkErr('🔌 Lỗi mạng sau 2 lan thu: '+(lastErr && lastErr.message || 'fetch failed'), 'network');
     }
     if (!r.ok) {
       if (r.status === 413) throw _mkErr('📦 File quá lớn (HTTP 413)', 'too_large');
