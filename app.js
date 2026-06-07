@@ -16848,40 +16848,53 @@ async function _authedFetch(url, options) {
     for (let i=0;i<pdfs.length;i++){
       if(cancel) break;
       const f=pdfs[i];
-      document.getElementById('v66Cur').textContent='📄 '+f.name;
-
       const fSizeMB = ((f.size||0)/1024/1024).toFixed(1);
       document.getElementById('v66Cur').textContent='📄 '+f.name+' ('+fSizeMB+'MB)';
-      if((f.size||0)>200*1024*1024){ fail++; done++; failed.push({name:f.name,error:'>200MB skip'}); if(window._v90Toast)_v90Toast('warn','⚠️ Bỏ qua file '+fSizeMB+'MB',f.name); }
-      else try {
-        // V91: _v90OcrFetch all-in-one (đã có retry + classify nội bộ)
-        // V92: _v90OcrFetch trả JSON luôn
-        const od = await window._v90OcrFetch(f.path, f.name, f.size);
-        const items=od.items||[];
-        if(!items.length){ failed.push({name:f.name,error:'Không có thiết bị'}); fail++; }
-        else {
-          const recs=items.map(it=>({
-            tram:it.tram||null, loai_thiet_bi:it.loai_thiet_bi||null, ten_thiet_bi:it.ten_thiet_bi||null,
-            kieu:it.kieu||null, so_che_tao:it.so_che_tao||null, hang_san_xuat:it.hang_san_xuat||null,
-            nuoc_san_xuat:it.nuoc_san_xuat||null, nam_san_xuat:it.nam_san_xuat||null, dien_ap:it.dien_ap||null,
-            dong_dien:it.dong_dien||null, ngay_kiem_dinh:it.ngay_kiem_dinh||null, dang_kiem_dinh:it.dang_kiem_dinh||null,
-            vi_tri_lap_dat:it.vi_tri_lap_dat||null, sfra:it.sfra, tiet_dien:it.tiet_dien||null,
-            file_url:f.path, file_name:f.name, file_source:'nas'
-          }));
-          const ir=await fetch(SB+'/rest/v1/bbtn_records',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY,'Prefer':'return=minimal'},body:JSON.stringify(recs)});
-          if(!ir.ok) throw new Error('Save fail: '+(await ir.text()).substring(0,120));
-          ok++; dev+=recs.length; success.push({name:f.name,count:recs.length});
-        }
-      } catch(e){
+      if((f.size||0)>200*1024*1024){
+        // V95: skip KHONG done++ - doan chung cuoi loop se done++
         fail++;
-        // V94: dùng message của error trực tiếp (đã được _v90OcrFetch classify)
-        const label = e._v90Type ? e.message : ('❌ Lỗi: '+e.message);
-        failed.push({name:f.name,error:label});
-        if(window._v90Toast) _v90Toast('error', label, f.name);
-        console.error('[V66] FAIL',f.name,e);
-      } finally {
-        // V94: clear heartbeat
-        if (typeof _v94hb !== 'undefined') clearInterval(_v94hb);
+        failed.push({name:f.name,error:'>200MB skip'});
+        if(window._v90Toast)_v90Toast('warn','⚠️ Bỏ qua file '+fSizeMB+'MB',f.name);
+      } else {
+        // V95: heartbeat SAU check >200MB, clear trong finally
+        const _v95t0 = Date.now();
+        const _v95hb = setInterval(() => {
+          const cur = document.getElementById('v66Cur');
+          if (cur) cur.textContent = '📄 ' + f.name + ' (' + fSizeMB + 'MB) · ⏱ ' + Math.round((Date.now()-_v95t0)/1000) + 's';
+        }, 2000);
+        try {
+          const od = await window._v90OcrFetch(f.path, f.name, f.size);
+          const items=od.items||[];
+          if(!items.length){ failed.push({name:f.name,error:'Khong co thiet bi'}); fail++; }
+          else {
+            const recs=items.map(it=>({
+              tram:it.tram||null, loai_thiet_bi:it.loai_thiet_bi||null, ten_thiet_bi:it.ten_thiet_bi||null,
+              kieu:it.kieu||null, so_che_tao:it.so_che_tao||null, hang_san_xuat:it.hang_san_xuat||null,
+              nuoc_san_xuat:it.nuoc_san_xuat||null, nam_san_xuat:it.nam_san_xuat||null, dien_ap:it.dien_ap||null,
+              dong_dien:it.dong_dien||null, ngay_kiem_dinh:it.ngay_kiem_dinh||null, dang_kiem_dinh:it.dang_kiem_dinh||null,
+              vi_tri_lap_dat:it.vi_tri_lap_dat||null, sfra:it.sfra, tiet_dien:it.tiet_dien||null,
+              file_url:f.path, file_name:f.name, file_source:'nas'
+            }));
+            // V95: fresh token + check null
+            const freshToken = await _authGetToken();
+            if (!freshToken) throw new Error('Phien dang nhap het han, vui long dang nhap lai');
+            const ir = await fetch(SB+'/rest/v1/bbtn_records', {
+              method:'POST',
+              headers:{'Content-Type':'application/json','Authorization':'Bearer '+freshToken,'apikey':_AUTH_SB_KEY,'Prefer':'return=minimal'},
+              body: JSON.stringify(recs)
+            });
+            if(!ir.ok) throw new Error('Save fail: '+(await ir.text()).substring(0,120));
+            ok++; dev+=recs.length; success.push({name:f.name,count:recs.length});
+          }
+        } catch(e){
+          fail++;
+          const label = e._v90Type ? e.message : ('Loi: '+e.message);
+          failed.push({name:f.name,error:label});
+          if(window._v90Toast) _v90Toast('error', label, f.name);
+          console.error('[V66] FAIL',f.name,e);
+        } finally {
+          clearInterval(_v95hb);
+        }
       }
 
       done++;
@@ -17121,18 +17134,45 @@ async function _authedFetch(url, options) {
       const f=allPdfs[i];
       const fSizeMB = ((f.size||0)/1024/1024).toFixed(1);
       document.getElementById('v68Cur').textContent='📄 '+f.name+' ('+fSizeMB+'MB)';
-      try {
-        if ((f.size||0) > 200*1024*1024) throw new Error('📦 >200MB skip ('+fSizeMB+'MB)');
-        const od = await _ocrOne(token, SB, f.path, f.name, f.size);
-        const items = od.items||[];
-        if(!items.length){ failed.push({name:f.name,error:'Không có thiết bị'}); fail++; }
-        else {
-          const recs = items.map(it=>_mapRec(it, f.path, f.name));
-          const ir = await fetch(SB+'/rest/v1/bbtn_records',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,'apikey':_AUTH_SB_KEY,'Prefer':'return=minimal'},body:JSON.stringify(recs)});
-          if(!ir.ok) throw new Error('Save fail');
-          ok++; dev+=recs.length; success.push({name:f.name,count:recs.length});
+      if ((f.size||0) > 200*1024*1024) {
+        // V95: skip KHONG continue - doan cuoi loop van update progress
+        fail++;
+        failed.push({name:f.name,error:'>200MB skip ('+fSizeMB+'MB)'});
+        if(window._v90Toast) _v90Toast('warn','⚠️ Bo qua file '+fSizeMB+'MB',f.name);
+      } else {
+        // V95: heartbeat SAU check >200MB
+        const _v95t0 = Date.now();
+        const _v95hb = setInterval(() => {
+          const cur = document.getElementById('v68Cur');
+          if (cur) cur.textContent = '📄 ' + f.name + ' (' + fSizeMB + 'MB) · ⏱ ' + Math.round((Date.now()-_v95t0)/1000) + 's';
+        }, 2000);
+        try {
+          const od = await _ocrOne(token, SB, f.path, f.name, f.size);
+          const items = od.items||[];
+          if(!items.length){ failed.push({name:f.name,error:'Khong co thiet bi'}); fail++; }
+          else {
+            const recs = items.map(it=>_mapRec(it, f.path, f.name));
+            // V95: fresh token + check null
+            const freshToken = await _authGetToken();
+            if (!freshToken) throw new Error('Phien dang nhap het han, vui long dang nhap lai');
+            const ir = await fetch(SB+'/rest/v1/bbtn_records',{
+              method:'POST',
+              headers:{'Content-Type':'application/json','Authorization':'Bearer '+freshToken,'apikey':_AUTH_SB_KEY,'Prefer':'return=minimal'},
+              body: JSON.stringify(recs)
+            });
+            if(!ir.ok) throw new Error('Save fail: '+(await ir.text()).substring(0,120));
+            ok++; dev+=recs.length; success.push({name:f.name,count:recs.length});
+          }
+        } catch(e){
+          fail++;
+          const label = e._v90Type ? e.message : ('Loi: '+e.message);
+          failed.push({name:f.name,error:label});
+          if(window._v90Toast) _v90Toast('error', label, f.name);
+          console.error('[V68]',f.name,e);
+        } finally {
+          clearInterval(_v95hb);
         }
-      } catch(e){ fail++; failed.push({name:f.name,error:e.message}); console.error('[V68]',f.name,e); }
+      }
       done++;
       const pct=(done/allPdfs.length*100);
       document.getElementById('v68Bar').style.width=pct+'%';
@@ -18046,6 +18086,7 @@ async function _authedFetch(url, options) {
           await new Promise(rs => setTimeout(rs, 8000));
         }
       } catch(e) {
+        r = null;
         lastErr = e;
         if (attempt < 2) {
           console.warn('[V94] '+e.name+' on attempt '+attempt+', retry 5s...');
@@ -18054,7 +18095,7 @@ async function _authedFetch(url, options) {
       }
     }
     if (!r) {
-      if (lastErr && lastErr.name === 'AbortError') throw _mkErr('⏱️ Timeout '+Math.round(timeoutMs/1000)+'s ('+sizeMB.toFixed(1)+'MB)', 'timeout');
+      if (lastErr && lastErr.name === 'AbortError') throw _mkErr('⏱️ Timeout '+Math.round(timeoutMs/1000)+'s sau 2 lan thu ('+sizeMB.toFixed(1)+'MB)', 'timeout');
       throw _mkErr('🔌 Lỗi mạng: '+(lastErr && lastErr.message || 'fetch failed'), 'network');
     }
     if (!r.ok) {
