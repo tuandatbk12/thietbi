@@ -186,11 +186,9 @@ QUY TẮC CHUNG:
 
 Trả về JSON với 17 trường trên.`;
 
-async function uploadToGeminiFileAPI(base64Data: string, mimeType: string, fileName: string): Promise<string> {
-  console.log(`[File API] Uploading ${fileName} (${base64Data.length} b64 chars)...`);
-  const binaryString = atob(base64Data);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+async function uploadBytesToGeminiFileAPI(bytes: Uint8Array, mimeType: string, fileName: string): Promise<string> {
+  // V97: nhan bytes truc tiep, KHONG decode base64 (tiet kiem RAM tranh OOM 546)
+  console.log(`[File API] Uploading ${fileName} (${(bytes.length/1024/1024).toFixed(2)}MB raw)...`);
   const fileSize = bytes.length;
 
   const initRes = await fetch(`${GEMINI_FILE_UPLOAD_URL}?key=${GEMINI_API_KEY}`, {
@@ -291,6 +289,7 @@ serve(async (req: Request) => {
   // V89: hỗ trợ INPUT mới {nas_path} - server fetch file từ NAS, tránh browser load file lớn
   let { file_base64, mime_type, file_name } = body;
   const nas_path = body.nas_path;
+  let nasBytes: Uint8Array | null = null; // V97: giu bytes cho file lon (upload thang FILE_API)
   
   if (nas_path && !file_base64) {
     // Stream-from-NAS mode
@@ -311,42 +310,57 @@ serve(async (req: Request) => {
       }
       const bytes = new Uint8Array(await upstream.arrayBuffer());
       const fetchMs = Date.now() - t0;
-      console.log(`[OCR-V89] Fetched ${(bytes.length/1024/1024).toFixed(2)}MB in ${fetchMs}ms`);
-      
-      // Encode base64 (chunked để tránh stack overflow với file lớn)
-      const CHUNK = 0x8000; // 32KB chunks
-      let bin = '';
-      for (let i = 0; i < bytes.length; i += CHUNK) {
-        bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + CHUNK)));
-      }
-      file_base64 = btoa(bin);
+      console.log(`[OCR-V97] Fetched ${(bytes.length/1024/1024).toFixed(2)}MB in ${fetchMs}ms`);
       mime_type = mime_type || 'application/pdf';
       file_name = file_name || nas_path.split('/').pop() || 'bbtn.pdf';
-      console.log(`[OCR-V89] Encoded base64 ${(file_base64.length/1024/1024).toFixed(2)}MB`);
+      // V97: GIU bytes - chi encode base64 neu file NHO (INLINE). File lon upload bytes thang -> tranh OOM 546
+      const INLINE_RAW_LIMIT = 10 * 1024 * 1024;
+      if (bytes.length <= INLINE_RAW_LIMIT) {
+        const CHUNK = 0x8000;
+        let bin = '';
+        for (let i = 0; i < bytes.length; i += CHUNK) {
+          bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + CHUNK)));
+        }
+        file_base64 = btoa(bin);
+        bin = '';
+        console.log(`[OCR-V97] INLINE base64 ${(file_base64.length/1024/1024).toFixed(2)}MB`);
+      } else {
+        nasBytes = bytes;
+        console.log(`[OCR-V97] LARGE ${(bytes.length/1024/1024).toFixed(2)}MB -> upload bytes thang (no base64)`);
+      }
     } catch (e) {
       console.error('[OCR-V89] Stream error:', e);
       return jsonResponse({ error: `NAS stream failed: ${(e as Error).message}`, nas_path }, 502);
     }
   }
   
-  if (!file_base64 || !mime_type) return jsonResponse({ error: "Missing fields (need file_base64 OR nas_path)" }, 400);
+  if ((!file_base64 && !nasBytes) || !mime_type) return jsonResponse({ error: "Missing fields (need file_base64 OR nas_path)" }, 400);
 
   const ALLOWED_MIMES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
   if (!ALLOWED_MIMES.includes(mime_type)) return jsonResponse({ error: `Unsupported MIME: ${mime_type}` }, 400);
 
-  const b64Size = file_base64.length;
+  const hasBytes = nasBytes !== null;
+  const b64Size = file_base64 ? file_base64.length : (nasBytes ? nasBytes.length * 1.34 : 0);
   const rawSizeMB = (b64Size * 0.75 / 1024 / 1024).toFixed(1);
   if (b64Size > FILE_API_LIMIT_B64) {
     return jsonResponse({ error: `File too large: ${rawSizeMB}MB. Max 50MB.` }, 413);
   }
 
-  const useFileAPI = b64Size > INLINE_LIMIT_B64;
-  console.log(`[OCR] File: ${file_name}, ${rawSizeMB}MB, mode: ${useFileAPI ? 'FILE_API' : 'INLINE'}`);
+  const useFileAPI = hasBytes || b64Size > INLINE_LIMIT_B64;
+  console.log(`[OCR] File: ${file_name}, ${rawSizeMB}MB, mode: ${useFileAPI ? 'FILE_API' : 'INLINE'}${hasBytes ? ' (bytes thang)' : ''}`);
 
   try {
     let parts: any[];
     if (useFileAPI) {
-      const fileUri = await uploadToGeminiFileAPI(file_base64, mime_type, file_name || "bbtn.pdf");
+      let uploadBytes: Uint8Array;
+      if (hasBytes && nasBytes) {
+        uploadBytes = nasBytes;
+      } else {
+        const binStr = atob(file_base64);
+        uploadBytes = new Uint8Array(binStr.length);
+        for (let i = 0; i < binStr.length; i++) uploadBytes[i] = binStr.charCodeAt(i);
+      }
+      const fileUri = await uploadBytesToGeminiFileAPI(uploadBytes, mime_type, file_name || "bbtn.pdf");
       parts = [{ text: SYSTEM_PROMPT }, { file_data: { mime_type, file_uri: fileUri } }];
     } else {
       parts = [{ text: SYSTEM_PROMPT }, { inline_data: { mime_type, data: file_base64 } }];
