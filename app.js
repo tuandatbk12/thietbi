@@ -16786,7 +16786,7 @@ async function _authedFetch(url, options) {
         return;
       }
       if (_v80SkipDup > 0) {
-        const _v80Ask = confirm("📊 " + pdfs.length + " file -TN- tìm thấy:\n   ✅ " + _v80NewOnly.length + " file MỚI (chưa OCR)\n   ⏭️ " + _v80SkipDup + " file ĐÃ OCR trước (SKIP)\n\nOK = OCR chỉ file mới (khuyến nghị)\nHủy = OCR TẤT CẢ (tạo duplicate)");
+        const _v80Ask = await window._v100Confirm(pdfs.length + " file -TN- tim thay:\n   " + _v80NewOnly.length + " file MOI (chua OCR)\n   " + _v80SkipDup + " file DA OCR truoc (SKIP)\n\nTiep tuc = OCR chi file moi (khuyen nghi)\nHuy = OCR TAT CA (tao duplicate)", "Loc file trung lap");
         if (_v80Ask) {
           pdfs.length = 0; _v80NewOnly.forEach(f => pdfs.push(f));
           console.log("[V80b] Bulk: chỉ OCR " + pdfs.length + " file mới, skip " + _v80SkipDup);
@@ -16808,7 +16808,7 @@ async function _authedFetch(url, options) {
         (oversized.length?'⚠️ '+oversized.length+' file >200MB (skip)\n':'')+
         '⏱️ ~'+estMin+' phút\n\nTiếp tục OCR tất cả?';
     }
-    if (!confirm(msg)) return;
+    if (!(await window._v100Confirm(msg, 'OCR tat ca PDF'))) return;
 
     // UI sticky top
     const old=document.getElementById('v66ProgressUI'); if(old) old.remove();
@@ -17100,7 +17100,7 @@ async function _authedFetch(url, options) {
         return;
       }
       if (_v80cSkip > 0) {
-        const _v80cAsk = confirm("📊 " + allPdfs.length + " file -TN- trong " + sel.length + " thư mục:\n   ✅ " + _v80cNew.length + " file MỚI (chưa OCR)\n   ⏭️ " + _v80cSkip + " file ĐÃ OCR trước (SKIP)\n\nOK = OCR chỉ file mới (khuyến nghị)\nHủy = OCR TẤT CẢ (tạo duplicate)");
+        const _v80cAsk = await window._v100Confirm(allPdfs.length + " file -TN- trong " + sel.length + " thu muc:\n   " + _v80cNew.length + " file MOI (chua OCR)\n   " + _v80cSkip + " file DA OCR truoc (SKIP)\n\nTiep tuc = OCR chi file moi (khuyen nghi)\nHuy = OCR TAT CA (tao duplicate)", "Loc file trung lap");
         if (_v80cAsk) {
           allPdfs.length = 0; _v80cNew.forEach(f => allPdfs.push(f));
           console.log("[V80c] Selected: chỉ OCR " + allPdfs.length + " file mới, skip " + _v80cSkip);
@@ -17109,7 +17109,7 @@ async function _authedFetch(url, options) {
         }
       }
     }
-    if (!confirm('📊 Tổng '+_v77orig2+' PDF trong '+sel.length+' thư mục, đã lọc:\n   ✅ '+allPdfs.length+' file Thí nghiệm (-TN-)\n'+(_v77skip2?'   ⏭️  '+_v77skip2+' file KD/GCNKD bỏ qua\n':'')+'⏱️ ~'+Math.round(allPdfs.length*25/60)+' phút\n\nOCR '+allPdfs.length+' file -TN-?')) return;
+    if (!(await window._v100Confirm('Tong '+_v77orig2+' PDF trong '+sel.length+' thu muc, da loc:\n   '+allPdfs.length+' file Thi nghiem (-TN-)\n'+(_v77skip2?'   '+_v77skip2+' file KD/GCNKD bo qua\n':'')+'~'+Math.round(allPdfs.length*25/60)+' phut\n\nOCR '+allPdfs.length+' file -TN-?', 'OCR thu muc da chon'))) return;
 
     // UI progress (giống v66)
     const old=document.getElementById('v66ProgressUI'); if(old) old.remove();
@@ -18210,6 +18210,40 @@ async function _authedFetch(url, options) {
     if (v.includes('đột xuất') || v.includes('dot xuat')) return 'Đột xuất';
     if (v.includes('sửa chữa') || v.includes('sua chua')) return 'Sửa chữa';
     return 'Khác'; // CBM, Kiem tra chat luong, gia tri la -> Khac
+  };
+
+  // V100: modal confirm thay native confirm() - Chrome khong chan duoc
+  window._v100Confirm = function(message, title) {
+    return new Promise((resolve) => {
+      const old = document.getElementById('v100ConfirmModal');
+      if (old) old.remove();
+      const ov = document.createElement('div');
+      ov.id = 'v100ConfirmModal';
+      ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999999;display:flex;align-items:center;justify-content:center;padding:20px';
+      const box = document.createElement('div');
+      box.style.cssText = 'background:#161b22;border:2px solid #ffc107;border-radius:12px;max-width:480px;width:100%;padding:24px;font-family:system-ui';
+      const h = document.createElement('div');
+      h.style.cssText = 'font-size:16px;font-weight:700;color:#ffc107;margin-bottom:12px';
+      h.textContent = title || 'Xac nhan';
+      const m = document.createElement('div');
+      m.style.cssText = 'font-size:13px;color:#ddd;white-space:pre-line;margin-bottom:20px;line-height:1.5';
+      m.textContent = message;
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:10px;justify-content:flex-end';
+      const no = document.createElement('button');
+      no.style.cssText = 'padding:10px 20px;background:rgba(255,255,255,.1);color:#fff;border:none;border-radius:6px;cursor:pointer';
+      no.textContent = 'Huy';
+      const yes = document.createElement('button');
+      yes.style.cssText = 'padding:10px 20px;background:linear-gradient(135deg,#ffc107,#ff9800);color:#000;border:none;border-radius:6px;cursor:pointer;font-weight:700';
+      yes.textContent = 'Tiep tuc';
+      no.onclick = () => { ov.remove(); resolve(false); };
+      yes.onclick = () => { ov.remove(); resolve(true); };
+      row.appendChild(no); row.appendChild(yes);
+      box.appendChild(h); box.appendChild(m); box.appendChild(row);
+      ov.appendChild(box);
+      document.body.appendChild(ov);
+      yes.focus();
+    });
   };
 
   console.log('[V90] OCR helpers loaded (timeout + classify + toast)');
