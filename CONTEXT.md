@@ -1,4 +1,4 @@
-# EVN Hà Nội Dashboard — CONTEXT (cập nhật v100)
+# EVN Hà Nội Dashboard — CONTEXT (cập nhật v102)
 
 ## Hệ thống
 - Dashboard: https://thietbi.vercel.app/ (Vercel auto-deploy)
@@ -241,3 +241,45 @@ Vấn đề gốc: file lớn crash browser, timeout, OOM, Gemini 503, Chrome ch
 - Setup GitHub Secrets v88 (SUPABASE_URL, SUPABASE_ANON_KEY)
 - Throttle bulk nếu OCR folder rất lớn (50-100+ file) gặp nhiều 503
 - Mobile responsive (Việc K - chưa làm)
+
+
+═══════════════════════════════════════════════════════════
+## CẬP NHẬT v101-v102 (Throttle + Root cause 502/429)
+═══════════════════════════════════════════════════════════
+
+### ⭐ CHẨN ĐOÁN QUAN TRỌNG: "502 hàng loạt khi bulk" = Gemini HẾT QUOTA (429)
+- Triệu chứng: bulk folder lớn (90 file) -> đa số fail "🚪 Gateway timeout (HTTP 502)"
+- Server log thật: "[Gemini] 429 quota, wait 10s (retry 3/3)" + "Het 3 retry van 429" + "shutdown"
+- GỐC RỄ: Gemini free tier gemini-2.5-flash giới hạn 15 RPM + **1,500 requests/NGÀY (RPD)**
+  - OCR nhiều lần test -> cạn 1,500/ngày -> mọi request 429
+  - Edge Function retry 429 (3×10s=30s) -> gần hết 60s -> shutdown -> client nhận 502
+- ⚠️ Throttle/retry CLIENT (v101) KHÔNG cứu được khi quota NGÀY đã cạn
+- GIẢI PHÁP THẬT:
+  1. Đợi quota reset: nửa đêm giờ Thái Bình Dương ≈ 14-15h chiều VN
+  2. Bật billing Gemini (pay-as-you-go): ~$0.10/1triệu token input, OCR 200 file/ngày ≈ vài nghìn đồng. Hết giới hạn RPD
+  3. Chia nhỏ <1,500 file/ngày (thực tế <200)
+- Cách xem quota: https://aistudio.google.com/app/apikey hoặc Google Cloud Console > Generative Language API > Quotas
+
+### v101 - Throttle + retry 5xx
+- V66 + V68 throttle: 1s -> 4s giữa file (đúng cho RPM 15/phút, KHÔNG cứu RPD)
+- _v90OcrFetch retry HTTP 5xx: 2 -> 3 lần, backoff 8s/15s (MAX_ATTEMPT=3); timeout/network giữ 2 lần
+
+### v102 - Fix bug slice + 429 fail nhanh
+- BUG: line 384 "text.slice is not a function" - Gemini đôi khi trả parts[0].text KHÔNG phải string
+  - Fix: ép text về string (typeof check) trước khi dùng. String(text).slice() phòng thủ
+- 429 retry: wait cap 10s -> 5s (retry lâu vô ích khi quota cạn, fail nhanh để báo rõ)
+- Backup: index.ts.before-v102.bak
+
+### Edge Function quota behavior (post-v102)
+- 503 (overload tạm) vs 429 (hết quota) vs 502 (gateway/shutdown)
+- MAX_RETRIES=3, 503 backoff 2/3/4s, 429 backoff cap 5s
+- Hết retry -> trả 503 JSON rõ ràng
+
+### Commit v101-v102
+- 2b8334c v101 (throttle 4s + retry 5xx 3 lan)
+- 6e1a021 v102 (fix slice + 429 nhanh)
+
+### Tech Lesson mới
+- "502 hàng loạt" khi bulk thường = Gemini 429 quota cạn, KHÔNG phải lỗi code/Supabase
+- LUÔN xem SERVER log (Supabase Dashboard) không chỉ browser console - phân biệt request có tới function không
+- Gemini response parts[0].text không đảm bảo là string -> luôn guard typeof trước .slice/.replace
