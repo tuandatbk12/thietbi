@@ -17914,14 +17914,14 @@ async function _authedFetch(url, options) {
     const MAX_WAIT = 60000;
     const t0 = Date.now();
     while (Date.now() - t0 < MAX_WAIT) {
-      if (window._AUTH_SB_URL && window._AUTH_SB_KEY) break;
+      if (typeof _AUTH_SB_URL !== 'undefined' && _AUTH_SB_URL && typeof _AUTH_SB_KEY !== 'undefined' && _AUTH_SB_KEY) break;
       await new Promise(r => setTimeout(r, 500));
     }
-    if (!window._AUTH_SB_URL) {
+    if (typeof _AUTH_SB_URL === 'undefined' || !_AUTH_SB_URL) {
       console.warn('[V86] Supabase chưa init sau ' + (MAX_WAIT/1000) + 's, retry ngầm');
       // Retry mỗi 30s nếu vẫn chưa init
       const retryId = setInterval(() => {
-        if (window._AUTH_SB_URL && window._AUTH_SB_KEY) {
+        if (typeof _AUTH_SB_URL !== 'undefined' && _AUTH_SB_URL && typeof _AUTH_SB_KEY !== 'undefined' && _AUTH_SB_KEY) {
           clearInterval(retryId);
           console.log('[V86] Supabase init xong, khởi động widget');
           createBanner();
