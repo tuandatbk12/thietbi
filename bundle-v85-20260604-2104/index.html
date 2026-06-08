@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<!-- ━━━━ V53: Performance hints (DNS prefetch + preconnect) ━━━━ -->
+<link rel="dns-prefetch" href="https://xqqmfmljwycpehfyknoy.supabase.co">
+<link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+<link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+<link rel="dns-prefetch" href="https://fonts.googleapis.com">
+<link rel="dns-prefetch" href="https://fonts.gstatic.com">
+
+<!-- Preconnect: TCP + TLS handshake sớm cho Supabase (auth + DB cần ngay) -->
+<link rel="preconnect" href="https://xqqmfmljwycpehfyknoy.supabase.co" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EVNHANOI – Layout Editor</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="./styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="./app.js" defer></script>
+<link rel="stylesheet" href="bbtn-ocr-ui.css">
+</head>
+<body>
+
+<!-- ═══ TOPBAR ═══ -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-icon"><i class="fas fa-bolt"></i></div>
+    <div>
+      <span class="brand-name">EVNHANOI</span>
+      <span class="brand-sub">LAYOUT EDITOR</span>
+    </div>
+  </div>
+  <div class="topbar-sep"></div>
+  <span class="topbar-page" id="topbarPageTitle">Dashboard <strong>Quản Lý Thiết Bị</strong></span>
+  <div id="unsavedDot" class="unsaved-dot" title="Có thay đổi chưa lưu"></div>
+  <span class="unsaved-label" id="unsavedLabel">Chưa lưu</span>
+  <div class="topbar-actions">
+    <span class="topbar-clock" id="clock">--:--:--</span>
+    <button class="btn" id="btnUndo" onclick="undoLayout()" disabled title="Hoàn tác (Ctrl+Z)"><i class="fas fa-undo"></i> Undo</button>
+    <button class="btn" onclick="autoOptimizeLayout()" title="Chuẩn hóa thứ tự, sticky, spacing"><i class="fas fa-wand-magic-sparkles"></i> Tối ưu nhanh</button>
+    <button class="btn" id="btnLightMode" onclick="toggleLightMode()" title="Chuyển chế độ sáng/tối"><i class="fas fa-sun"></i> Chế độ sáng</button>
+    <button class="btn" id="btnPreviewTop" onclick="togglePreviewMode()" title="Xem trước dashboard"><i class="fas fa-expand"></i> Xem trước</button>
+    <button class="btn" onclick="resetLayout()"><i class="fas fa-undo-alt"></i> Reset</button>
+    <button class="btn" title="Xóa cache và tải lại dữ liệu từ Supabase" onclick="forceReloadData()"><i class="fas fa-rotate"></i> Tải lại dữ liệu</button>
+    <button class="btn" onclick="exportLayout()"><i class="fas fa-download"></i> Export JSON</button>
+    <button class="btn btn-primary" onclick="applyLayout()"><i class="fas fa-check"></i> Áp dụng</button>
+  </div>
+</header>
+
+<!-- ═══ STATUS BAR ═══ -->
+<div class="statusbar" id="statusbar">
+  <div class="sb-item">
+    <i class="fas fa-layer-group"></i>
+    <span>Sections</span>
+    <span class="sb-val" id="sb-count">—</span>
+  </div>
+  <div class="sb-item">
+    <i class="fas fa-eye"></i>
+    <span>Hiển thị</span>
+    <span class="sb-val" id="sb-visible">—</span>
+  </div>
+  <div class="sb-item">
+    <i class="fas fa-eye-slash"></i>
+    <span>Ẩn</span>
+    <span class="sb-val" id="sb-hidden">—</span>
+  </div>
+  <div class="sb-item">
+    <i class="fas fa-thumbtack"></i>
+    <span>Sticky</span>
+    <span class="sb-val" id="sb-sticky">—</span>
+  </div>
+  <div class="sb-item" id="sb-selected-item" style="display:none">
+    <i class="fas fa-mouse-pointer" style="color:var(--accent)"></i>
+    <span style="color:var(--accent)" id="sb-selected-name">—</span>
+  </div>
+  <div class="sb-history" style="margin-left:auto">
+    <button class="history-btn" id="histBtn" onclick="undoLayout()" disabled title="Ctrl+Z">
+      <i class="fas fa-history"></i>
+      <span id="histLabel">0 thao tác</span>
+    </button>
+  </div>
+</div>
+
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon"><i class="fas fa-bolt"></i></div>
+    <div class="brand-text">
+      <span class="brand-name">EVNHANOI</span>
+      <span class="brand-sub">Hệ thống quản lý</span>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+
+    <!-- ══ CHÍNH ══ -->
+    <span class="nav-label nav-user-allowed">CHÍNH</span>
+    <a href="#" class="nav-item nav-user-allowed active" onclick="navActivate(this)">
+      <i class="fas fa-chart-line"></i>
+      <span>Dashboard</span>
+    </a>
+
+    <!-- Thiết bị (parent) -->
+    <div class="nav-parent" onclick="navToggle(this,'sub-thietbi')">
+      <div class="nav-left">
+        <i class="fas fa-microchip nav-icon"></i>
+        <span>Thiết bị</span>
+      </div>
+      <i class="fas fa-chevron-right nav-chevron"></i>
+    </div>
+    <div class="nav-sub" id="sub-thietbi">
+      <a href="#" class="nav-sub-item" onclick="navActivate(this)">
+        <i class="fas fa-exchange-alt"></i><span>MBA</span>
+      </a>
+      <a href="#" class="nav-sub-item" onclick="navActivate(this)">
+        <i class="fas fa-bolt"></i><span>MC</span>
+      </a>
+      <a href="#" class="nav-sub-item" onclick="navActivate(this)">
+        <i class="fas fa-plug"></i><span>DCL</span>
+      </a>
+      <a href="#" class="nav-sub-item" onclick="navActivate(this)">
+        <i class="fas fa-broadcast-tower"></i><span>TU, TI</span>
+      </a>
+      <a href="#" class="nav-sub-item" onclick="navActivate(this)">
+        <i class="fas fa-shield-alt"></i><span>CSV</span>
+      </a>
+      <a href="#" class="nav-sub-item" onclick="navActivate(this)">
+        <i class="fas fa-cable-car"></i><span>Cáp</span>
+      </a>
+    </div>
+
+    <!-- Tình trạng bất thường -->
+    <a href="#" class="nav-item" onclick="navActivate(this)">
+      <i class="fas fa-exclamation-circle"></i>
+      <span>Tình trạng bất thường</span>
+    </a>
+
+    <!-- ══ CÔNG TÁC ══ -->
+    <span class="nav-label nav-user-allowed">CÔNG TÁC</span>
+
+    <!-- Công tác Thí nghiệm (parent) -->
+    <div class="nav-parent" onclick="navToggle(this,'sub-congTacTN')">
+      <div class="nav-left">
+        <i class="fas fa-flask nav-icon"></i>
+        <span>Công tác Thí nghiệm</span>
+      </div>
+      <i class="fas fa-chevron-right nav-chevron"></i>
+    </div>
+    <div class="nav-sub" id="sub-congTacTN">
+      <a href="#" class="nav-sub-item" onclick="navActivate(this)">
+        <i class="fas fa-calendar-check"></i><span>Thí nghiệm định kỳ</span>
+      </a>
+      <a href="#" class="nav-sub-item" onclick="navActivate(this)">
+        <i class="fas fa-bolt"></i><span>Thí nghiệm đột xuất</span>
+      </a>
+    </div>
+
+    <!-- Quản lý BBTN -->
+    <a href="#" class="nav-item nav-user-allowed" onclick="navActivate(this)">
+      <i class="fas fa-file-signature"></i>
+      <span>Quản lý BBTN</span>
+    </a>
+
+    <a href="#" class="nav-item" onclick="navActivate(this)">
+        <i class="fas fa-upload"></i>
+        <span>Upload TNĐK</span>
+      </a>
+
+      <a href="#" class="nav-item nav-user-allowed" onclick="navActivate(this)">
+        <i class="fas fa-clipboard-check"></i>
+        <span>Báo cáo, theo dõi kết quả thực hiện</span>
+      </a>
+      <!-- ══ BÁO CÁO ══ -->
+    <span class="nav-label">BÁO CÁO</span>
+
+    <!-- Kế hoạch NGCCĐ (parent) -->
+    <div class="nav-parent" onclick="navToggle(this,'sub-ngccd')">
+      <div class="nav-left">
+        <i class="fas fa-calendar-alt nav-icon"></i>
+        <span>Kế hoạch NGCCĐ</span>
+      </div>
+      <i class="fas fa-chevron-right nav-chevron"></i>
+    </div>
+    <div class="nav-sub" id="sub-ngccd">
+      <a href="#" class="nav-sub-item" onclick="navActivate(this)">
+        <i class="fas fa-calendar"></i><span>Kế hoạch năm</span>
+      </a>
+      <a href="#" class="nav-sub-item" onclick="navActivate(this)">
+        <i class="fas fa-calendar-week"></i><span>Kế hoạch tháng</span>
+      </a>
+    </div>
+
+    <!-- Khối lượng thực hiện TNĐK (parent) -->
+    <div class="nav-parent" onclick="navToggle(this,'sub-khoiluong')">
+      <div class="nav-left">
+        <i class="fas fa-chart-bar nav-icon"></i>
+        <span>Khối lượng TNĐK</span>
+      </div>
+      <i class="fas fa-chevron-right nav-chevron"></i>
+    </div>
+    <div class="nav-sub" id="sub-khoiluong">
+      <a href="#" class="nav-sub-item" onclick="navActivate(this)">
+        <i class="fas fa-chart-bar"></i><span>KL theo tháng</span>
+      </a>
+      <a href="#" class="nav-sub-item" onclick="navActivate(this)">
+        <i class="fas fa-chart-line"></i><span>KL theo năm</span>
+      </a>
+      <a href="#" class="nav-sub-item" onclick="navActivate(this)">
+        <i class="fas fa-exclamation-triangle"></i><span>Thiết bị quá hạn</span>
+      </a>
+      <a href="#" class="nav-sub-item" onclick="navActivate(this)">
+        <i class="fas fa-forward"></i><span>Đặt sớm kế hoạch</span>
+      </a>
+    </div>
+
+  </nav>
+  <div class="sidebar-footer">
+    <div class="connection-status" id="connectionStatus">
+      <span class="status-dot connecting" id="statusDot"></span>
+      <span class="status-text" id="statusText">Đang kết nối...</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ═══ CANVAS ═══ -->
+<div class="canvas-area" id="canvasArea">
+  <div class="canvas-header">
+    <div class="canvas-head-main">
+      <span class="canvas-title"><i class="fas fa-table-columns"></i>Bảng điều khiển</span>
+      <div class="canvas-line"></div>
+      <span class="canvas-order-hint">Kéo <i class="fas fa-grip-vertical" style="font-size:9px;opacity:.5"></i> để sắp xếp section</span>
+    </div>
+    <div class="canvas-head-actions">
+      <span class="ux-score-chip" id="uxScoreBadge">UX —</span>
+      <div class="view-toggle">
+        <button type="button" id="viewEditBtn" class="active" onclick="setViewMode('edit')"><i class="fas fa-pen-ruler"></i> Chỉnh sửa</button>
+        <button type="button" id="viewPreviewBtn" onclick="setViewMode('preview')"><i class="fas fa-desktop"></i> Xem trước</button>
+      </div>
+      <button class="btn" onclick="autoOptimizeLayout()"><i class="fas fa-wand-magic-sparkles"></i> Áp preset tối ưu</button>
+    </div>
+  </div>
+  <div class="ux-audit-panel" id="uxAuditPanel" style="display:none"></div>
+  <div class="canvas-quick-nav" id="canvasQuickNav"></div>
+  <div id="canvas"></div>
+</div>
+
+<!-- ═══ THIẾT BỊ PAGE OVERLAY ═══ -->
+<!-- ══ UPLOAD SECTION (spec: uploadSection + btnUpload) ══ -->
+<div id="uploadSection" class="section-wrapper" style="display:none;position:fixed;top:calc(var(--topbar-h,56px) + var(--statusbar-h,32px));left:0;right:0;bottom:0;z-index:9500;background:var(--bg-main,#0d1117);overflow-y:auto;padding:28px 32px;box-sizing:border-box">
+  <div style="max-width:520px;margin:0 auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+      <div>
+        <h3 style="margin:0;font-size:18px;font-weight:800;color:rgba(240,250,255,.97)">📤 Upload thiết bị TNĐK</h3>
+        <p style="margin:6px 0 0;font-size:11px;color:rgba(180,200,220,.65)">Đề nghị cập nhật → Admin phê duyệt → Cập nhật bảng chính</p>
+      </div>
+      <button onclick="document.getElementById('uploadSection').style.display='none'" style="background:none;border:none;color:rgba(200,220,235,.6);font-size:20px;cursor:pointer">✕</button>
+    </div>
+
+    <div style="display:grid;gap:14px">
+      <div>
+        <label class="upload-lbl">Tên thiết bị <span style="color:#ff5252">*</span></label>
+        <input type="text" id="deviceNameInput" placeholder="VD: MBA T1, MC 131-1..." class="upload-inp">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label class="upload-lbl">Số lượng <span style="color:#ff5252">*</span></label>
+          <input type="number" id="quantityInput" placeholder="1" min="1" class="upload-inp">
+        </div>
+        <div>
+          <label class="upload-lbl">Ngày TN thực tế <span style="color:#ff5252">*</span></label>
+          <input type="date" id="dateInput" class="upload-inp">
+        </div>
+      </div>
+      <div>
+        <label class="upload-lbl">Hình ảnh thiết bị <span style="color:rgba(180,200,220,.5)">(JPG/PNG, max 10MB)</span></label>
+        <div id="uploadDropZone" onclick="document.getElementById('fileInput').click()"
+          style="border:2px dashed rgba(0,200,255,.3);border-radius:9px;padding:20px;text-align:center;cursor:pointer;background:rgba(0,200,255,.03);transition:border-color .15s"
+          ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+          ondragleave="this.style.borderColor='rgba(0,200,255,.3)'"
+          ondrop="event.preventDefault();this.style.borderColor='rgba(0,200,255,.3)';document.getElementById('fileInput').files=event.dataTransfer.files;_uploadFileSelected()">
+          <i class="fas fa-cloud-upload-alt" style="font-size:24px;color:rgba(0,200,255,.4);margin-bottom:8px;display:block"></i>
+          <div id="uploadFileLbl" style="font-size:11.5px;color:rgba(180,200,220,.7)">Kéo thả hoặc nhấp để chọn ảnh</div>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="_uploadFileSelected()">
+      </div>
+      <div>
+        <label class="upload-lbl">Ghi chú / Lý do cập nhật <span style="color:#ff5252">*</span></label>
+        <textarea id="uploadNoteInput" rows="3" placeholder="Mô tả lý do cập nhật..." class="upload-inp" style="resize:vertical"></textarea>
+      </div>
+
+      <!-- NAS status indicator -->
+      <div id="uploadNasStatus" style="padding:8px 12px;border-radius:7px;font-size:10.5px;background:rgba(255,255,255,.04);color:rgba(180,200,220,.7)">
+        ● NAS chưa cấu hình — ảnh sẽ không được lưu lên NAS
+      </div>
+
+      <button id="btnUpload" style="padding:11px 20px;border-radius:8px;border:none;background:var(--accent);color:#000;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+        <i class="fas fa-paper-plane"></i> Gửi cập nhật
+      </button>
+      <div id="uploadStatus" style="text-align:center;font-size:11.5px;min-height:18px;font-family:var(--font-mono)"></div>
+    </div>
+  </div>
+</div>
+
+
+<div id="tbPageOverlay" style="display:none;position:absolute;inset:0;background:var(--bg-main,#0d1117);overflow-y:auto;z-index:100;padding:20px 24px;box-sizing:border-box"></div>
+
+<!-- ═══ RIGHT PANEL — LAYERS + PROPERTIES ═══ -->
+<div class="props-panel">
+  <!-- Tab switcher -->
+  <div class="rpanel-tabs">
+    <button class="rpanel-tab active" id="tabLayers" onclick="switchRTab('layers')">
+      <i class="fas fa-layer-group"></i> Layers
+      <span class="panel-count" id="layerCount" style="margin-left:4px">0</span>
+    </button>
+    <button class="rpanel-tab" id="tabProps" onclick="switchRTab('props')">
+      <i class="fas fa-sliders-h"></i> Properties
+      <span class="props-selected" id="propsTitle" style="margin-left:4px">—</span>
+    </button>
+  </div>
+
+  <!-- LAYERS pane -->
+  <div class="rpanel-pane" id="paneLayersWrap">
+    <div class="rpanel-toolbar">
+      <div class="rpanel-search-wrap">
+        <i class="fas fa-search"></i>
+        <input type="text" id="layerSearchInput" class="rpanel-search-input" placeholder="Tìm section... (/)" oninput="filterLayers(this.value)">
+      </div>
+      <button class="rpanel-clear-btn" id="layerSearchClear" onclick="clearLayerSearch()" title="Xóa tìm kiếm">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="rpanel-pane-body" id="layerList"></div>
+    <div class="rpanel-shortcuts">
+      <div class="shortcut-chip"><span>Tìm nhanh</span><kbd>/</kbd></div>
+      <div class="shortcut-chip"><span>Hoàn tác</span><kbd>Ctrl+Z</kbd></div>
+      <div class="shortcut-chip"><span>Chuyển section</span><kbd>↑ ↓</kbd></div>
+      <div class="shortcut-chip"><span>Xuất cấu hình</span><kbd>Ctrl+S</kbd></div>
+    </div>
+    <div class="sidebar-add">
+      <span class="add-section-label">Thêm section</span>
+      <div id="addButtons"></div>
+    </div>
+  </div>
+
+  <!-- PROPERTIES pane -->
+  <div class="rpanel-pane" id="panePropWrap" style="display:none">
+    <div class="rpanel-pane-body" id="propsContent">
+      <div class="props-empty">
+        <i class="fas fa-mouse-pointer"></i>
+        <div>Chọn một section<br>để chỉnh thuộc tính</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+
+<!-- ═══════════════════════════════════════
+     AUTH OVERLAY
+═══════════════════════════════════════ -->
+<div id="authOverlay">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <div class="auth-logo-icon"><i class="fas fa-bolt"></i></div>
+      <div class="auth-title">EVNHANOI Dashboard</div>
+      <div class="auth-sub">Đăng nhập để tiếp tục</div>
+    </div>
+    <div class="auth-field">
+      <label class="auth-label">Tài khoản</label>
+      <input class="auth-input" id="authUser" type="text" placeholder="Nhập username" autocomplete="username">
+    </div>
+    <div class="auth-field">
+      <label class="auth-label">Mật khẩu</label>
+      <input class="auth-input" id="authPass" type="password" placeholder="Nhập mật khẩu" autocomplete="current-password">
+    </div>
+    <div class="auth-err" id="authErr"></div>
+    <button class="auth-btn" onclick="_authLogin()"><i class="fas fa-sign-in-alt" style="margin-right:6px"></i>Đăng nhập</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     USER MENU BUTTON (inserted into topbar via JS)
+═══════════════════════════════════════ -->
+
+<!-- ═══════════════════════════════════════
+     ADMIN PANEL
+═══════════════════════════════════════ -->
+<div id="adminPanel">
+  <div class="admin-modal">
+    <div class="admin-hd">
+      <i class="fas fa-shield-alt" style="color:var(--accent)"></i>
+      <span class="admin-hd-title">Bảng điều khiển Admin</span>
+      <button onclick="document.getElementById('adminPanel').classList.remove('open')"
+        style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px">✕</button>
+    </div>
+    <div class="admin-tabs">
+      <div class="admin-tab active" onclick="_adminTab('users',this)"><i class="fas fa-users" style="margin-right:5px"></i>Người dùng</div>
+      <div class="admin-tab" onclick="_adminTab('log',this)"><i class="fas fa-history" style="margin-right:5px"></i>Nhật ký</div>
+      <div class="admin-tab" onclick="_adminTab('access',this)"><i class="fas fa-key" style="margin-right:5px"></i>Phân quyền</div>
+    </div>
+    <div class="admin-body" id="adminBody">
+      <!-- filled by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     CHANGE NOTIFICATION AREA
+═══════════════════════════════════════ -->
+<div id="changeNotifArea"></div>
+
+
+</body>
+</html>

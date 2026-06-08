@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# V85: Pre-commit hook
+# - Check syntax JS (app.js, sw.js)
+# - Auto bump cache version sw.js nếu app.js thay đổi
+# - Auto add sw.js vào commit
+
+set -e
+
+cd "$(git rev-parse --show-toplevel)"
+
+echo "🔍 [pre-commit] Checking syntax..."
+
+# 1. Syntax check
+if ! node --check app.js 2>/dev/null; then
+  echo "❌ app.js có lỗi syntax! Commit BỊ HỦY."
+  node --check app.js
+  exit 1
+fi
+
+if ! node --check sw.js 2>/dev/null; then
+  echo "❌ sw.js có lỗi syntax! Commit BỊ HỦY."
+  node --check sw.js
+  exit 1
+fi
+
+echo "✓ Syntax OK"
+
+# 2. Check app.js có thay đổi không
+if git diff --cached --name-only | grep -q "^app\.js$"; then
+  echo "📦 app.js đã thay đổi → auto bump cache version..."
+  
+  # Bump cache version với timestamp ngắn
+  python3 -c "
+import re, time
+c = open('sw.js', encoding='utf-8').read()
+# Tìm version hiện tại
+m = re.search(r\"'evn-v(\d+)([^']*)'\", c)
+if m:
+    old_num = int(m.group(1))
+    old_suffix = m.group(2)
+    # Tạo version mới: tăng số HOẶC thêm timestamp nếu giống nhau
+    ts = str(int(time.time()))[-6:]
+    new_ver = f\"'evn-v{old_num}-{ts}'\"
+    new_c = re.sub(r\"'evn-v[0-9]+[^']*'\", new_ver, c, count=1)
+    open('sw.js','w',encoding='utf-8').write(new_c)
+    print(f'  ✓ Cache bumped → evn-v{old_num}-{ts}')
+"
+  
+  # Re-check sw.js sau bump
+  if ! node --check sw.js 2>/dev/null; then
+    echo "❌ sw.js bị hỏng sau bump! Commit BỊ HỦY."
+    exit 1
+  fi
+  
+  # Add sw.js
+  git add sw.js
+  echo "✓ sw.js added to commit"
+fi
+
+echo "✓ [pre-commit] Done"

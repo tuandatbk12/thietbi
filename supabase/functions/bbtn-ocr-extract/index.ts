@@ -237,6 +237,16 @@ async function uploadBytesToGeminiFileAPI(bytes: Uint8Array, mimeType: string, f
   return fileUri;
 }
 
+// V103: loi rieng khi Gemini het quota (429) / qua tai (503) sau khi het retry
+class GeminiBusyError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "GeminiBusyError";
+    this.status = status;
+  }
+}
+
 async function callGeminiOcr(parts: any[]): Promise<{ text: string; elapsed: number; retries: number }> {
   const geminiBody = {
     contents: [{ parts }],
@@ -277,7 +287,8 @@ async function callGeminiOcr(parts: any[]): Promise<{ text: string; elapsed: num
   if (geminiRes.status === 503 || geminiRes.status === 429) {
     const busyMsg = geminiRes.status === 429 ? 'Gemini het quota (429)' : 'Gemini qua tai (503)';
     console.error(`[Gemini] Het ${MAX_RETRIES} retry, van ${geminiRes.status} -> tra loi`);
-    return jsonResponse({ error: `${busyMsg} sau ${MAX_RETRIES} lan thu. Thu lai sau vai phut.`, gemini_status: geminiRes.status }, 503);
+    // V103: throw (truoc day return Response -> caller destructure sai -> text.replace loi -> 502)
+    throw new GeminiBusyError(`${busyMsg} sau ${MAX_RETRIES} lan thu. Thu lai sau vai phut.`, geminiRes.status);
   }
   const elapsed = Date.now() - startTime;
   if (!geminiRes.ok) throw new Error(`Gemini ${geminiRes.status}: ${(await geminiRes.text()).slice(0, 500)}`);
@@ -453,6 +464,10 @@ serve(async (req: Request) => {
     }, 200);
 
   } catch (err: any) {
+    // V103: het quota/qua tai -> 503 ro rang thay vi 502 mu mo
+    if (err instanceof GeminiBusyError) {
+      return jsonResponse({ error: err.message, gemini_status: err.status }, 503);
+    }
     console.error(`[OCR] Exception: ${err.message}`);
     return jsonResponse({ error: "OCR failed", detail: err.message }, 502);
   }

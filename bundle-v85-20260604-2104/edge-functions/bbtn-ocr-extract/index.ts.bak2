@@ -1,0 +1,270 @@
+// ════════════════════════════════════════════════════════════════
+// Edge Function: bbtn-ocr-extract
+//
+// Nhận file (ảnh/PDF) base64 → gọi Gemini Vision → trả JSON 9 fields
+//
+// POST /functions/v1/bbtn-ocr-extract
+// Body: {
+//   file_base64: string,  // base64 encoded file (KHÔNG có prefix data:...)
+//   mime_type: string,    // 'image/jpeg', 'application/pdf', ...
+//   file_name: string     // tên gốc để log
+// }
+// Response: {
+//   success: true,
+//   fields: {
+//     tram, ten_thiet_bi, kieu, so_che_tao, hang_san_xuat, nuoc_san_xuat,
+//     nam_san_xuat, dien_ap, dong_dien, dong_cat,
+//     ngay_kiem_dinh, dang_kiem_dinh, dieu_kien_mt, phuong_phap,
+//     don_vi_dat_lam, vi_tri_lap_dat
+//   },
+//   confidence: 0.85,
+//   raw: { ... }  // full response từ Gemini để debug
+// }
+// ════════════════════════════════════════════════════════════════
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
+const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+// ──────────────────────────────────────────────────────────────
+// SYSTEM PROMPT — Hướng dẫn Gemini extract đúng format
+// ──────────────────────────────────────────────────────────────
+const SYSTEM_PROMPT = `Bạn là chuyên gia OCR cho Biên Bản Thí Nghiệm (BBTN) thiết bị điện của EVN Hà Nội.
+
+NHIỆM VỤ: Đọc file BBTN (ảnh/PDF) và trích xuất 16 trường thông tin sau ra JSON.
+
+CÁC TRƯỜNG CẦN TRÍCH:
+
+1. **tram** (text): Tên trạm biến áp. VD: "E1.1", "E1.5 Đông Anh", "E2.3"
+   - Tìm trong "Vị trí lắp đặt (Site)" hoặc tiêu đề trạm
+   - Format chuẩn: "E1.1" (không có "TBA" phía trước)
+
+2. **ten_thiet_bi** (text): Tên/loại thiết bị
+   - VD: "Máy cắt 131", "DCL 171-1", "MBA T1", "TI 131"
+   - Format: <Loại> <Số ngăn>
+
+3. **kieu** (text): Kiểu/model cụ thể
+   - VD: "GL312F1/4031P", "LTB 145D1/B"
+
+4. **so_che_tao** (text): Serial number / Số chế tạo
+   - VD: "327100800040017"
+
+5. **hang_san_xuat** (text): Hãng. VD: "GE", "ABB", "Siemens", "Schneider"
+
+6. **nuoc_san_xuat** (text): Nước. VD: "India", "Germany", "France"
+
+7. **nam_san_xuat** (number): Năm sản xuất. VD: 2025
+
+8. **dien_ap** (text): Điện áp định mức. VD: "145 kV", "245 kV", "40.5 kV"
+
+9. **dong_dien** (text): Dòng điện định mức. VD: "3150 A", "2500 A"
+
+10. **dong_cat** (text): Dòng cắt định mức (nếu có). VD: "40 kA", "50 kA"
+
+11. **ngay_kiem_dinh** (text format YYYY-MM-DD): Ngày kiểm định / ngày thí nghiệm
+    - Chuyển ngày từ format Việt (DD/MM/YYYY) sang YYYY-MM-DD
+    - VD: "24/05/2025" → "2025-05-24"
+
+12. **dang_kiem_dinh** (text): "Lần đầu" / "Định kỳ" / "Đột xuất" / "Sửa chữa"
+    - Tìm trong "Dạng kiểm định (State)"
+
+13. **dieu_kien_mt** (text): Điều kiện môi trường. VD: "Không mưa", "Trời nắng"
+
+14. **phuong_phap** (text): Phương pháp thử. VD: "IEC62271-100, IEC60694, QCVN QTĐ-5:2009"
+
+15. **don_vi_dat_lam** (text): Đơn vị đặt làm. VD: "Công ty lưới điện cao thế TP Hà Nội"
+
+16. **vi_tri_lap_dat** (text): Vị trí lắp đặt chi tiết
+    - VD: "MC 131 TBA E1.1 Đông Anh - Công trình: Đại tu thay thế các MC 110kV"
+
+QUY TẮC:
+- Trả về CHỈ JSON, KHÔNG markdown, KHÔNG \`\`\`json wrapper
+- Nếu không đọc được trường nào → giá trị null (KHÔNG bỏ trường đó ra khỏi JSON)
+- Số chế tạo có thể có 0 ở đầu, GIỮ NGUYÊN không bỏ
+- Ngày luôn format YYYY-MM-DD, kể cả khi BBTN viết DD/MM/YYYY
+- Tên trạm chuẩn hóa: bỏ "TBA " phía trước, chỉ giữ ký hiệu (E1.1, E2.3, ...)
+- Tin tưởng vào dữ liệu trong BBTN, không tự đoán/sửa
+
+Trả về object JSON đơn lẻ với 16 trường trên.`;
+
+// ──────────────────────────────────────────────────────────────
+// MAIN HANDLER
+// ──────────────────────────────────────────────────────────────
+serve(async (req: Request) => {
+  // CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: CORS_HEADERS });
+  }
+
+  if (req.method !== "POST") {
+    return jsonResponse({ error: "Method not allowed" }, 405);
+  }
+
+  // Verify GEMINI_API_KEY có
+  if (!GEMINI_API_KEY) {
+    return jsonResponse({
+      error: "GEMINI_API_KEY not configured. Run: supabase secrets set GEMINI_API_KEY=xxx"
+    }, 500);
+  }
+
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400);
+  }
+
+  const { file_base64, mime_type, file_name } = body;
+
+  if (!file_base64 || !mime_type) {
+    return jsonResponse({
+      error: "Missing required fields: file_base64, mime_type"
+    }, 400);
+  }
+
+  // Validate MIME type
+  const ALLOWED_MIMES = [
+    "image/jpeg", "image/jpg", "image/png", "image/webp",
+    "application/pdf"
+  ];
+  if (!ALLOWED_MIMES.includes(mime_type)) {
+    return jsonResponse({
+      error: `Unsupported MIME type: ${mime_type}. Allowed: ${ALLOWED_MIMES.join(", ")}`
+    }, 400);
+  }
+
+  // Validate base64 size (max ~15MB encoded, ~11MB actual)
+  if (file_base64.length > 30_000_000) {
+    return jsonResponse({
+      error: "File too large (max ~22MB). Resize PDF truoc khi upload."
+    }, 400);
+  }
+
+  console.log(`[OCR] File: ${file_name}, type: ${mime_type}, size: ${file_base64.length} bytes (b64)`);
+
+  try {
+    // ──────────────────────────────────────────────
+    // Gọi Gemini Vision API
+    // ──────────────────────────────────────────────
+    const geminiBody = {
+      contents: [{
+        parts: [
+          { text: SYSTEM_PROMPT },
+          {
+            inline_data: {
+              mime_type: mime_type,
+              data: file_base64,
+            }
+          }
+        ]
+      }],
+      generationConfig: {
+        temperature: 0.1,           // thấp để consistent
+        topP: 0.95,
+        topK: 40,
+        maxOutputTokens: 2048,
+        responseMimeType: "application/json",  // ép trả JSON
+      },
+    };
+
+    const startTime = Date.now();
+    const geminiRes = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(geminiBody),
+    });
+
+    const elapsed = Date.now() - startTime;
+    console.log(`[OCR] Gemini response in ${elapsed}ms, status: ${geminiRes.status}`);
+
+    if (!geminiRes.ok) {
+      const errText = await geminiRes.text();
+      console.error(`[OCR] Gemini error: ${errText.slice(0, 500)}`);
+      return jsonResponse({
+        error: `Gemini API error: ${geminiRes.status}`,
+        detail: errText.slice(0, 500),
+      }, 502);
+    }
+
+    const geminiData = await geminiRes.json();
+
+    // Extract text content từ response
+    const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    if (!text) {
+      return jsonResponse({
+        error: "Gemini returned empty response",
+        raw: geminiData,
+      }, 502);
+    }
+
+    // Parse JSON
+    let fields: any;
+    try {
+      // Strip markdown code fence nếu có (defensive)
+      const cleanText = text.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+      fields = JSON.parse(cleanText);
+    } catch (parseErr) {
+      console.error(`[OCR] Failed to parse JSON: ${text.slice(0, 200)}`);
+      return jsonResponse({
+        error: "Gemini returned non-JSON",
+        raw_text: text.slice(0, 1000),
+      }, 502);
+    }
+
+    // Validate fields cơ bản
+    if (typeof fields !== "object" || fields === null) {
+      return jsonResponse({
+        error: "Invalid fields format",
+        raw_text: text.slice(0, 1000),
+      }, 502);
+    }
+
+    // Normalize: convert nam_san_xuat to integer if string
+    if (typeof fields.nam_san_xuat === "string") {
+      const yearMatch = fields.nam_san_xuat.match(/\d{4}/);
+      fields.nam_san_xuat = yearMatch ? parseInt(yearMatch[0]) : null;
+    }
+
+    // Tính confidence dựa trên số field không null
+    const fieldCount = 16;
+    const filledCount = Object.values(fields).filter(v => v !== null && v !== "").length;
+    const confidence = filledCount / fieldCount;
+
+    console.log(`[OCR] Extracted ${filledCount}/${fieldCount} fields, confidence: ${confidence.toFixed(2)}`);
+
+    return jsonResponse({
+      success: true,
+      fields,
+      confidence,
+      filled_count: filledCount,
+      total_fields: fieldCount,
+      elapsed_ms: elapsed,
+      model: GEMINI_MODEL,
+    }, 200);
+
+  } catch (err: any) {
+    console.error(`[OCR] Exception: ${err.message}`);
+    return jsonResponse({
+      error: "Internal error",
+      detail: err.message,
+    }, 500);
+  }
+});
+
+// ──────────────────────────────────────────────────────────────
+// HELPER
+// ──────────────────────────────────────────────────────────────
+function jsonResponse(data: any, status: number): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+  });
+}

@@ -1,0 +1,471 @@
+/* ════════════════════════════════════════════════════════════════
+   BBTN OCR UI — Phase 3 Styles
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Sidebar badge ── */
+.bbtn-sidebar-badge {
+  background: #ff5252;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 10px;
+  margin-left: auto;
+  min-width: 18px;
+  text-align: center;
+  display: inline-block;
+  box-shadow: 0 0 8px rgba(255, 82, 82, 0.4);
+}
+
+/* ── Modal overlay ── */
+.bbtn-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 99998;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(4px);
+}
+
+.bbtn-modal-card {
+  background: #1a1f2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 1000px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.bbtn-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bbtn-modal-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #00c8ff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bbtn-modal-close {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #eef;
+  font-size: 14px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bbtn-modal-close:hover {
+  background: rgba(255, 82, 82, 0.15);
+  border-color: rgba(255, 82, 82, 0.4);
+}
+
+.bbtn-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.bbtn-modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 12px;
+}
+
+.bbtn-footer-info {
+  color: #9ab;
+  font-size: 12px;
+}
+
+.bbtn-footer-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Upload zone ── */
+.bbtn-upload-zone {
+  border: 2px dashed rgba(0, 200, 255, 0.3);
+  border-radius: 12px;
+  padding: 40px 20px;
+  text-align: center;
+  transition: all 0.2s;
+  background: rgba(0, 200, 255, 0.03);
+}
+
+.bbtn-upload-zone.dragover {
+  border-color: #00c8ff;
+  background: rgba(0, 200, 255, 0.1);
+}
+
+.bbtn-upload-icon {
+  font-size: 48px;
+  color: #00c8ff;
+  margin-bottom: 12px;
+}
+
+.bbtn-upload-text {
+  font-size: 14px;
+  color: #eef;
+  margin-bottom: 12px;
+}
+
+.bbtn-upload-hint {
+  font-size: 11px;
+  color: rgba(180, 200, 220, 0.5);
+  margin-top: 10px;
+}
+
+/* ── Progress ── */
+.bbtn-progress-wrap {
+  margin: 16px 0;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+}
+
+.bbtn-progress-text {
+  font-size: 12px;
+  color: #9ab;
+  margin-bottom: 6px;
+}
+
+.bbtn-progress-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.bbtn-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00c8ff, #0088ff);
+  border-radius: 3px;
+  transition: width 0.3s;
+  width: 0;
+}
+
+/* ── Preview ── */
+.bbtn-preview-wrap {
+  margin-top: 16px;
+}
+
+.bbtn-preview-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #eef;
+  margin-bottom: 12px;
+}
+
+.bbtn-preview-card {
+  background: rgba(0, 200, 255, 0.04);
+  border: 1px solid rgba(0, 200, 255, 0.2);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  transition: all 0.2s;
+}
+
+.bbtn-preview-card.unselected {
+  opacity: 0.4;
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.bbtn-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bbtn-card-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.bbtn-card-check input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.bbtn-card-badge {
+  background: #00c8ff;
+  color: #000;
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.bbtn-card-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #00e676;
+}
+
+.bbtn-card-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  color: rgba(180, 200, 220, 0.6);
+  align-items: center;
+}
+
+.bbtn-page-badge {
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffc107;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-weight: 700;
+  font-size: 10px;
+}
+
+.bbtn-file-name {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+.bbtn-card-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.bbtn-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.bbtn-field-label {
+  font-size: 10px;
+  color: rgba(180, 200, 220, 0.6);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.bbtn-field-input {
+  width: 100%;
+  padding: 5px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #eef;
+  font-size: 12px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.bbtn-field-input:focus {
+  outline: none;
+  border-color: #00c8ff;
+  background: rgba(0, 200, 255, 0.06);
+}
+
+.bbtn-field-input.empty {
+  color: rgba(255, 82, 82, 0.7);
+  font-style: italic;
+}
+
+/* ── Buttons ── */
+.bbtn-btn-primary {
+  background: linear-gradient(135deg, #00c8ff, #0088ff);
+  color: #000;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bbtn-btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.bbtn-btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: #eef;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 10px 20px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.bbtn-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ── Alert rows ── */
+.bbtn-alert-row:hover {
+  background: rgba(255, 152, 0, 0.12) !important;
+}
+
+/* ━━━━ Filter inputs/selects trong trang Quản lý BBTN OCR (chữ đen nền trắng) ━━━━ */
+#bbtnFilterTram,
+#bbtnFilterLoai,
+#bbtnFilterStatus,
+#bbtnFilterSearch,
+#bbtnFilterDateFrom,
+#bbtnFilterDateTo,
+input[id^="bbtnFilter"],
+select[id^="bbtnFilter"] {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border: 1px solid #d0d7de !important;
+  font-weight: 500 !important;
+  padding: 6px 10px !important;
+}
+input[id^="bbtnFilter"]::placeholder {
+  color: #999 !important;
+  font-style: italic;
+  font-weight: 400;
+}
+input[id^="bbtnFilter"]:focus,
+select[id^="bbtnFilter"]:focus {
+  outline: 2px solid #2196f3 !important;
+  background: #fff !important;
+  color: #000 !important;
+}
+
+/* Dropdown options trong filter */
+select[id^="bbtnFilter"] option {
+  background: #ffffff !important;
+  color: #000000 !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ĐỒNG NHẤT DROPDOWN: nền đen chữ trắng + font hỗ trợ tiếng Việt
+   Áp dụng TOÀN BỘ dashboard (mọi <select> và <option>)
+   ════════════════════════════════════════════════════════════════ */
+
+/* Mọi select trong dashboard */
+select {
+  background: #1e2530 !important;
+  color: #ffffff !important;
+  border: 1px solid #2c3744 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", 
+               "Helvetica Neue", "Arial", "Noto Sans", "Liberation Sans", 
+               sans-serif !important;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 4px;
+}
+
+/* Options bên trong dropdown */
+select option {
+  background: #1e2530 !important;
+  color: #ffffff !important;
+  font-family: inherit !important;
+  padding: 6px 10px;
+}
+
+/* Option đang hover hoặc đang chọn */
+select option:hover,
+select option:checked,
+select option:focus,
+select option[selected] {
+  background: #2196f3 !important;
+  color: #ffffff !important;
+}
+
+/* Khi select đang focus (mở dropdown) */
+select:focus {
+  outline: 2px solid #2196f3 !important;
+  background: #1e2530 !important;
+  color: #ffffff !important;
+}
+
+/* EXCEPTION: dropdown trong các module dùng nền trắng chữ đen (Filter BBTN OCR + Card OCR) */
+#bbtnFilterTram,
+#bbtnFilterLoai,
+#bbtnFilterStatus,
+#bbtnFilterSearch,
+#bbtnFilterDateFrom,
+#bbtnFilterDateTo,
+input[id^="bbtnFilter"],
+select[id^="bbtnFilter"],
+.bbtn-card-row input,
+.bbtn-card-row select,
+.bbtn-card input,
+.bbtn-card select,
+.bbtn-card-field input,
+.bbtn-card-field select {
+  background: #ffffff !important;
+  color: #000000 !important;
+}
+select[id^="bbtnFilter"] option,
+.bbtn-card select option,
+.bbtn-card-field select option {
+  background: #ffffff !important;
+  color: #000000 !important;
+}
+
+/* Dropdown PMIS module - chữ trắng theo theme dark */
+.pmis-modal select,
+.pmis-input {
+  background: #1e2530 !important;
+  color: #ffffff !important;
+}
+.pmis-modal select option {
+  background: #1e2530 !important;
+  color: #ffffff !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   FIX: Force font Vietnamese-safe cho TẤT CẢ select dropdown
+   "Segoe UI" Windows native, "Roboto" Android, đảm bảo render đầy đủ dấu
+   ════════════════════════════════════════════════════════════════ */
+
+select, select * {
+  font-family: "Segoe UI", "Roboto", "Helvetica Neue", "Arial Unicode MS", 
+               "Tahoma", "Verdana", sans-serif !important;
+  font-feature-settings: normal !important;
+  font-variant: normal !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Force consistent rendering across all options */
+option {
+  font-family: "Segoe UI", "Roboto", "Helvetica Neue", "Arial Unicode MS", 
+               "Tahoma", "Verdana", sans-serif !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
