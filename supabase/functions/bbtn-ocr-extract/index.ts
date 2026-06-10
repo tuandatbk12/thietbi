@@ -14,6 +14,8 @@ import { getNasConfig, nasUrl, nasAuthHeader, nasFetch, safeJoinPath, normalizeC
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
 const GEMINI_MODEL = "gemini-2.5-flash";
+// V104: fallback nhieu model - moi model co quota RIENG (1500 RPD) -> tang ~4500/ngay + ne overload
+const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite"];
 const GEMINI_GENERATE_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const GEMINI_FILE_UPLOAD_URL = `https://generativelanguage.googleapis.com/upload/v1beta/files`;
 const GEMINI_FILE_GET_URL = `https://generativelanguage.googleapis.com/v1beta`;
@@ -257,49 +259,59 @@ async function callGeminiOcr(parts: any[]): Promise<{ text: string; elapsed: num
     },
   };
   const startTime = Date.now();
-  let geminiRes: Response;
-  let retryCount = 0;
-  // V99: gioi han retry de KHONG vuot 60s wall-clock free tier (tranh shutdown -> HTTP 546)
-  const MAX_RETRIES = 3;
-  while (true) {
-    geminiRes = await fetch(`${GEMINI_GENERATE_URL}?key=${GEMINI_API_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(geminiBody),
-    });
-    if ((geminiRes.status !== 503 && geminiRes.status !== 429) || retryCount >= MAX_RETRIES) break;
-    retryCount++;
-    // V99: 503 backoff nhe (2/3/4s) thay vi 2/4/6...; 429 quota van doc retry-in nhung cap 10s
-    let waitMs = 1000 * (retryCount + 1); // 2s, 3s, 4s
-    if (geminiRes.status === 429) {
-      const errText = await geminiRes.clone().text();
-      const m = errText.match(/retry in (\d+(?:\.\d+)?)s/i);
-      // V102: 429 = het quota, retry it va nhanh (cap 5s) vi retry lau cung vo ich khi quota can
-      if (m) waitMs = Math.min((Math.ceil(parseFloat(m[1])) + 1) * 1000, 5000); // cap 5s
-      else waitMs = 4000;
-      console.log(`[Gemini] 429 quota, wait ${waitMs/1000}s (retry ${retryCount}/${MAX_RETRIES})`);
-    } else {
-      console.log(`[Gemini] 503, wait ${waitMs/1000}s (retry ${retryCount}/${MAX_RETRIES})`);
+  // V104: fallback nhieu model - moi model quota rieng + ne overload
+  const MAX_RETRIES = 2; // giam 3->2 de co time thu nhieu model trong 60s
+  let totalRetries = 0;
+  let lastStatus = 0;
+  for (let mi = 0; mi < GEMINI_MODELS.length; mi++) {
+    const model = GEMINI_MODELS[mi];
+    const genUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    let geminiRes: Response;
+    let retryCount = 0;
+    while (true) {
+      geminiRes = await fetch(`${genUrl}?key=${GEMINI_API_KEY}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(geminiBody),
+      });
+      if ((geminiRes.status !== 503 && geminiRes.status !== 429) || retryCount >= MAX_RETRIES) break;
+      retryCount++; totalRetries++;
+      let waitMs = 1000 * (retryCount + 1); // 2s, 3s
+      if (geminiRes.status === 429) {
+        const errText = await geminiRes.clone().text();
+        const m = errText.match(/retry in (\d+(?:\.\d+)?)s/i);
+        if (m) waitMs = Math.min((Math.ceil(parseFloat(m[1])) + 1) * 1000, 4000);
+        else waitMs = 3000;
+        console.log(`[Gemini] ${model} 429 quota, wait ${waitMs/1000}s (retry ${retryCount}/${MAX_RETRIES})`);
+      } else {
+        console.log(`[Gemini] ${model} 503, wait ${waitMs/1000}s (retry ${retryCount}/${MAX_RETRIES})`);
+      }
+      await new Promise(r => setTimeout(r, waitMs));
     }
-    await new Promise(r => setTimeout(r, waitMs));
+    // Neu model nay van 503/429 -> thu model tiep theo (quota rieng)
+    if (geminiRes.status === 503 || geminiRes.status === 429) {
+      lastStatus = geminiRes.status;
+      console.warn(`[Gemini] ${model} het retry (${geminiRes.status}) -> thu model tiep theo...`);
+      continue;
+    }
+    if (!geminiRes.ok) {
+      throw new Error(`Gemini ${model} ${geminiRes.status}: ${String(await geminiRes.text()).slice(0, 500)}`);
+    }
+    // Thanh cong
+    const elapsed = Date.now() - startTime;
+    const geminiData = await geminiRes.json();
+    let text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (typeof text !== "string") {
+      text = text == null ? "" : (typeof text === "object" ? JSON.stringify(text) : String(text));
+    }
+    if (!text) throw new Error("Gemini empty response");
+    if (mi > 0) console.log(`[Gemini] OK voi model fallback: ${model}`);
+    return { text, elapsed, retries: totalRetries, model };
   }
-  // V99: het retry van 503/429 -> tra loi ro rang, KHONG de Edge Function chay tiep roi shutdown
-  if (geminiRes.status === 503 || geminiRes.status === 429) {
-    const busyMsg = geminiRes.status === 429 ? 'Gemini het quota (429)' : 'Gemini qua tai (503)';
-    console.error(`[Gemini] Het ${MAX_RETRIES} retry, van ${geminiRes.status} -> tra loi`);
-    // V103: throw (truoc day return Response -> caller destructure sai -> text.replace loi -> 502)
-    throw new GeminiBusyError(`${busyMsg} sau ${MAX_RETRIES} lan thu. Thu lai sau vai phut.`, geminiRes.status);
-  }
-  const elapsed = Date.now() - startTime;
-  if (!geminiRes.ok) throw new Error(`Gemini ${geminiRes.status}: ${(await geminiRes.text()).slice(0, 500)}`);
-  const geminiData = await geminiRes.json();
-  // V102: dam bao text luon la string (Gemini doi khi tra parts khong chuan -> .slice loi)
-  let text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (typeof text !== "string") {
-    text = text == null ? "" : (typeof text === "object" ? JSON.stringify(text) : String(text));
-  }
-  if (!text) throw new Error("Gemini empty response");
-  return { text, elapsed, retries: retryCount };
+  // Tat ca model deu 503/429
+  const busyMsg = lastStatus === 429 ? 'Tat ca model Gemini het quota (429)' : 'Tat ca model Gemini qua tai (503)';
+  console.error(`[Gemini] Het tat ca ${GEMINI_MODELS.length} model, van ${lastStatus}`);
+  throw new GeminiBusyError(`${busyMsg}. Thu lai sau vai phut.`, lastStatus || 503);
 }
 
 serve(async (req: Request) => {
