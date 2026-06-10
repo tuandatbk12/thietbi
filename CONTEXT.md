@@ -1,4 +1,4 @@
-# EVN Hà Nội Dashboard — CONTEXT (cập nhật v103)
+# EVN Hà Nội Dashboard — CONTEXT (cập nhật v104)
 
 ## Hệ thống
 - Dashboard: https://thietbi.vercel.app/ (Vercel auto-deploy)
@@ -306,3 +306,43 @@ Vấn đề gốc: file lớn crash browser, timeout, OOM, Gemini 503, Chrome ch
 
 ### Commit v103
 - c209d78 v103 (V86 check _AUTH_SB_URL truc tiep)
+
+
+═══════════════════════════════════════════════════════════
+## CẬP NHẬT v104 (Multi-model fallback - GIẢI PHÁP TRIỆT ĐỂ 429/503)
+═══════════════════════════════════════════════════════════
+
+### ⭐ v104 - Fallback nhiều model Gemini (giải quyết triệt để OCR hàng loạt)
+- VẤN ĐỀ GỐC (sau nhiều phiên chẩn đoán): OCR bulk fail hàng loạt do lệ thuộc 1 model
+  - 429 = hết quota ngày gemini-2.5-flash (1,500 RPD free tier)
+  - 503 = model overload tạm thời khi request dồn
+  - Throttle/retry client KHÔNG cứu được (quota/overload là phía Gemini)
+- GIẢI PHÁP: GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-flash-lite"]
+  - callGeminiOcr loop qua từng model: model A bị 429/503 hết 2 retry -> tự thử model B (quota RIÊNG)
+  - Mỗi model free tier có quota riêng 1,500 RPD -> tổng ~4,500 OCR/ngày MIỄN PHÍ
+  - Vừa né hết quota (429) vừa né overload (503)
+  - MAX_RETRIES giảm 3->2/model để có thời gian thử 3 model trong 60s wall-clock
+  - Return thêm field `model` (model nào OCR thành công)
+  - Log: "[Gemini] {model} het retry -> thu model tiep theo", "[Gemini] OK voi model fallback: {model}"
+- KẾT QUẢ: quét được liên tục, không còn fail hàng loạt
+- Backup: index.ts.before-v104.bak
+- Commit 1d0f13f
+
+### Chốt giải pháp OCR (toàn bộ hành trình)
+| Vấn đề | Giải pháp |
+|--------|-----------|
+| Browser crash file lớn | v89 stream qua Edge Function |
+| Timeout/OOM | v94-97 timeout động + upload bytes thẳng |
+| Chrome chặn confirm | v100 modal HTML |
+| Gemini 429/503 hàng loạt | v104 fallback 3 model (~4,500/ngày free) |
+
+### Nếu cần >4,500 OCR/ngày
+- Bật billing Gemini (pay-as-you-go ~$0.10/1triệu token, không giới hạn RPD)
+- File hướng dẫn: HUONG_DAN_GEMINI_BILLING.md (nếu đã tạo)
+
+### TODO kiểm tra
+- Đối chiếu chất lượng data model fallback (2.0-flash, 2.5-flash-lite) vs 2.5-flash
+  - Nếu model nào đọc kém BBTN -> điều chỉnh thứ tự GEMINI_MODELS hoặc bỏ model đó
+
+### Commit v104
+- 1d0f13f v104 (fallback multi-model)
