@@ -1,4 +1,4 @@
-# EVN Hà Nội Dashboard — CONTEXT (cập nhật v102)
+# EVN Hà Nội Dashboard — CONTEXT (cập nhật v103)
 
 ## Hệ thống
 - Dashboard: https://thietbi.vercel.app/ (Vercel auto-deploy)
@@ -283,3 +283,26 @@ Vấn đề gốc: file lớn crash browser, timeout, OOM, Gemini 503, Chrome ch
 - "502 hàng loạt" khi bulk thường = Gemini 429 quota cạn, KHÔNG phải lỗi code/Supabase
 - LUÔN xem SERVER log (Supabase Dashboard) không chỉ browser console - phân biệt request có tới function không
 - Gemini response parts[0].text không đảm bảo là string -> luôn guard typeof trước .slice/.replace
+
+
+═══════════════════════════════════════════════════════════
+## CẬP NHẬT v103 (Fix V86 widget check sai biến)
+═══════════════════════════════════════════════════════════
+
+### v103 - V86 widget không init
+- BUG: V86 check window._AUTH_SB_URL nhưng biến khai báo `const _AUTH_SB_URL` (line 8069-8070, top-level)
+  - const/let top-level KHÔNG tự gán vào window (khác var) -> window._AUTH_SB_URL = undefined
+  - V86 đợi mãi 60s -> "[V86] Supabase chưa init sau 60s, retry ngầm"
+  - Các module khác dùng _AUTH_SB_URL trực tiếp (cùng scope) nên OK, chỉ V86 dùng window. nên fail
+- FIX: V86 đổi sang check `typeof _AUTH_SB_URL !== 'undefined' && _AUTH_SB_URL` (truy cập trực tiếp)
+- Commit c209d78
+
+### Warning vô hại (KHÔNG cần fix)
+- "Multiple GoTrueClient instances" - Supabase lib tạo 2 client, vô hại
+- "onboarding.js getImageNode" - script bên thứ 3, không phải code app
+
+### Tech Lesson
+- `const X`/`let X` top-level script KHÔNG tạo window.X (chỉ `var`). Cùng scope dùng X trực tiếp; khác scope phải gán window explicit
+
+### Commit v103
+- c209d78 v103 (V86 check _AUTH_SB_URL truc tiep)
