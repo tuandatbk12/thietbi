@@ -15705,6 +15705,16 @@ async function _authedFetch(url, options) {
       
       // Insert TRƯỚC nút "Tải lại" (để nút mới ở vị trí ưu tiên)
       refreshBtn.parentNode.insertBefore(bulkBtn, refreshBtn);
+      // V105: nut "Quet lai file loi" (chi hien khi co file loi)
+      if (!document.getElementById('v105RetryBtn')) {
+        const retryBtn = document.createElement('button');
+        retryBtn.id = 'v105RetryBtn';
+        retryBtn.style.cssText = 'padding:8px 16px;border-radius:7px;border:1px solid rgba(0,200,255,.5);background:linear-gradient(135deg,#00c8ff,#0080cc);color:#fff;font-weight:700;cursor:pointer;font-size:11.5px;margin-right:8px;display:none;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(0,200,255,.25)';
+        retryBtn.title = 'Quet lai cac file OCR loi tu lan truoc (luu ben vung)';
+        retryBtn.onclick = function() { if (window._v105RetryAll) window._v105RetryAll(); };
+        refreshBtn.parentNode.insertBefore(retryBtn, refreshBtn);
+        if (window._v105UpdateBadge) setTimeout(window._v105UpdateBadge, 100);
+      }
       refreshBtn.dataset.bulkBtnV60 = '1';
       injected++;
     });
@@ -16885,11 +16895,13 @@ async function _authedFetch(url, options) {
             });
             if(!ir.ok) throw new Error('Save fail: '+(await ir.text()).substring(0,120));
             ok++; dev+=recs.length; success.push({name:f.name,count:recs.length});
+            if(window._v105RemoveFailed) _v105RemoveFailed(f.path);
           }
         } catch(e){
           fail++;
           const label = e._v90Type ? e.message : ('Loi: '+e.message);
           failed.push({name:f.name,error:label});
+          if(window._v105AddFailed) _v105AddFailed(f.path, f.name, f.size, label);
           if(window._v90Toast) _v90Toast('error', label, f.name);
           console.error('[V66] FAIL',f.name,e);
         } finally {
@@ -16972,6 +16984,93 @@ async function _authedFetch(url, options) {
       file_url:nasPath, file_name:fileName, file_source:'nas'
     };
   }
+
+  // ═══ V105: Theo doi + retry file OCR loi (luu ben vung localStorage) ═══
+  const _V105_KEY = 'evn_ocr_failed_v105';
+  const _V105_MAX_ROUNDS = 5;
+  window._v105GetFailed = function() {
+    try { return JSON.parse(localStorage.getItem(_V105_KEY) || '[]'); } catch(e) { return []; }
+  };
+  window._v105SaveFailed = function(arr) {
+    try { localStorage.setItem(_V105_KEY, JSON.stringify(arr)); } catch(e) {}
+    if (window._v105UpdateBadge) window._v105UpdateBadge();
+  };
+  window._v105AddFailed = function(path, name, size, reason) {
+    if (!path) return;
+    const arr = window._v105GetFailed();
+    const ex = arr.find(x => x.path === path);
+    if (ex) { ex.tries = (ex.tries||0) + 1; ex.reason = reason || ex.reason; ex.lastTry = Date.now(); ex.name = name || ex.name; ex.size = size || ex.size; }
+    else { arr.push({ path: path, name: name || path, size: size || 0, reason: reason || 'loi', tries: 1, lastTry: Date.now() }); }
+    window._v105SaveFailed(arr);
+  };
+  window._v105RemoveFailed = function(path) {
+    if (!path) return;
+    const arr = window._v105GetFailed().filter(x => x.path !== path);
+    window._v105SaveFailed(arr);
+  };
+  window._v105ClearFailed = function() { window._v105SaveFailed([]); };
+  window._v105UpdateBadge = function() {
+    const n = window._v105GetFailed().length;
+    const btn = document.getElementById('v105RetryBtn');
+    if (btn) {
+      if (n > 0) { btn.style.display = 'inline-flex'; btn.innerHTML = '🔄 Quét lại ' + n + ' file lỗi'; }
+      else { btn.style.display = 'none'; }
+    }
+  };
+  // Retry tat ca file loi - nhieu vong cho den khi het hoac dat max rounds
+  window._v105RetryAll = async function() {
+    let arr = window._v105GetFailed();
+    if (!arr.length) { if(window._v90Toast)_v90Toast('info','Khong co file loi','Danh sach trong'); return; }
+    const ok = await window._v100Confirm('Co ' + arr.length + ' file loi can quet lai.\nSe thu toi da ' + _V105_MAX_ROUNDS + ' vong (model fallback v104).\n\nBat dau?', '🔄 Quét lại file lỗi');
+    if (!ok) return;
+    const SB = _AUTH_SB_URL.replace(/\/$/, '');
+    let round = 0;
+    let totalOk = 0, totalDev = 0;
+    while (round < _V105_MAX_ROUNDS) {
+      arr = window._v105GetFailed();
+      if (!arr.length) break;
+      round++;
+      if(window._v90Toast)_v90Toast('info','Vong ' + round + '/' + _V105_MAX_ROUNDS, 'Quet lai ' + arr.length + ' file...');
+      const snapshot = arr.slice();
+      for (let i = 0; i < snapshot.length; i++) {
+        const fileObj = snapshot[i];
+        const _v105hb = window._v96StartPerFileProgress ? window._v96StartPerFileProgress(fileObj.name, ((fileObj.size||0)/1024/1024).toFixed(1)+'MB') : null;
+        try {
+          const od = await _ocrOne(null, SB, fileObj.path, fileObj.name, fileObj.size);
+          const items = od.items || [];
+          if (!items.length) { window._v105AddFailed(fileObj.path, fileObj.name, fileObj.size, 'Khong co thiet bi'); }
+          else {
+            const recs = items.map(it => _mapRec(it, fileObj.path, fileObj.name));
+            const tok = await _authGetToken();
+            if (!tok) throw new Error('Phien dang nhap het han');
+            const ir = await fetch(SB+'/rest/v1/bbtn_records', {
+              method:'POST',
+              headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok,'apikey':_AUTH_SB_KEY,'Prefer':'return=minimal'},
+              body: JSON.stringify(recs)
+            });
+            if (!ir.ok) throw new Error('Save fail: '+(await ir.text()).substring(0,120));
+            window._v105RemoveFailed(fileObj.path);
+            totalOk++; totalDev += recs.length;
+            if(window._v90Toast)_v90Toast('success','✓ OCR lai OK', fileObj.name);
+          }
+        } catch(e) {
+          const label = e._v90Type ? e.message : ('Loi: '+e.message);
+          window._v105AddFailed(fileObj.path, fileObj.name, fileObj.size, label);
+        } finally {
+          if (window._v96StopPerFileProgress) window._v96StopPerFileProgress(_v105hb);
+        }
+        await new Promise(r => setTimeout(r, 4000)); // throttle 4s
+      }
+    }
+    const remain = window._v105GetFailed().length;
+    if (remain === 0) {
+      if(window._v90Toast)_v90Toast('success','🎉 Hoan tat!', 'Da OCR lai het. ' + totalOk + ' file, ' + totalDev + ' thiet bi.');
+    } else {
+      if(window._v90Toast)_v90Toast('error', remain + ' file van loi sau ' + round + ' vong', 'Co the file hong/loi that su. OCR OK: ' + totalOk + ' file.');
+    }
+    if (window._showBbtnMgmt) { /* optional refresh */ }
+  };
+  console.log('[V105] OCR failed-retry tracker loaded');
 
   // ── FIX PER-FILE OCR (override v57) ──
   window._bbtnOcrFromNas = async function(nasPath, fileName, sizeBytes) {
@@ -17165,11 +17264,13 @@ async function _authedFetch(url, options) {
             });
             if(!ir.ok) throw new Error('Save fail: '+(await ir.text()).substring(0,120));
             ok++; dev+=recs.length; success.push({name:f.name,count:recs.length});
+            if(window._v105RemoveFailed) _v105RemoveFailed(f.path);
           }
         } catch(e){
           fail++;
           const label = e._v90Type ? e.message : ('Loi: '+e.message);
           failed.push({name:f.name,error:label});
+          if(window._v105AddFailed) _v105AddFailed(f.path, f.name, f.size, label);
           if(window._v90Toast) _v90Toast('error', label, f.name);
           console.error('[V68]',f.name,e);
         } finally {
