@@ -1,4 +1,4 @@
-# EVN Hà Nội Dashboard — CONTEXT (cập nhật v104)
+# EVN Hà Nội Dashboard — CONTEXT (cập nhật v106)
 
 ## Hệ thống
 - Dashboard: https://thietbi.vercel.app/ (Vercel auto-deploy)
@@ -346,3 +346,40 @@ Vấn đề gốc: file lớn crash browser, timeout, OOM, Gemini 503, Chrome ch
 
 ### Commit v104
 - 1d0f13f v104 (fallback multi-model)
+
+
+═══════════════════════════════════════════════════════════
+## CẬP NHẬT v105-v106 (Auto-retry file OCR lỗi)
+═══════════════════════════════════════════════════════════
+
+### v105 - Theo dõi + tự động quét lại file OCR lỗi (localStorage bền vững)
+- YÊU CẦU: tự lưu file chưa OCR được + tự động quét lại
+- Storage: localStorage key 'evn_ocr_failed_v105' = [{path,name,size,reason,tries,lastTry}]
+- Helpers (window scope, cùng scope _ocrOne/_mapRec, chèn trước "FIX PER-FILE OCR"):
+  - _v105GetFailed/_v105SaveFailed/_v105AddFailed/_v105RemoveFailed/_v105ClearFailed
+  - _v105UpdateBadge: cập nhật text+hiện/ẩn nút theo số file lỗi
+  - _v105RetryAll: retry tối đa 5 vòng (_V105_MAX_ROUNDS), throttle 4s/file, dùng fallback v104
+    - File OK -> _v105RemoveFailed (rời danh sách); file lỗi -> giữ lại vòng sau
+    - Hết file -> "🎉 Hoàn tất"; sau 5 vòng vẫn lỗi -> "N file vẫn lỗi, có thể file hỏng"
+- HOOK vào V66 bulk + V68 selected (cùng pattern, mỗi hook 2 chỗ):
+  - catch fail -> _v105AddFailed(f.path,f.name,f.size,label)
+  - insert OK -> _v105RemoveFailed(f.path)
+- Nút "🔄 Quét lại N file lỗi" (id v105RetryBtn): chỉ hiện khi có file lỗi
+- Commit e856e10
+
+### v106 - Fix nút v105 bám nhầm topbar
+- BUG: có 2 nút "OCR tất cả PDF" (V58 line 15493 hiện + V60 line 15659 ẩn ở top=-142)
+  - v105 inject bám nút V60 (ẩn) -> user KHÔNG thấy nút
+- FIX: _v106EnsureRetryBtn() chạy mỗi 2s -> tìm nút "OCR tất cả PDF" DANG HIEN (width>0)
+  - Gỡ nút v105 bám sai -> đặt lại ngay cạnh nút OCR visible (insertBefore nextSibling)
+  - Tự bám đúng kể cả màn hình render lại
+- Commit 943da16
+
+### Tech Lesson
+- Nút inject phải bám element ĐANG HIỂN THỊ (getBoundingClientRect width>0), không chỉ tồn tại trong DOM
+- localStorage mất khi hard reset XÓA site data; reset chỉ unregister SW + xóa cache thì localStorage còn
+- Khi có nhiều bản nút trùng (V58/V60), inject động theo visible robust hơn bám 1 nút cố định
+
+### Commit v105-v106
+- e856e10 v105 (auto-retry file loi + localStorage)
+- 943da16 v106 (nut bam dung nut OCR visible)
