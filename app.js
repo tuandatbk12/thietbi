@@ -17072,6 +17072,35 @@ async function _authedFetch(url, options) {
   };
   console.log('[V105] OCR failed-retry tracker loaded');
 
+  // ═══ V106: dam bao nut Quet lai bam canh nut "OCR tat ca PDF" DANG HIEN (visible) ═══
+  window._v106EnsureRetryBtn = function() {
+    // Tim nut "OCR tat ca PDF" dang hien that su (width > 0)
+    const ocrBtns = [...document.querySelectorAll('button')].filter(b => {
+      if (!(b.innerHTML || '').includes('OCR tất cả PDF')) return false;
+      const r = b.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    });
+    if (!ocrBtns.length) return; // chua co nut OCR visible -> chua o man hinh BBTN
+    const ocrBtn = ocrBtns[0];
+    // Neu nut v105 chua ton tai HOAC khong cung parent voi nut OCR visible -> tao/di chuyen
+    let btn = document.getElementById('v105RetryBtn');
+    const needMove = !btn || btn.parentElement !== ocrBtn.parentElement;
+    if (needMove) {
+      if (btn) btn.remove(); // xoa ban cu (bam sai cho)
+      btn = document.createElement('button');
+      btn.id = 'v105RetryBtn';
+      btn.style.cssText = 'padding:8px 16px;border-radius:7px;border:1px solid rgba(0,200,255,.5);background:linear-gradient(135deg,#00c8ff,#0080cc);color:#fff;font-weight:700;cursor:pointer;font-size:11.5px;margin-right:8px;display:none;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(0,200,255,.25)';
+      btn.title = 'Quet lai cac file OCR loi tu lan truoc (luu ben vung)';
+      btn.onclick = function() { if (window._v105RetryAll) window._v105RetryAll(); };
+      // Chen ngay SAU nut OCR tat ca PDF
+      ocrBtn.parentElement.insertBefore(btn, ocrBtn.nextSibling);
+    }
+    if (window._v105UpdateBadge) window._v105UpdateBadge();
+  };
+  // Chay dinh ky de bam dung nut OCR visible (man hinh BBTN co the render lai)
+  setInterval(function(){ try { window._v106EnsureRetryBtn(); } catch(e){} }, 2000);
+  setTimeout(function(){ try { window._v106EnsureRetryBtn(); } catch(e){} }, 1000);
+
   // ── FIX PER-FILE OCR (override v57) ──
   window._bbtnOcrFromNas = async function(nasPath, fileName, sizeBytes) {
     if (!nasPath) { (window._friendlyAlert||alert)('Không có đường dẫn file'); return; }
