@@ -25,3 +25,8 @@ fix-*.sh
 apply-*.sh
 quick-win-*.sh
 NODEEOF
+bundle-*/
+bundle-*.tar.gz
+*.bak
+*.before-v*.bak
+**/.temp/
