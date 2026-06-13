@@ -5413,7 +5413,7 @@ async function loadStatsFromSupabase() {
   let cacheValid = true;
   if (cached?.rows?.length) {
     try {
-      const sbCheck = window.supabase.createClient(_SB_URL, _SB_KEY);
+      const sbCheck = (typeof _getAuthSb==='function'&&_getAuthSb())||window.supabase.createClient(_SB_URL,_SB_KEY); // V109 dung chung singleton, ne deadlock
       const { count } = await sbCheck.from('TongHopThietBi').select('*', { count: 'exact', head: true });
       serverCount = count;
       const cachedCount = cached.meta?.count || cached.rows.length;
@@ -5449,7 +5449,7 @@ async function loadStatsFromSupabase() {
   }
   try {
     // Dùng cách tải của app.js: supabaseClient tạo 1 lần, vòng while đơn giản
-    const supabaseClient = window.supabase.createClient(_SB_URL, _SB_KEY);
+    const supabaseClient = (typeof _getAuthSb==='function'&&_getAuthSb())||window.supabase.createClient(_SB_URL,_SB_KEY); // V109 dung chung singleton
     const TABLE_NAME = 'TongHopThietBi';
     const batchSize  = 1000;
 
@@ -6794,7 +6794,7 @@ function _tnAlertBadge(row) {
 
 // ── DATA FETCH ────────────────────────────────────────────────
 async function _tnFetchData() {
-  const sb = window.supabase ? window.supabase.createClient(_TN_SB_URL, _TN_SB_KEY) : null;
+  const sb = (typeof _getAuthSb==='function'&&_getAuthSb()) || (window.supabase ? window.supabase.createClient(_TN_SB_URL, _TN_SB_KEY) : null); // V109 dung chung singleton
   if (!sb) return [];
 
   // ── Cache + row count check triệt để ──
@@ -8070,7 +8070,7 @@ const _AUTH_SB_URL='https://xqqmfmljwycpehfyknoy.supabase.co';
 const _AUTH_SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxcW1mbWxqd3ljcGVoZnlrbm95Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODM4MDQsImV4cCI6MjA4Nzg1OTgwNH0.J_z0cFqq_Yet-n2X2L_VREdkcAqbkRFpYUp-ti3Fukc';
 const _AUTH_LOG_KEY='evn_audit_log_v1';
 let _authSb=null;
-function _getAuthSb(){if(!_authSb&&window.supabase&&window.supabase.createClient)_authSb=window.supabase.createClient(_AUTH_SB_URL,_AUTH_SB_KEY);return _authSb;}
+function _getAuthSb(){if(!_authSb&&window.supabase&&window.supabase.createClient)_authSb=window.supabase.createClient(_AUTH_SB_URL,_AUTH_SB_KEY,{auth:{lock:async(name,acquireTimeout,fn)=>await fn(),storageKey:'sb-xqqmfmljwycpehfyknoy-auth-token'}});return _authSb;}
 // Khởi tạo _sbClient NGAY khi script load (không đợi DOMContentLoaded/login)
 // → các module Asset / TNĐK / Update Requests luôn có _sbClient sẵn sàng
 try { window._sbClient = _getAuthSb(); } catch(e) { console.warn('_sbClient init failed:', e); }
