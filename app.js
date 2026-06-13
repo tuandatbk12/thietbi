@@ -13059,6 +13059,22 @@ async function _authedFetch(url, options) {
   // RENDER PAGE
   // ────────────────────────────────────────────────────────────
   async function _bbtnMgmtRenderPage() {
+    // V108: vao muc Quan ly BBTN OCR -> dam bao nut "Quet lai file loi" + nhac neu co loi
+    setTimeout(function() {
+      try {
+        if (window._v106EnsureRetryBtn) window._v106EnsureRetryBtn();
+        if (!window._v107Prompted && window._v105GetFailed && window._v105GetFailed().length > 0) {
+          window._v107Prompted = true;
+          setTimeout(async function() {
+            const n = window._v105GetFailed().length;
+            if (n > 0 && window._v100Confirm) {
+              const ok = await window._v100Confirm('Co ' + n + ' file OCR loi tu lan truoc chua quet duoc.\nQuet lai ngay bay gio?', 'File loi can quet lai');
+              if (ok && window._v105RetryAll) window._v105RetryAll();
+            }
+          }, 800);
+        }
+      } catch(e) { console.warn('[V108]', e); }
+    }, 500);
     const ov = document.getElementById('tbPageOverlay');
     if (!ov) return;
     ov.style.display = 'block';
@@ -17096,21 +17112,10 @@ async function _authedFetch(url, options) {
       ocrBtn.parentElement.insertBefore(btn, ocrBtn.nextSibling);
     }
     if (window._v105UpdateBadge) window._v105UpdateBadge();
-    // V107b: nhac quet lai 1 lan/phien khi co file loi (sau khi vao man hinh BBTN)
-    if (!window._v107Prompted && window._v105GetFailed && window._v105GetFailed().length > 0) {
-      window._v107Prompted = true;
-      setTimeout(async function() {
-        const n = window._v105GetFailed().length;
-        if (n > 0 && window._v100Confirm) {
-          const ok = await window._v100Confirm('Co ' + n + ' file OCR loi tu lan truoc chua quet duoc.\nQuet lai ngay bay gio?', 'File loi can quet lai');
-          if (ok && window._v105RetryAll) window._v105RetryAll();
-        }
-      }, 1500);
-    }
   };
-  // Chay dinh ky de bam dung nut OCR visible (man hinh BBTN co the render lai)
-  setInterval(function(){ try { window._v106EnsureRetryBtn(); } catch(e){} }, 2000);
-  setTimeout(function(){ try { window._v106EnsureRetryBtn(); } catch(e){} }, 1000);
+  // V108: KHONG chay toan cuc nua (truoc day setInterval 2s bat popup o moi man hinh ke ca dashboard
+  // -> OCR ngam + dashboard roi). Gio chi goi _v106EnsureRetryBtn khi vao muc Quan ly BBTN OCR.
+  // Popup nhac quet lai cung chuyen vao do (xem hook _bbtnMgmtRenderPage).
 
   // ── FIX PER-FILE OCR (override v57) ──
   window._bbtnOcrFromNas = async function(nasPath, fileName, sizeBytes) {
