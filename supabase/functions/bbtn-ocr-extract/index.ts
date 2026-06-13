@@ -441,6 +441,7 @@ serve(async (req: Request) => {
 
       // Force null tiet_dien for non-Cáp
       if (item.loai_thiet_bi !== "Cáp") item.tiet_dien = null;
+      if (item.loai_thiet_bi === "D\u1ea7u") { item.kieu = null; item.so_che_tao = null; item.hang_san_xuat = null; } // V107 Dau khong co kieu/serial/hang
 
       return item;
     });
